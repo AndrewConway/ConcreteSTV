@@ -53,6 +53,7 @@ pub struct DataSource {
 
 impl ElectionMetadata {
     pub fn party(&self,index:PartyIndex) -> &Party { &self.parties[index.0] }
+    pub fn candidate(&self,index:CandidateIndex) -> &Candidate { &self.candidates[index.0] }
 }
 
 /// Which election it was.

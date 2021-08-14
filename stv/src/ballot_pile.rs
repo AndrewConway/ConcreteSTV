@@ -16,7 +16,7 @@ use std::hash::Hash;
 /// A number representing a count of pieces of paper.
 /// This is distinct from votes which may be fractional in the presence of weights.
 #[derive(Copy,Clone,Eq, PartialEq,Debug,Serialize,Deserialize)]
-pub struct BallotPaperCount(usize);
+pub struct BallotPaperCount(pub usize);
 
 impl AddAssign for BallotPaperCount {
     fn add_assign(&mut self, rhs: Self) { self.0+=rhs.0; }
@@ -46,8 +46,8 @@ impl<'a>  PartiallyDistributedVote<'a> {
     }
     pub fn exhausted(&self) -> bool { self.upto==self.prefs.len() }
     pub fn candidate(&self) -> CandidateIndex { self.prefs[self.upto] }
-    pub fn next(&self,continuing:HashSet<CandidateIndex>) -> Option<Self> {
-        for i in self.upto+1 .. self.prefs.len() {
+    pub fn next(&self,continuing:&HashSet<CandidateIndex>) -> Option<Self> {
+        for i in self.upto .. self.prefs.len() {
             if continuing.contains(&self.prefs[i]) {
                 return Some(PartiallyDistributedVote{upto:i,n:self.n,prefs:self.prefs,source:self.source})
             }
@@ -62,7 +62,7 @@ impl<'a>  PartiallyDistributedVote<'a> {
         }
     }
 }
-
+#[derive(Clone)]
 pub struct PileProvenance<Tally> {
     pub counts_comes_from : HashSet<CountIndex>,
     pub when_tv_created:Option<CountIndex>, // if there is a unique time the TV was created, hold it.
@@ -80,6 +80,7 @@ impl <Tally:AddAssign> PileProvenance<Tally> {
 
 /// A pile of votes with the same transfer value, and whatever provenence matters.
 /// In a physical count, this would typically be a single pile. Except it might get too high. A metaphorical single pile.
+#[derive(Clone)]
 pub struct VotesWithSameTransferValue<'a> {
     pub votes : Vec<PartiallyDistributedVote<'a>>,
     pub num_ballots : BallotPaperCount,
@@ -112,9 +113,29 @@ impl <'a> VotesWithSameTransferValue<'a> {
     }
 }
 
+/// Votes distributed amongst continuing candidates.
+pub struct DistributedVotes<'a> {
+    pub(crate) by_candidate : Vec<VotesWithSameTransferValue<'a>>,
+    pub(crate) exhausted : BallotPaperCount,
+}
+
+impl <'a> DistributedVotes<'a> {
+    pub fn distribute(votes:&Vec<PartiallyDistributedVote<'a>>,continuing_candidates:&HashSet<CandidateIndex>,num_candidates:usize) -> Self {
+        let mut by_candidate = vec![VotesWithSameTransferValue::default();num_candidates];
+        let mut exhausted = BallotPaperCount(0);
+        for vote in votes {
+            if let Some(next) = vote.next(continuing_candidates) {
+                by_candidate[next.candidate().0].add_vote(next);
+            } else { exhausted+=vote.n }
+        }
+        DistributedVotes{by_candidate,exhausted}
+    }
+}
+
+
 /// Different jurisdictions split up parcels of shares by their provenence in different ways. This abstracts that.
 pub trait HowSplitByCountNumber {
-    type KeyToDivide : Eq+Hash;
+    type KeyToDivide : Eq+Hash+Clone;
     fn key(count_index:CountIndex,when_tv_created:Option<CountIndex>) -> Self::KeyToDivide;
 }
 
@@ -154,12 +175,60 @@ pub struct VotesWithMultipleTransferValues<'a,S:HowSplitByCountNumber,Tally> {
 
 }
 
+impl <'a,S:HowSplitByCountNumber,Tally> Default for VotesWithMultipleTransferValues<'a,S,Tally> {
+    fn default() -> Self {
+        VotesWithMultipleTransferValues{ by_provenance: HashMap::default() }
+    }
+}
+
 impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero> VotesWithMultipleTransferValues<'a,S,Tally> {
-    pub fn add(&'a mut self,votes:VotesWithSameTransferValue<'a>,transfer_value:TransferValue,count_index:CountIndex,when_tv_created:Option<CountIndex>,tally:Tally) {
+    pub fn add(& mut self,votes:&'_ VotesWithSameTransferValue<'a>,transfer_value:TransferValue,count_index:CountIndex,when_tv_created:Option<CountIndex>,tally:Tally) {
         let key = (S::key(count_index,when_tv_created),transfer_value.clone());
         let entry = self.by_provenance.entry(key).or_insert_with(||
             (PileProvenance{ counts_comes_from: Default::default(),when_tv_created,tally:Tally::zero()}, VotesWithSameTransferValue::default()));
         entry.0.add(count_index,when_tv_created,tally);
         entry.1.add(&votes.votes)
+    }
+
+    pub fn get_all_provenance_keys(&self) -> Vec<(S::KeyToDivide,TransferValue)> {
+        let mut res: Vec<(S::KeyToDivide,TransferValue)> = vec![];
+        for x in self.by_provenance.keys() {
+            res.push((*x).clone());
+        }
+        res
+    }
+
+    pub fn num_ballots(&self) -> BallotPaperCount {
+        let mut res = BallotPaperCount(0);
+        for (_,votes) in self.by_provenance.values() {
+            res+=votes.num_ballots;
+        }
+        res
+    }
+    pub fn num_atl_ballots(&self) -> BallotPaperCount {
+        let mut res = BallotPaperCount(0);
+        for (_,votes) in self.by_provenance.values() {
+            res+=votes.num_atl_ballots;
+        }
+        res
+    }
+
+
+    /// Extracts all the ballots, adding all together, ignoring everything but pieces of paper.
+    /// Clears this object.
+    pub fn extract_all_ballots_ignoring_transfer_value(&'_ mut self) -> VotesWithSameTransferValue<'a> {
+        let mut sum : Option<VotesWithSameTransferValue> = None;
+        for (_,(_,votes)) in self.by_provenance.drain() {
+            match &mut sum {
+                None => { sum=Some(votes) }
+                Some(accum) => accum.add(&votes.votes),
+            }
+        }
+        sum.unwrap_or_else(||VotesWithSameTransferValue::default())
+    }
+
+    /// Extracts all the ballots with a given provenance from this key.
+    pub fn extract_all_ballots_with_given_provenance(&'_ mut self, key:&'_ (S::KeyToDivide,TransferValue)) -> Option<(PileProvenance<Tally>, VotesWithSameTransferValue<'a>)> {
+        self.by_provenance.remove(key)
     }
 }
