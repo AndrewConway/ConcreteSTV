@@ -1,5 +1,5 @@
 use stv::preference_distribution::PreferenceDistributionRules;
-use stv::ballot_pile::BallotPaperCount;
+use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber};
 use stv::transfer_value::{TransferValue, LostToRounding};
 
 pub mod parse;
@@ -7,7 +7,10 @@ pub mod parse;
 pub struct FederalRules {
 }
 
-impl PreferenceDistributionRules<usize> for FederalRules {
+impl PreferenceDistributionRules for FederalRules {
+    type Tally = usize;
+    type SplitByNumber = DoNotSplitByCountNumber;
+
     fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus,ballots)
     }

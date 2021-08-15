@@ -2,32 +2,36 @@
 //! Unlike IRV, there are many ambiguities in the conceptual description of STV, so parameterized
 
 
-use num::Num;
+use num::{Zero};
 use crate::election_data::ElectionData;
 use crate::ballot_pile::{VotesWithMultipleTransferValues, HowSplitByCountNumber, PartiallyDistributedVote, BallotPaperCount, DistributedVotes, VotesWithSameTransferValue};
 use std::collections::{HashSet, VecDeque};
 use crate::ballot_metadata::CandidateIndex;
 use crate::history::CountIndex;
 use crate::transfer_value::{TransferValue, LostToRounding};
-use std::ops::{AddAssign, Neg, SubAssign};
+use std::ops::{AddAssign, Neg, SubAssign, Sub};
 use std::fmt::Display;
 
-pub trait PreferenceDistributionRules<Tally> {
-    fn make_transfer_value(surplus:Tally,ballots:BallotPaperCount) -> TransferValue;
-    fn use_transfer_value(transfer_value:&TransferValue,ballots:BallotPaperCount) -> (Tally,LostToRounding);
+pub trait PreferenceDistributionRules {
+    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+Ord+Sub<Output=Self::Tally>+Zero;
+    type SplitByNumber : HowSplitByCountNumber;
+    fn make_transfer_value(surplus:Self::Tally,ballots:BallotPaperCount) -> TransferValue;
+    fn use_transfer_value(transfer_value:&TransferValue,ballots:BallotPaperCount) -> (Self::Tally,LostToRounding);
+
+
 }
 
 /// The main workhorse class that does preference distribution.
-pub struct PreferenceDistributor<'a,S:HowSplitByCountNumber,Tally:Num> {
+pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     data : &'a ElectionData,
     original_votes:&'a Vec<PartiallyDistributedVote<'a>>,
     num_candidates : usize,
     candidates_to_be_elected : usize,
-    quota : Tally,
+    quota : Rules::Tally,
     /// The tally, by candidate.
-    tallys : Vec<Tally>,
+    tallys : Vec<Rules::Tally>,
     /// the papers that a particular candidate currently has.
-    papers : Vec<VotesWithMultipleTransferValues<'a,S,Tally>>,
+    papers : Vec<VotesWithMultipleTransferValues<'a,Rules::SplitByNumber,Rules::Tally>>,
     continuing_candidates : HashSet<CandidateIndex>,
     continuing_candidates_sorted_by_tally : Vec<CandidateIndex>,
     exhausted : BallotPaperCount,
@@ -36,13 +40,13 @@ pub struct PreferenceDistributor<'a,S:HowSplitByCountNumber,Tally:Num> {
     elected_candidates : Vec<CandidateIndex>,
 }
 
-impl <'a,S:HowSplitByCountNumber,Tally:Num+Clone+AddAssign+SubAssign+From<usize>+Display+Ord> PreferenceDistributor<'a,S,Tally>
+impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 {
     pub fn new(data : &'a ElectionData,original_votes:&'a Vec<PartiallyDistributedVote<'a>>,candidates_to_be_elected : usize,excluded_candidates:&HashSet<CandidateIndex>) -> Self {
         let num_candidates = data.metadata.candidates.len();
-        let tallys = vec![Tally::zero();num_candidates];
+        let tallys = vec![Rules::Tally::zero();num_candidates];
         let mut papers = vec![];
-        for _ in 0..num_candidates { papers.push(VotesWithMultipleTransferValues::<'a,S,Tally>::default()); }
+        for _ in 0..num_candidates { papers.push(VotesWithMultipleTransferValues::<'a,Rules::SplitByNumber,Rules::Tally>::default()); }
         let mut continuing_candidates : HashSet<CandidateIndex> = HashSet::default();
         let mut continuing_candidates_sorted_by_tally = vec![];
         for i in 0..num_candidates {
@@ -56,7 +60,7 @@ impl <'a,S:HowSplitByCountNumber,Tally:Num+Clone+AddAssign+SubAssign+From<usize>
             original_votes,
             num_candidates,
             candidates_to_be_elected,
-            quota : Tally::zero(), // dummy until computed.
+            quota : Rules::Tally::zero(), // dummy until computed.
             tallys,
             papers,
             continuing_candidates,
@@ -73,7 +77,7 @@ impl <'a,S:HowSplitByCountNumber,Tally:Num+Clone+AddAssign+SubAssign+From<usize>
         let mut total_first_preferences : BallotPaperCount = BallotPaperCount(0);
         for i in 0..self.num_candidates {
             let votes = &distributed.by_candidate[i];
-            let tally = Tally::from(votes.num_ballots.0);
+            let tally = Rules::Tally::from(votes.num_ballots.0);
             total_first_preferences+=votes.num_ballots;
             self.tallys[i]+=tally.clone();
             self.papers[i].add(votes, TransferValue::one(), self.current_count, Some(self.current_count), tally);
@@ -91,11 +95,11 @@ impl <'a,S:HowSplitByCountNumber,Tally:Num+Clone+AddAssign+SubAssign+From<usize>
 
     /// quota = round_down(first_preferences/(1+num_to_elect))+1
     pub fn compute_quota(&mut self,total_first_preferences:BallotPaperCount) {
-        self.quota = Tally::from(total_first_preferences.0/(1+self.candidates_to_be_elected)+1);
+        self.quota = Rules::Tally::from(total_first_preferences.0/(1+self.candidates_to_be_elected)+1);
         println!("Quota = {}",self.quota);
     }
 
-    pub fn tally(&self,candidate:CandidateIndex) -> Tally { self.tallys[candidate.0].clone() }
+    pub fn tally(&self,candidate:CandidateIndex) -> Rules::Tally { self.tallys[candidate.0].clone() }
 
     // declare that a candidate is no longer continuing.
     fn no_longer_continuing(&mut self,candidate:CandidateIndex) {
@@ -184,15 +188,15 @@ impl <'a,S:HowSplitByCountNumber,Tally:Num+Clone+AddAssign+SubAssign+From<usize>
     /// > added to the number of first preference votes of the
     /// > continuing candidate and all those ballot papers shall be
     /// > transferred to the continuing candidate;
-    pub fn distribute_surplus_all_with_same_transfer_value<Rules:PreferenceDistributionRules<Tally>>(&mut self,candidate_to_distribute:CandidateIndex) {
-        let surplus : Tally = self.tally(candidate_to_distribute)-self.quota.clone();
+    pub fn distribute_surplus_all_with_same_transfer_value(&mut self,candidate_to_distribute:CandidateIndex) {
+        let surplus: Rules::Tally  = self.tally(candidate_to_distribute)-self.quota.clone();
         self.tallys[candidate_to_distribute.0]=self.quota.clone();
         let ballots : VotesWithSameTransferValue<'a> = self.papers[candidate_to_distribute.0].extract_all_ballots_ignoring_transfer_value();
         let transfer_value : TransferValue = Rules::make_transfer_value(surplus,ballots.num_ballots);
-        self.parcel_out_votes_with_give_transfer_value::<Rules>(transfer_value,ballots,Some(self.current_count));
+        self.parcel_out_votes_with_give_transfer_value(transfer_value,ballots,Some(self.current_count));
     }
 
-    pub fn parcel_out_votes_with_give_transfer_value<Rules:PreferenceDistributionRules<Tally>>(&mut self,transfer_value:TransferValue,ballots:VotesWithSameTransferValue<'a>,when_tv_created:Option<CountIndex>) {
+    pub fn parcel_out_votes_with_give_transfer_value(&mut self,transfer_value:TransferValue,ballots:VotesWithSameTransferValue<'a>,when_tv_created:Option<CountIndex>) {
         let distributed = DistributedVotes::distribute(&ballots.votes,&self.continuing_candidates,self.num_candidates);
         for (candidate_index,candidate_ballots) in distributed.by_candidate.into_iter().enumerate() {
             if candidate_ballots.num_ballots.0>0 {
@@ -203,9 +207,9 @@ impl <'a,S:HowSplitByCountNumber,Tally:Num+Clone+AddAssign+SubAssign+From<usize>
         }
     }
 
-    pub fn distribute_surplus<Rules:PreferenceDistributionRules<Tally>>(&mut self,candidate_to_distribute:CandidateIndex) {
+    pub fn distribute_surplus(&mut self,candidate_to_distribute:CandidateIndex) {
         println!("Distributing surplus for {}",self.data.metadata.candidate(candidate_to_distribute).name);
-        self.distribute_surplus_all_with_same_transfer_value::<Rules>(candidate_to_distribute);
+        self.distribute_surplus_all_with_same_transfer_value(candidate_to_distribute);
         self.end_of_count_step();
     }
 
@@ -250,8 +254,8 @@ impl <'a,S:HowSplitByCountNumber,Tally:Num+Clone+AddAssign+SubAssign+From<usize>
     /// > candidate;
     /// > (iii) all those ballot papers must be transferred to the
     /// > continuing candidate.
-    pub fn eliminate<Rules:PreferenceDistributionRules<Tally>>(&mut self,candidates_to_eliminate:Vec<CandidateIndex>) {
-        let mut provenances : HashSet<(S::KeyToDivide,TransferValue)> = HashSet::default();
+    pub fn eliminate(&mut self,candidates_to_eliminate:Vec<CandidateIndex>) {
+        let mut provenances : HashSet<(<Rules::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,TransferValue)> = HashSet::default();
         for &candidate in &candidates_to_eliminate {
             println!("Excluding {}",self.data.metadata.candidate(candidate).name);
             self.no_longer_continuing(candidate);
@@ -260,7 +264,7 @@ impl <'a,S:HowSplitByCountNumber,Tally:Num+Clone+AddAssign+SubAssign+From<usize>
             }
         }
         // TODO check for interrupt at this point.
-        let mut provenances : Vec<(S::KeyToDivide,TransferValue)> = provenances.into_iter().collect();
+        let mut provenances : Vec<(<Rules::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,TransferValue)> = provenances.into_iter().collect();
         // TODO sort by S::KeyToDivide
         provenances.sort_by_key(|f|f.1.0.clone().neg()); // stable sort, will preserve ordering of other key stull
         for key in provenances {
@@ -273,33 +277,33 @@ impl <'a,S:HowSplitByCountNumber,Tally:Num+Clone+AddAssign+SubAssign+From<usize>
                     else { all_votes.add(&votes.votes) }
                 }
             }
-            self.parcel_out_votes_with_give_transfer_value::<Rules>(key.1,all_votes,None); // TODO do better with when_tv_created
+            self.parcel_out_votes_with_give_transfer_value(key.1,all_votes,None); // TODO do better with when_tv_created
             self.end_of_count_step();
         }
     }
 
 
-    pub fn distribute_lowest<Rules:PreferenceDistributionRules<Tally>>(&mut self) {
+    pub fn distribute_lowest(&mut self) {
         // TODO do the absurd Federal 13(A) multiple elimination
         let candidates_to_remove = self.get_lowest_candidate();
-        self.eliminate::<Rules>(candidates_to_remove);
+        self.eliminate(candidates_to_remove);
     }
-    pub fn go<Rules:PreferenceDistributionRules<Tally>>(&mut self) {
+    pub fn go(&mut self) {
         self.print_candidates_names();
         self.distribute_first_preferences();
         while self.remaining_to_elect()>0 {
             if let Some(candidate) = self.pending_surplus_distribution.pop_front() {
-                self.distribute_surplus::<Rules>(candidate);
+                self.distribute_surplus(candidate);
             } else {
-                self.distribute_lowest::<Rules>();
+                self.distribute_lowest();
             }
         }
     }
 }
 
-pub fn distribute_preferences<S:HowSplitByCountNumber,Tally:Num+Clone+AddAssign+SubAssign+From<usize>+Display+Ord,Rules:PreferenceDistributionRules<Tally>>(data:&ElectionData,candidates_to_be_elected : usize,excluded_candidates:&HashSet<CandidateIndex>) {
+pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : usize,excluded_candidates:&HashSet<CandidateIndex>) {
     let arena = typed_arena::Arena::<CandidateIndex>::new();
     let votes = data.resolve_atl(&arena);
-    let mut work : PreferenceDistributor<'_, S, Tally> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates);
-    work.go::<Rules>();
+    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates);
+    work.go();
 }
