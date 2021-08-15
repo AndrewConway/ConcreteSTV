@@ -1,6 +1,8 @@
 use crate::ballot_metadata::{ElectionMetadata, CandidateIndex};
 use crate::ballot_paper::{ATL, BTL, VoteSource};
 use crate::ballot_pile::{PartiallyDistributedVote};
+use std::fs::File;
+use serde::{Deserialize,Serialize};
 
 /*
 /// Complete list of raw ballot markings.
@@ -10,6 +12,7 @@ pub struct RawElectionData {
 }*/
 
 /// Formal votes for the election.
+#[derive(Debug,Serialize,Deserialize,Clone)]
 pub struct ElectionData {
     pub metadata : ElectionMetadata,
     pub atl : Vec<ATL>,
@@ -55,5 +58,13 @@ impl ElectionData {
         println!("{} formal votes, {} informal",self.num_votes(),self.informal);
         println!("{} ATL formal votes, {} unique preference lists",self.num_atl(),self.atl.len());
         println!("{} BTL formal votes, {} unique preference lists",self.num_btl(),self.btl.len());
+    }
+
+    pub fn save_to_cache(&self) -> std::io::Result<()> {
+        let name = self.metadata.name.cache_file_name();
+        std::fs::create_dir_all(name.parent().unwrap())?;
+        let file = File::create(name)?;
+        serde_json::to_writer(file,&self)?;
+        Ok(())
     }
 }

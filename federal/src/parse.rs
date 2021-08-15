@@ -70,6 +70,17 @@ impl FederalDataLoader {
         })
     }
 
+    pub fn load_cached_data(&self,state:&str) -> anyhow::Result<ElectionData> {
+        match self.name(state).load_cached_data() {
+            Ok(data) => Ok(data),
+            Err(_) => {
+                let data = self.read_raw_data(state)?;
+                data.save_to_cache()?;
+                Ok(data)
+            }
+        }
+    }
+
     // This below should be made more general and most of it factored out into a separate function.
     pub fn read_raw_data(&self,state:&str) -> anyhow::Result<ElectionData> {
         let mut metadata = self.read_raw_metadata(state)?;

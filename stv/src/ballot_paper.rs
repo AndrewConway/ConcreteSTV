@@ -2,6 +2,7 @@
 //! This may or may not be formal.
 
 use crate::ballot_metadata::{CandidateIndex, PartyIndex};
+use serde::{Deserialize,Serialize};
 
 /// A marking on a particular square in a ballot. This may or may not be a number.
 #[derive(Copy,Clone,Debug,Eq, PartialEq)]
@@ -47,7 +48,7 @@ pub enum VoteSource<'a> {
 }
 
 /// Below the line vote.
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct BTL {
     /// Candidate ids, in preference order
     pub candidates : Vec<CandidateIndex>,
@@ -56,7 +57,7 @@ pub struct BTL {
 }
 
 /// Above the line vote, usually for multiple parties.
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct ATL {
     /// Party ids, in preference order
     pub parties : Vec<PartyIndex>,

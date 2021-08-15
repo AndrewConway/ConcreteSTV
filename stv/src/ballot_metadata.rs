@@ -2,6 +2,9 @@
 
 use serde::{Serialize,Deserialize};
 use std::fmt;
+use std::path::PathBuf;
+use crate::election_data::ElectionData;
+use std::fs::File;
 
 /// a candidate, referred to by position on the ballot paper, 0 being first
 #[derive(Clone, Copy, PartialEq, Eq, Hash,Serialize,Deserialize)]
@@ -74,6 +77,17 @@ pub struct ElectionName {
 impl ElectionName {
     pub fn human_readable_name(&self) -> String {
         format!("{} {} election for {}.{}",self.year,self.name,self.electorate,self.modifications.join(" & "))
+    }
+
+    pub fn cache_file_name(&self) -> PathBuf {
+        let path = PathBuf::from("Cache");
+        path.join(&self.name).join(&self.year).join(self.electorate.clone()+&self.modifications.join(",")+".stv")
+    }
+
+    pub fn load_cached_data(&self) -> std::io::Result<ElectionData> {
+        let name = self.cache_file_name();
+        let file = File::open(name)?;
+        Ok(serde_json::from_reader(file)?)
     }
 }
 

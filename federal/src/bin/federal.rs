@@ -9,7 +9,8 @@ fn main()  -> anyhow::Result<()> {
     let loader = get_federal_data_loader_2016();
     //let metadata = loader.read_raw_metadata("ACT")?;
     //println!("{:#?}",metadata);
-    let data = loader.read_raw_data("ACT")?;
+    let data = loader.load_cached_data("ACT")?;
+    data.save_to_cache()?;
     data.print_summary();
     let transcript = distribute_preferences::<FederalRules>(&data,2,&HashSet::default());
     let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
