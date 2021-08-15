@@ -8,10 +8,12 @@ use std::collections::{HashSet, HashMap};
 use crate::history::CountIndex;
 use crate::transfer_value::TransferValue;
 use num::{Zero};
-use std::ops::AddAssign;
+use std::ops::{AddAssign, Sub, Add};
 use serde::Deserialize;
 use serde::Serialize;
 use std::hash::Hash;
+use crate::distribution_of_preferences_transcript::PortionOfReasonBeingDoneThisCount;
+use crate::util::{DetectUnique, CollectAll};
 
 /// A number representing a count of pieces of paper.
 /// This is distinct from votes which may be fractional in the presence of weights.
@@ -20,6 +22,16 @@ pub struct BallotPaperCount(pub usize);
 
 impl AddAssign for BallotPaperCount {
     fn add_assign(&mut self, rhs: Self) { self.0+=rhs.0; }
+}
+
+impl Sub for BallotPaperCount {
+    type Output = BallotPaperCount;
+    fn sub(self, rhs: Self) -> Self::Output { BallotPaperCount(self.0-rhs.0) }
+}
+
+impl Add for BallotPaperCount {
+    type Output = BallotPaperCount;
+    fn add(self, rhs: Self) -> Self::Output { BallotPaperCount(self.0+rhs.0) }
 }
 
 /// A vote, resolved into BTL, that is somewhere through being distributed.
@@ -117,18 +129,20 @@ impl <'a> VotesWithSameTransferValue<'a> {
 pub struct DistributedVotes<'a> {
     pub(crate) by_candidate : Vec<VotesWithSameTransferValue<'a>>,
     pub(crate) exhausted : BallotPaperCount,
+    pub(crate) exhausted_atl : BallotPaperCount,
 }
 
 impl <'a> DistributedVotes<'a> {
     pub fn distribute(votes:&Vec<PartiallyDistributedVote<'a>>,continuing_candidates:&HashSet<CandidateIndex>,num_candidates:usize) -> Self {
         let mut by_candidate = vec![VotesWithSameTransferValue::default();num_candidates];
         let mut exhausted = BallotPaperCount(0);
+        let mut exhausted_atl = BallotPaperCount(0);
         for vote in votes {
             if let Some(next) = vote.next(continuing_candidates) {
                 by_candidate[next.candidate().0].add_vote(next);
-            } else { exhausted+=vote.n }
+            } else { exhausted+=vote.n; if vote.is_atl() { exhausted_atl+=vote.n; } }
         }
-        DistributedVotes{by_candidate,exhausted}
+        DistributedVotes{by_candidate,exhausted,exhausted_atl}
     }
 }
 
@@ -163,8 +177,6 @@ impl HowSplitByCountNumber for SplitByWhenTransferValueWasCreated {
     type KeyToDivide = CountIndex;
     fn key(_count_index: CountIndex, when_tv_created: Option<CountIndex>) -> Self::KeyToDivide { when_tv_created.unwrap() }
 }
-
-
 
 
 /// A set of votes potentially with multiple transfer values or sources.
@@ -216,15 +228,27 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero> VotesWithMultipleTransfer
 
     /// Extracts all the ballots, adding all together, ignoring everything but pieces of paper.
     /// Clears this object.
-    pub fn extract_all_ballots_ignoring_transfer_value(&'_ mut self) -> VotesWithSameTransferValue<'a> {
+    pub fn extract_all_ballots_ignoring_transfer_value(&'_ mut self) -> (VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount) {
         let mut sum : Option<VotesWithSameTransferValue> = None;
-        for (_,(_,votes)) in self.by_provenance.drain() {
+        let mut papers_came_from_counts = CollectAll::<CountIndex>::default();
+        let mut transfer_value = DetectUnique::<TransferValue>::default();
+        let mut tv_came_from_count = DetectUnique::<Option<CountIndex>>::default();
+        for ((_,tv),(prov,votes)) in self.by_provenance.drain() {
+            papers_came_from_counts.extend(prov.counts_comes_from.iter());
+            transfer_value.add(tv);
+            tv_came_from_count.add(prov.when_tv_created);
             match &mut sum {
-                None => { sum=Some(votes) }
+                None => { sum=Some(votes);  }
                 Some(accum) => accum.add(&votes.votes),
             }
         }
-        sum.unwrap_or_else(||VotesWithSameTransferValue::default())
+        let res = sum.unwrap_or_else(||VotesWithSameTransferValue::default());
+        let provenance = PortionOfReasonBeingDoneThisCount{
+            transfer_value: transfer_value.take(),
+            when_tv_created: tv_came_from_count.take().flatten(),
+            papers_came_from_counts: papers_came_from_counts.take(),
+        };
+        (res,provenance)
     }
 
     /// Extracts all the ballots with a given provenance from this key.

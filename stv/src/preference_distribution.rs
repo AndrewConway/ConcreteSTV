@@ -11,6 +11,8 @@ use crate::history::CountIndex;
 use crate::transfer_value::{TransferValue, LostToRounding};
 use std::ops::{AddAssign, Neg, SubAssign, Sub};
 use std::fmt::Display;
+use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, TransferValueSource, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo};
+use crate::util::{DetectUnique, CollectAll};
 
 pub trait PreferenceDistributionRules {
     type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+Ord+Sub<Output=Self::Tally>+Zero;
@@ -19,6 +21,12 @@ pub trait PreferenceDistributionRules {
     fn use_transfer_value(transfer_value:&TransferValue,ballots:BallotPaperCount) -> (Self::Tally,LostToRounding);
 
 
+}
+
+struct PendingTranscript<Tally> {
+    elected : Vec<CandidateElected>,
+    not_continuing : Vec<CandidateIndex>,
+    created_transfer_value : Option<TransferValueCreation<Tally>>,
 }
 
 /// The main workhorse class that does preference distribution.
@@ -35,9 +43,17 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     continuing_candidates : HashSet<CandidateIndex>,
     continuing_candidates_sorted_by_tally : Vec<CandidateIndex>,
     exhausted : BallotPaperCount,
+    exhausted_atl : BallotPaperCount,
+    tally_lost_to_rounding : Option<Rules::Tally>,
+    tally_exhausted : Rules::Tally,
+    tally_set_aside : Option<Rules::Tally>,
     current_count : CountIndex,
     pending_surplus_distribution : VecDeque<CandidateIndex>,
     elected_candidates : Vec<CandidateIndex>,
+
+    // information about what is going on in this count.
+    in_this_count : PendingTranscript<Rules::Tally>,
+    transcript : Transcript<Rules::Tally>,
 }
 
 impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
@@ -66,9 +82,27 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             continuing_candidates,
             continuing_candidates_sorted_by_tally,
             exhausted : BallotPaperCount(0),
+            exhausted_atl : BallotPaperCount(0),
+            tally_lost_to_rounding: None,
+            tally_exhausted: Rules::Tally::zero(),
+            tally_set_aside: None,
             current_count : CountIndex(0),
             pending_surplus_distribution : VecDeque::default(),
             elected_candidates : vec![],
+            in_this_count : PendingTranscript {
+                elected: vec![],
+                not_continuing: vec![],
+                created_transfer_value: None
+            },
+            transcript : Transcript {
+                quota: QuotaInfo { // dummy values
+                    papers: BallotPaperCount(0),
+                    vacancies: 0,
+                    quota: Rules::Tally::zero(),
+                },
+                counts: vec![],
+                elected: vec![]
+            }
         }
     }
 
@@ -83,8 +117,13 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             self.papers[i].add(votes, TransferValue::one(), self.current_count, Some(self.current_count), tally);
         }
         self.exhausted+=distributed.exhausted;
+        self.exhausted_atl+=distributed.exhausted_atl;
         self.compute_quota(total_first_preferences);
-        self.end_of_count_step();
+        self.end_of_count_step(ReasonForCount::FirstPreferenceCount, PortionOfReasonBeingDoneThisCount {
+            transfer_value: None,
+            when_tv_created: None,
+            papers_came_from_counts: vec![]
+        }, true);
     }
 
     pub fn resort_candidates(&mut self) {
@@ -96,27 +135,35 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// quota = round_down(first_preferences/(1+num_to_elect))+1
     pub fn compute_quota(&mut self,total_first_preferences:BallotPaperCount) {
         self.quota = Rules::Tally::from(total_first_preferences.0/(1+self.candidates_to_be_elected)+1);
+        self.transcript.quota = QuotaInfo{
+            papers: total_first_preferences,
+            vacancies: self.candidates_to_be_elected,
+            quota: self.quota.clone(),
+        };
         println!("Quota = {}",self.quota);
     }
 
     pub fn tally(&self,candidate:CandidateIndex) -> Rules::Tally { self.tallys[candidate.0].clone() }
 
     // declare that a candidate is no longer continuing.
-    fn no_longer_continuing(&mut self,candidate:CandidateIndex) {
+    fn no_longer_continuing(&mut self,candidate:CandidateIndex,used_in_current_count:bool) {
+        if !used_in_current_count { self.in_this_count.not_continuing.push(candidate); }
         self.continuing_candidates_sorted_by_tally.retain(|&e|e!=candidate);
         self.continuing_candidates.remove(&candidate);
     }
-    fn declare_elected(&mut self,candidate:CandidateIndex) {
-        println!("Elected {}",self.data.metadata.candidate(candidate).name);
-        self.elected_candidates.push(candidate);
-        self.no_longer_continuing(candidate);
+    fn declare_elected(&mut self,who:CandidateIndex,why:ElectionReason) {
+        self.in_this_count.elected.push(CandidateElected{who,why});
+        println!("Elected {}",self.data.metadata.candidate(who).name);
+        self.elected_candidates.push(who);
+        self.transcript.elected.push(who);
+        self.no_longer_continuing(who,true);
     }
 
     pub fn check_elected_by_quota(&mut self) {
         let elected_by_quota : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().rev().take_while(|&&c|self.tally(c)>self.quota).cloned().collect();
         // TODO check for ties and do countbacks. See AEC rules 21-23
         for c in elected_by_quota {
-            self.declare_elected(c);
+            self.declare_elected(c,ElectionReason::ReachedQuota);
             if self.tally(c)>self.quota { self.pending_surplus_distribution.push_back(c); }
         }
     }
@@ -138,7 +185,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             if self.tally(candidate1)==self.tally(candidate2) {
                 // TODO mark that this is a decision by the EC.
             }
-            self.declare_elected(candidate1);
+            self.declare_elected(candidate1,ElectionReason::HighestOfLastTwoStanding);
         }
     }
 
@@ -151,7 +198,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             let elected_group = self.continuing_candidates_sorted_by_tally.clone();
             // TODO check for ties and do countbacks. See AEC rules 21-23
             for c in elected_group {
-                self.declare_elected(c);
+                self.declare_elected(c,ElectionReason::AllRemainingMustBeElected);
             }
         }
     }
@@ -162,11 +209,40 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         self.check_if_should_elect_all_remaining();
     }
 
-    pub fn end_of_count_step(&mut self) {
+    pub fn end_of_count_step(&mut self,reason : ReasonForCount,portion : PortionOfReasonBeingDoneThisCount,reason_completed : bool) {
         self.resort_candidates();
         self.check_elected();
         self.print_tallys();
         self.current_count=CountIndex(self.current_count.0+1);
+        self.transcript.counts.push(SingleCount{
+            reason,
+            portion,
+            reason_completed,
+            elected: self.in_this_count.elected.clone(),
+            not_continuing: self.in_this_count.not_continuing.clone(),
+            created_transfer_value: self.in_this_count.created_transfer_value.take(),
+            status: EndCountStatus {
+                tallies: PerCandidate {
+                    candidate: self.tallys.clone(),
+                    exhausted: self.tally_exhausted.clone(),
+                    rounding:  self.tally_lost_to_rounding.clone(),
+                    set_aside: self.tally_set_aside.clone(),
+                },
+                papers: PerCandidate {
+                    candidate: self.papers.iter().map(|p|p.num_ballots()).collect(),
+                    exhausted: self.exhausted,
+                    rounding: None,
+                    set_aside: None
+                },
+                atl_papers: Some(PerCandidate {
+                    candidate: self.papers.iter().map(|p|p.num_atl_ballots()).collect(),
+                    exhausted: self.exhausted_atl,
+                    rounding: None,
+                    set_aside: None
+                }),
+            }
+        });
+        self.in_this_count.not_continuing=self.in_this_count.elected.drain(..).map(|e|e.who).collect();
     }
 
     /// Transfer votes using a single transfer value. Used for Federal and Victoria
@@ -188,15 +264,30 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// > added to the number of first preference votes of the
     /// > continuing candidate and all those ballot papers shall be
     /// > transferred to the continuing candidate;
-    pub fn distribute_surplus_all_with_same_transfer_value(&mut self,candidate_to_distribute:CandidateIndex) {
-        let surplus: Rules::Tally  = self.tally(candidate_to_distribute)-self.quota.clone();
+    pub fn distribute_surplus_all_with_same_transfer_value(&mut self,candidate_to_distribute:CandidateIndex) -> PortionOfReasonBeingDoneThisCount {
+        let votes : Rules::Tally = self.tally(candidate_to_distribute);
+        let surplus: Rules::Tally  = votes.clone()-self.quota.clone();
         self.tallys[candidate_to_distribute.0]=self.quota.clone();
-        let ballots : VotesWithSameTransferValue<'a> = self.papers[candidate_to_distribute.0].extract_all_ballots_ignoring_transfer_value();
-        let transfer_value : TransferValue = Rules::make_transfer_value(surplus,ballots.num_ballots);
-        self.parcel_out_votes_with_give_transfer_value(transfer_value,ballots,Some(self.current_count));
+        let (ballots,provenance) = self.papers[candidate_to_distribute.0].extract_all_ballots_ignoring_transfer_value();
+        let ballots_considered : BallotPaperCount = ballots.num_ballots;
+        let transfer_value : TransferValue = Rules::make_transfer_value(surplus.clone(),ballots.num_ballots);
+        let exhausted : BallotPaperCount = self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),ballots,Some(self.current_count));
+        let continuing_ballots = ballots_considered-exhausted;
+        self.in_this_count.created_transfer_value=Some(TransferValueCreation{
+            surplus,
+            votes,
+            original_transfer_value: None,
+            ballots_considered,
+            continuing_ballots,
+            transfer_value,
+            source: TransferValueSource::SurplusOverBallots
+        });
+        provenance
     }
 
-    pub fn parcel_out_votes_with_give_transfer_value(&mut self,transfer_value:TransferValue,ballots:VotesWithSameTransferValue<'a>,when_tv_created:Option<CountIndex>) {
+    /// Parcel out votes by next continuing candidate with a given transfer value.
+    /// Return the number of exhausted votes.
+    pub fn parcel_out_votes_with_given_transfer_value(&mut self,transfer_value:TransferValue,ballots:VotesWithSameTransferValue<'a>,when_tv_created:Option<CountIndex>) -> BallotPaperCount {
         let distributed = DistributedVotes::distribute(&ballots.votes,&self.continuing_candidates,self.num_candidates);
         for (candidate_index,candidate_ballots) in distributed.by_candidate.into_iter().enumerate() {
             if candidate_ballots.num_ballots.0>0 {
@@ -205,12 +296,13 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 self.papers[candidate_index].add(&candidate_ballots, transfer_value.clone(), self.current_count, when_tv_created, worth);
             }
         }
+        distributed.exhausted
     }
 
     pub fn distribute_surplus(&mut self,candidate_to_distribute:CandidateIndex) {
         println!("Distributing surplus for {}",self.data.metadata.candidate(candidate_to_distribute).name);
-        self.distribute_surplus_all_with_same_transfer_value(candidate_to_distribute);
-        self.end_of_count_step();
+        let provenance = self.distribute_surplus_all_with_same_transfer_value(candidate_to_distribute);
+        self.end_of_count_step(ReasonForCount::ExcessDistribution(candidate_to_distribute), provenance, true);
     }
 
     pub fn print_candidates_names(&self) {
@@ -258,7 +350,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let mut provenances : HashSet<(<Rules::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,TransferValue)> = HashSet::default();
         for &candidate in &candidates_to_eliminate {
             println!("Excluding {}",self.data.metadata.candidate(candidate).name);
-            self.no_longer_continuing(candidate);
+            self.no_longer_continuing(candidate,false);
             for prov in self.papers[candidate.0].get_all_provenance_keys() {
                 provenances.insert(prov);
             }
@@ -267,18 +359,29 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let mut provenances : Vec<(<Rules::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,TransferValue)> = provenances.into_iter().collect();
         // TODO sort by S::KeyToDivide
         provenances.sort_by_key(|f|f.1.0.clone().neg()); // stable sort, will preserve ordering of other key stull
+        let mut togo = provenances.len();
         for key in provenances {
             // doing the transfer for this key.
             let mut all_votes = VotesWithSameTransferValue::default();
+            let mut when_tv_created = DetectUnique::<Option<CountIndex>>::default();
+            let mut papers_came_from_counts = CollectAll::<CountIndex>::default();
             for &candidate in &candidates_to_eliminate {
                 if let Some((from,votes)) = self.papers[candidate.0].extract_all_ballots_with_given_provenance(&key) {
+                    when_tv_created.add(from.when_tv_created);
+                    papers_came_from_counts.extend(from.counts_comes_from.into_iter());
                     self.tallys[candidate.0]-=from.tally;
                     if all_votes.num_ballots.0==0 { all_votes=votes; }
                     else { all_votes.add(&votes.votes) }
                 }
             }
-            self.parcel_out_votes_with_give_transfer_value(key.1,all_votes,None); // TODO do better with when_tv_created
-            self.end_of_count_step();
+            let when_tv_created=when_tv_created.take().flatten();
+            self.parcel_out_votes_with_given_transfer_value(key.1.clone(),all_votes,when_tv_created);
+            togo-=1;
+            self.end_of_count_step(ReasonForCount::Elimination(candidates_to_eliminate.clone()), PortionOfReasonBeingDoneThisCount {
+                transfer_value: Some(key.1),
+                when_tv_created,
+                papers_came_from_counts: papers_came_from_counts.take(),
+            }, togo==0);
         }
     }
 
@@ -301,9 +404,10 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 }
 
-pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : usize,excluded_candidates:&HashSet<CandidateIndex>) {
+pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : usize,excluded_candidates:&HashSet<CandidateIndex>) -> Transcript<Rules::Tally> {
     let arena = typed_arena::Arena::<CandidateIndex>::new();
     let votes = data.resolve_atl(&arena);
     let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates);
     work.go();
+    work.transcript
 }

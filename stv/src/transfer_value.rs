@@ -3,10 +3,16 @@ use serde::Serialize;
 use serde::Deserialize;
 use num::{One, BigRational, BigInt, ToPrimitive};
 use crate::ballot_pile::BallotPaperCount;
+use std::fmt::{Display, Formatter};
+use std::convert::TryFrom;
+use std::str::FromStr;
+use num::rational::{ParseRatioError, Ratio};
 
 pub struct LostToRounding(pub f64);
 
 #[derive(Clone,Debug,Serialize,Deserialize,Ord, PartialOrd, Eq, PartialEq,Hash)]
+#[serde(into = "String")]
+#[serde(try_from = "String")]
 pub struct TransferValue(pub(crate) num::rational::BigRational);
 
 impl TransferValue {
@@ -30,3 +36,22 @@ impl TransferValue {
     }
 }
 
+impl Display for TransferValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"{}",self.0)
+    }
+}
+
+impl From<TransferValue> for String {
+    fn from(t: TransferValue) -> Self { t.0.to_string() }
+}
+
+impl FromStr for TransferValue {
+    type Err = ParseRatioError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(TransferValue(Ratio::from_str(s)?)) }
+}
+
+impl TryFrom<String> for TransferValue {
+    type Error = ParseRatioError;
+    fn try_from(s: String) -> Result<Self, Self::Error> { Ok(TransferValue(Ratio::from_str(&s)?)) }
+}

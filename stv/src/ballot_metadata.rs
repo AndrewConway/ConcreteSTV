@@ -32,7 +32,7 @@ impl fmt::Debug for PartyIndex {
 
 
 /// Information about the election
-#[derive(Debug,Serialize,Deserialize)]
+#[derive(Debug,Serialize,Deserialize,Clone)]
 pub struct ElectionMetadata {
     pub name : ElectionName,
     pub candidates : Vec<Candidate>,
@@ -44,7 +44,7 @@ pub struct ElectionMetadata {
 }
 
 /// Documentation on where the data files used for this data came from.
-#[derive(Debug,Serialize,Deserialize)]
+#[derive(Debug,Serialize,Deserialize,Clone)]
 pub struct DataSource {
     pub url : String,
     pub files : Vec<String>,
@@ -57,7 +57,7 @@ impl ElectionMetadata {
 }
 
 /// Which election it was.
-#[derive(Debug,Serialize,Deserialize)]
+#[derive(Debug,Serialize,Deserialize,Clone)]
 pub struct ElectionName {
     /// The year this election was held
     pub year : String,
