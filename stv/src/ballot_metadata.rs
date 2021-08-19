@@ -5,6 +5,7 @@ use std::fmt;
 use std::path::PathBuf;
 use crate::election_data::ElectionData;
 use std::fs::File;
+use std::collections::HashMap;
 
 /// a candidate, referred to by position on the ballot paper, 0 being first
 #[derive(Clone, Copy, PartialEq, Eq, Hash,Serialize,Deserialize)]
@@ -57,6 +58,13 @@ pub struct DataSource {
 impl ElectionMetadata {
     pub fn party(&self,index:PartyIndex) -> &Party { &self.parties[index.0] }
     pub fn candidate(&self,index:CandidateIndex) -> &Candidate { &self.candidates[index.0] }
+    pub fn get_candidate_name_lookup(&self) -> HashMap<String,CandidateIndex> {
+        let mut res = HashMap::default();
+        for i in 0..self.candidates.len() {
+            res.insert(self.candidates[i].name.clone(),CandidateIndex(i));
+        }
+        res
+    }
 }
 
 /// Which election it was.

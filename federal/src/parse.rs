@@ -9,6 +9,10 @@ use zip::ZipArchive;
 use zip::read::ZipFile;
 use anyhow::anyhow;
 use stv::election_data::ElectionData;
+use stv::distribution_of_preferences_transcript::QuotaInfo;
+use serde::Deserialize;
+use stv::ballot_pile::BallotPaperCount;
+use stv::official_dop_transcript::{candidate_elem, OfficialDistributionOfPreferencesTranscript};
 
 pub fn get_federal_data_loader_2016() -> FederalDataLoader {
     FederalDataLoader::new("2016",true,"https://results.aec.gov.au/20499/Website/SenateDownloadsMenu-20499-Csv.htm",20499)
@@ -28,8 +32,19 @@ pub struct FederalDataLoader {
 }
 
 impl FederalDataLoader {
+    pub fn find_ec_data_repository() -> Option<PathBuf> {
+        for possible_path in vec![
+            "votecounting/CountPreferentialVotes/Elections",
+            "../votecounting/CountPreferentialVotes/Elections",
+            "../../votecounting/CountPreferentialVotes/Elections",
+            "../../../votecounting/CountPreferentialVotes/Elections"
+        ] {
+            if Path::new(possible_path).exists() { return Some(PathBuf::from(possible_path)) }
+        }
+        None
+    }
     pub fn new(year:&'static str,double_dissolution:bool,page_url:&'static str,election_number:usize) -> Self {
-        let base_path : PathBuf = PathBuf::from("../votecounting/CountPreferentialVotes/Elections/Federal/".to_string()+year);
+        let base_path : PathBuf = FederalDataLoader::find_ec_data_repository().map(|p|p.join("Federal").join(year)).unwrap_or_else(||PathBuf::from(".")); // ../votecounting/CountPreferentialVotes/Elections/Federal/".to_string()+year);
         FederalDataLoader {
             year: year.to_string(),
             double_dissolution,
@@ -48,11 +63,20 @@ impl FederalDataLoader {
         }
     }
 
+    pub fn candidates_to_be_elected(&self,state:&str) -> usize {
+        if state=="ACT" || state=="NT" { 2 }
+        else if self.double_dissolution { 12 }
+        else { 6 }
+    }
+
     fn name_of_candidate_source_post_election(&self) -> String {
         format!("SenateFirstPrefsByStateByVoteTypeDownload-{}.csv",self.election_number)
     }
     fn name_of_vote_source(&self,state:&str) -> String {
         format!("aec-senate-formalpreferences-{}-{}.zip",self.election_number,state)
+    }
+    fn name_of_official_transcript_zip_file(&self) -> String {
+        format!("SenateDopDownload-{}.zip",self.election_number)
     }
     pub fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata> {
         let mut builder = CandidateAndGroupInformationBuilder::default();
@@ -111,7 +135,106 @@ impl FederalDataLoader {
         let btl = btls.into_iter().map(|(candidates,n)|BTL{ candidates , n }).collect();
         Ok(ElectionData{ metadata, atl, btl, informal })
     }
+
+    pub fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+        let filename = self.name_of_official_transcript_zip_file();
+        let preferences_zip_file = self.base_path.join(&filename);
+        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
+        let mut zipfile = zip::ZipArchive::new(File::open(preferences_zip_file)?)?;
+        {
+            for i in 0..zipfile.len() {
+                let file = zipfile.by_index(i)?;
+                if file.name().contains(&metadata.name.electorate) {
+                    return read_official_dop_transcript_work(file,metadata);
+                }
+            }
+            Err(anyhow!("Could not find file in zipfile for {}",&metadata.name.electorate))
+/*
+            if let Some(file_name) = zipfile.file_names().find(|&n|n.contains(&data.metadata.name.electorate)).map(|file_name|zipfile.by_name(file_name)) {
+                let zip_contents = file_name?; //zipfile.by_name(file_name)?;
+            } else {}*/
+        }
+    }
 }
+
+
+fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+    let mut reader = csv::ReaderBuilder::new().flexible(false).has_headers(true).from_reader(file);
+    #[derive(Debug, Deserialize)]
+    struct Record {
+        #[serde(rename = "State")] state: String,
+        #[serde(rename = "No Of Vacancies")] vacancies: usize,
+        #[serde(rename = "Total Formal Papers")] formal_papers: usize,
+        #[serde(rename = "Quota")] quota : usize,
+        #[serde(rename = "Count")] count : usize,
+        #[serde(rename = "Ballot Position")] ballot_position : usize,
+        #[serde(rename = "Ticket")] ticket : String,
+        #[serde(rename = "Surname")] surname : String,
+        #[serde(rename = "GivenNm")] given_name : String,
+        #[serde(rename = "Papers")] papers_transferred : isize,
+        #[serde(rename = "VoteTransferred")] votes_transferred : isize,
+        #[serde(rename = "ProgressiveVoteTotal")] votes_total : usize,
+        #[serde(rename = "Transfer Value")] transfer_value : f64,
+        #[serde(rename = "Status")] status : String, // blank, Elected, Excluded
+        #[serde(rename = "Changed")] changed : String, // True or blank.
+        #[serde(rename = "Order Elected")] order_elected : usize,
+        #[serde(rename = "Comment")] comment: Option<String>,
+    }
+    let lookup_names : HashMap<String,CandidateIndex> = metadata.get_candidate_name_lookup();
+    let mut res = OfficialDistributionOfPreferencesTranscript::default();
+    let mut last_count : usize = 0;
+    let mut order_elected : HashMap<CandidateIndex,usize> = Default::default(); // value is order elected, which is not necessarily as encountered.
+    let mut excluded_last : Vec<CandidateIndex> = vec![]; // transcript marks them as excluded the round before they are excluded in.
+    for result in reader.deserialize() {
+        let record : Record = result?;
+        if last_count==0 {
+            res.quota=Some(QuotaInfo{
+                papers: BallotPaperCount(record.formal_papers),
+                vacancies : record.vacancies,
+                quota: record.quota as f64
+            });
+        }
+        if record.count!=last_count {
+            last_count=record.count;
+            res.finished_count();
+            res.count().excluded.extend(excluded_last.drain(..));
+        }
+        if record.transfer_value!=0.0 { res.count().transfer_value = Some(record.transfer_value) }
+        if record.surname=="Exhausted" {
+            res.count().paper_delta().exhausted= record.papers_transferred as isize;
+            res.count().vote_delta().exhausted= record.votes_transferred as f64;
+            res.count().vote_total().exhausted= record.votes_total as f64;
+        } else if record.surname=="Gain/Loss" {
+            res.count().paper_delta().rounding= record.papers_transferred as isize;
+            res.count().vote_delta().rounding= record.votes_transferred as f64;
+            res.count().vote_total().rounding= record.votes_total as f64;
+        } else {
+            let name = record.surname+", "+&record.given_name;
+            match lookup_names.get(&name) {
+                None => return Err(anyhow!("Could not find name {}",name)),
+                Some(&candidate) => {
+                    * candidate_elem(&mut res.count().paper_delta().candidate,candidate) = record.papers_transferred as isize;
+                    * candidate_elem(&mut res.count().vote_delta().candidate,candidate)= record.votes_transferred as f64;
+                    * candidate_elem(&mut res.count().vote_total().candidate,candidate)= record.votes_total as f64;
+                    if &record.changed=="True" {
+                        match record.status.as_str() {
+                            "Excluded" => excluded_last.push(candidate),
+                            "Elected" => {
+                                //println!("Elected {} at count {}",candidate,res.counts.len());
+                                res.count().elected.push(candidate);
+                                order_elected.insert(candidate,record.order_elected);
+                                res.count().elected.sort_by_key(|c|order_elected.get(c));
+                            }
+                            _ => return Err(anyhow!("Could not understand status {}",record.status)),
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(res)
+}
+
 
 #[derive(Default)]
 struct CandidateAndGroupInformationBuilder {

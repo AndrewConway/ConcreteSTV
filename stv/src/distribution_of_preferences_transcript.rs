@@ -17,12 +17,22 @@ pub struct PerCandidate<X> {
     pub candidate : Vec<X>,
     /// something is exhausted if it can't go to a specific candidate as there are not enough preferences on a particular ballot.
     pub exhausted : X,
-    /// something goes to rounding if it can't go to a specific candidate as fractions are not allowed. None if not applicable
-    pub rounding : Option<X>,
+    /// something goes to rounding if it can't go to a specific candidate as fractions are not allowed.
+    pub rounding : X,
     /// something gets set aside if some feature of the the rules means it doesn't go to a particular candidate. None if not applicable.
     pub set_aside : Option<X>,
 }
 
+impl <X:Default> Default for PerCandidate<X> {
+    fn default() -> Self {
+        PerCandidate{
+            candidate: vec![],
+            exhausted: X::default(),
+            rounding: X::default(),
+            set_aside: None
+        }
+    }
+}
 /// Record the status of the count at the end of the count.
 #[derive(Clone,Serialize,Deserialize)]
 pub struct EndCountStatus<Tally> {
@@ -39,6 +49,15 @@ pub enum ReasonForCount {
     FirstPreferenceCount,
     ExcessDistribution(CandidateIndex),
     Elimination(Vec<CandidateIndex>),  // usually just one candidate, but federal rules allow multiple elimination
+}
+
+impl ReasonForCount {
+    pub fn is_elimination(&self) -> bool {
+        match self {
+            ReasonForCount::Elimination(_) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Copy, Clone,Serialize,Deserialize)]
@@ -82,6 +101,14 @@ pub struct TransferValueCreation<Tally> {
     pub source : TransferValueSource,
 }
 
+/// Sometimes the Electoral Commission needs to make a decision, such as tie resolution.
+/// Sometimes legislation mandates this be random, sometimes the returning officer.
+/// Regardless, this records that the decision needs to be made.
+#[derive(Clone,Serialize,Deserialize)]
+pub struct DecisionMadeByEC {
+    pub affected : Vec<CandidateIndex>
+}
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct SingleCount<Tally> {
     /// The action that is being done in said count
@@ -96,7 +123,9 @@ pub struct SingleCount<Tally> {
     pub not_continuing : Vec<CandidateIndex>,
     /// If a transfer value was created, how
     pub created_transfer_value : Option<TransferValueCreation<Tally>>,
-    /// status at end of count,
+    /// whether the EC needs to make any decisions
+    pub decisions : Vec<DecisionMadeByEC>,
+    /// status at end of count.
     pub status : EndCountStatus<Tally>
 }
 
@@ -119,4 +148,5 @@ pub struct TranscriptWithMetadata<Tally> {
     pub metadata : ElectionMetadata,
     pub transcript : Transcript<Tally>,
 }
+
 

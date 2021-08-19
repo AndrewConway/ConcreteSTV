@@ -7,6 +7,8 @@ pub mod transfer_value;
 pub mod preference_distribution;
 pub mod distribution_of_preferences_transcript;
 pub mod util;
+pub mod tie_resolution;
+pub mod official_dop_transcript;
 
 #[cfg(test)]
 mod tests {

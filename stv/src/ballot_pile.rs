@@ -14,10 +14,11 @@ use serde::Serialize;
 use std::hash::Hash;
 use crate::distribution_of_preferences_transcript::PortionOfReasonBeingDoneThisCount;
 use crate::util::{DetectUnique, CollectAll};
+use std::fmt;
 
 /// A number representing a count of pieces of paper.
 /// This is distinct from votes which may be fractional in the presence of weights.
-#[derive(Copy,Clone,Eq, PartialEq,Debug,Serialize,Deserialize)]
+#[derive(Copy,Clone,Eq, PartialEq,Serialize,Deserialize)]
 pub struct BallotPaperCount(pub usize);
 
 impl AddAssign for BallotPaperCount {
@@ -32,6 +33,14 @@ impl Sub for BallotPaperCount {
 impl Add for BallotPaperCount {
     type Output = BallotPaperCount;
     fn add(self, rhs: Self) -> Self::Output { BallotPaperCount(self.0+rhs.0) }
+}
+// type alias really, don't want long display
+impl fmt::Display for BallotPaperCount {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.0) }
+}
+// type alias really, don't want long display
+impl fmt::Debug for BallotPaperCount {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.0) }
 }
 
 /// A vote, resolved into BTL, that is somewhere through being distributed.
