@@ -1,0 +1,56 @@
+
+
+td.CandidateName {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+}
+
+td.PartyName {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid grey;
+    border-right: 1px solid grey;
+}
+
+td.FirstCandidate {
+    border-left: 1px solid grey;
+}
+
+td.LastCandidate {
+    border-right: 1px solid grey;
+}
+
+td.Elected {
+    background: #e0ffe0;
+    text-align: right;
+    padding : 0;
+}
+
+td.Eliminated {
+    background: #ffe0e0;
+    text-align: right;
+    padding : 0;
+}
+
+td.Continuing {
+    text-align: right;
+    padding : 0;
+}
+
+table {
+    border-collapse: collapse;
+}
+
+tr.MinorEndCount {
+    border-bottom: 1px solid #aaa;
+}
+
+tr.MajorEndCount {
+    border-bottom: 1px solid #888;
+}
