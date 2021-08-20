@@ -1,9 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::fs::File;
-use std::io::{BufReader, BufRead, Seek, SeekFrom};
-use stv::ballot_metadata::{ElectionName, Candidate, CandidateIndex, PartyIndex, Party, ElectionMetadata, DataSource};
+use stv::ballot_metadata::{ElectionName, Candidate, CandidateIndex, PartyIndex, ElectionMetadata, DataSource};
 use stv::ballot_paper::{RawBallotMarking, parse_marking, RawBallotMarkings, FormalVote, ATL, BTL};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use csv::{StringRecord, StringRecordsIntoIter};
 use zip::ZipArchive;
 use zip::read::ZipFile;
@@ -13,6 +12,14 @@ use stv::distribution_of_preferences_transcript::QuotaInfo;
 use serde::Deserialize;
 use stv::ballot_pile::BallotPaperCount;
 use stv::official_dop_transcript::{candidate_elem, OfficialDistributionOfPreferencesTranscript};
+use stv::tie_resolution::TieResolutionsMadeByEC;
+use std::iter::FromIterator;
+use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder};
+use crate::parse2013::{read_from_senate_group_voting_tickets_download_file2013, read_ticket_votes2013, read_btl_votes2013};
+
+pub fn get_federal_data_loader_2013() -> FederalDataLoader {
+    FederalDataLoader::new("2013",false,"https://results.aec.gov.au/17496/Website/SenateDownloadsMenu-17496-Csv.htm",17496)
+}
 
 pub fn get_federal_data_loader_2016() -> FederalDataLoader {
     FederalDataLoader::new("2016",true,"https://results.aec.gov.au/20499/Website/SenateDownloadsMenu-20499-Csv.htm",20499)
@@ -70,7 +77,10 @@ impl FederalDataLoader {
     }
 
     fn name_of_candidate_source_post_election(&self) -> String {
-        format!("SenateFirstPrefsByStateByVoteTypeDownload-{}.csv",self.election_number)
+        if self.year=="2013" { "SenateGroupVotingTicketsDownload-17496.csv".to_string() }
+        else {
+            format!("SenateFirstPrefsByStateByVoteTypeDownload-{}.csv",self.election_number)
+        }
     }
     fn name_of_vote_source(&self,state:&str) -> String {
         format!("aec-senate-formalpreferences-{}-{}.zip",self.election_number,state)
@@ -80,7 +90,8 @@ impl FederalDataLoader {
     }
     pub fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata> {
         let mut builder = CandidateAndGroupInformationBuilder::default();
-        builder.read_from_senate_first_prefs_by_state_by_vote_typ_download_file(self.base_path.join(self.name_of_candidate_source_post_election()).as_path(),state)?;
+        if self.year=="2013" { read_from_senate_group_voting_tickets_download_file2013(&mut builder,self.base_path.join(self.name_of_candidate_source_post_election()).as_path(),state)?; }
+        else { read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(&mut builder,self.base_path.join(self.name_of_candidate_source_post_election()).as_path(),state)?; }
         Ok(ElectionMetadata{
             name: self.name(state),
             candidates: builder.candidates.clone(),
@@ -107,6 +118,7 @@ impl FederalDataLoader {
 
     // This below should be made more general and most of it factored out into a separate function.
     pub fn read_raw_data(&self,state:&str) -> anyhow::Result<ElectionData> {
+        if self.year=="2013" { return self.read_raw_data2013(state); }
         let mut metadata = self.read_raw_metadata(state)?;
         let filename = self.name_of_vote_source(state);
         let preferences_zip_file = self.base_path.join(&filename);
@@ -136,6 +148,22 @@ impl FederalDataLoader {
         Ok(ElectionData{ metadata, atl, btl, informal })
     }
 
+    fn read_raw_data2013(&self,state:&str) -> anyhow::Result<ElectionData> {
+        let mut metadata = self.read_raw_metadata(state)?;
+        let filename = "SenateUseOfGvtByGroupDownload-17496.csv".to_string();
+        let preferences_zip_file = self.base_path.join(&filename);
+        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
+        metadata.source[0].files.push(filename);
+        let ticket_votes = read_ticket_votes2013(&metadata,&preferences_zip_file,state)?;
+        let filename = format!("SenateStateBtlDownload-{}-{}.zip",self.election_number,state);
+        let preferences_zip_file = self.base_path.join(&filename);
+        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
+        metadata.source[0].files.push(filename);
+        let (mut btl,informal) = read_btl_votes2013(&metadata, &preferences_zip_file, 1)?;
+        btl.extend_from_slice(&ticket_votes);
+        Ok(ElectionData{ metadata, atl:vec![], btl, informal })
+    }
+
     pub fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let filename = self.name_of_official_transcript_zip_file();
         let preferences_zip_file = self.base_path.join(&filename);
@@ -153,6 +181,30 @@ impl FederalDataLoader {
             if let Some(file_name) = zipfile.file_names().find(|&n|n.contains(&data.metadata.name.electorate)).map(|file_name|zipfile.by_name(file_name)) {
                 let zip_contents = file_name?; //zipfile.by_name(file_name)?;
             } else {}*/
+        }
+    }
+
+    /// These are deduced by looking at the actual transcript of results.
+    pub fn ec_decisions(&self,state:&str) -> TieResolutionsMadeByEC {
+        match self.year.as_str() {
+            "2016" => match state {
+               // "TAS" => TieResolutionsMadeByEC{ resolutions: vec![vec![CandidateIndex(57), CandidateIndex(50), CandidateIndex(29)]] } , // count 26, 3 way tie for 39. Candidate 29 got eliminated.
+               // "NSW" => TieResolutionsMadeByEC{ resolutions: vec![vec![CandidateIndex(78),CandidateIndex(88) ]] } , // count 10, 2 way tie for 18. Candidate 78 got eliminated.
+                _ => Default::default(),
+            },
+            _ => Default::default(),
+        }
+    }
+
+    /// These are due to a variety of events.
+    pub fn excluded_candidates(&self,state:&str) -> HashSet<CandidateIndex> {
+        match self.year.as_str() {
+            "2016" => match state {
+                "SA" => HashSet::from_iter(vec![CandidateIndex(38)]), // Bob Day was excluded because of indirect pecuniary interest.
+                "WA" => HashSet::from_iter(vec![CandidateIndex(45)]), // Rod Cullerton was excluded because of bankruptcy and larceny.
+                _ => Default::default(),
+            },
+            _ => Default::default(),
         }
     }
 }
@@ -236,77 +288,38 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
 }
 
 
-#[derive(Default)]
-struct CandidateAndGroupInformationBuilder {
-    candidates : Vec<Candidate>,
-    //candidate_by_id : HashMap<String,CandidateIndex>,
-    parties : Vec<GroupBuilder>,
-}
-
-struct GroupBuilder {
-    name : String,
-    group_id : String, // e.g. "A" or "UG"
-    ticket_id : Option<String>, // the dummy candidate id for the ticket vote.
-}
-
-fn skip_first_line_of_file(path:&Path) -> anyhow::Result<File> {
-    let file = File::open(path)?;
-    // want to jump to the first newline. Simplest efficient way to do this is make a buffered reader to get the position...
-    let mut buffered = BufReader::new(file);
-    buffered.read_line(&mut String::new())?;
-    let position = buffered.stream_position()?;
-    let mut file = buffered.into_inner(); // get back the file.
-    file.seek(SeekFrom::Start(position))?;
-    Ok(file)
-}
-
-impl CandidateAndGroupInformationBuilder {
-    // the candidate information file doesn't list the place on the ticket.
-    // the SenateFirstPrefsByStateByVoteTypeDownload file does, but it isn't available until after the election.
-    // the file that is available before the election is not available well after the election :-)
-    // so need to be able to parse both.
-    fn read_from_senate_first_prefs_by_state_by_vote_typ_download_file(&mut self,path:&Path,state:&str) -> anyhow::Result<()> {
-        let mut rdr = csv::Reader::from_reader(skip_first_line_of_file(path)?);
-        for result in rdr.records() {
-            let record = result?;
-            if state==&record[0] { // right state
-                let group_id = &record[1]; // something like A, B, or UG
-                let candidate_id = &record[2]; // something like 32847
-                if candidate_id!="0" {
-                    let position_in_ticket = record[3].parse::<usize>()?; // 0, 1, .. 0 means a dummy id for the group ticket.
-                    if self.parties.len()==0 || &self.parties[self.parties.len()-1].group_id != group_id {
-                        self.parties.push(GroupBuilder{name:record[5].to_string(),group_id:group_id.to_string(),ticket_id:if position_in_ticket==0 {Some(candidate_id.to_string())} else {None}});
-                    }
-                    if position_in_ticket!=0 { // real candidate.
-                        // self.candidate_by_id.insert(candidate_id.to_string(),CandidateIndex(self.candidates.len()));
-                        self.candidates.push(Candidate{
-                            name: record[4].to_string(),
-                            party: PartyIndex(self.parties.len()-1),
-                            position: position_in_ticket
-                        })
-                    }
+/// the candidate information file doesn't list the place on the ticket.
+/// the SenateFirstPrefsByStateByVoteTypeDownload file does, but it isn't available until after the election.
+/// the file that is available before the election is not available well after the election :-)
+/// so need to be able to parse both.
+/// This format is used in 2016 and 2019
+fn read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(builder: &mut CandidateAndGroupInformationBuilder,path:&Path,state:&str) -> anyhow::Result<()> {
+    let mut rdr = csv::Reader::from_reader(skip_first_line_of_file(path)?);
+    for result in rdr.records() {
+        let record = result?;
+        if state==&record[0] { // right state
+            let group_id = &record[1]; // something like A, B, or UG
+            let candidate_id = &record[2]; // something like 32847
+            if candidate_id!="0" {
+                let position_in_ticket = record[3].parse::<usize>()?; // 0, 1, .. 0 means a dummy id for the group ticket.
+                if builder.parties.len()==0 || &builder.parties[builder.parties.len()-1].group_id != group_id {
+                    builder.parties.push(GroupBuilder{name:record[5].to_string(), abbreviation:None, group_id:group_id.to_string(),ticket_id:if position_in_ticket==0 {Some(candidate_id.to_string())} else {None}, tickets: vec![] });
+                }
+                if position_in_ticket!=0 { // real candidate.
+                    // self.candidate_by_id.insert(candidate_id.to_string(),CandidateIndex(self.candidates.len()));
+                    builder.candidates.push(Candidate{
+                        name: record[4].to_string(),
+                        party: PartyIndex(builder.parties.len()-1),
+                        position: position_in_ticket,
+                        ec_id: Some(candidate_id.to_string()),
+                    })
                 }
             }
         }
-        Ok(())
     }
-
-    fn extract_parties(&self) -> Vec<Party> {
-        let mut res : Vec<Party> = self.parties.iter().map(|g|Party{
-            column_id: g.group_id.clone(),
-            name: g.name.clone(),
-            abbreviation: None,
-            atl_allowed: g.ticket_id.is_some(),
-            candidates: vec![]
-        }).collect();
-        for candidate_index in 0..self.candidates.len() {
-            let candidate = & self.candidates[candidate_index];
-            res[candidate.party.0].candidates.push(CandidateIndex(candidate_index));
-            assert_eq!(res[candidate.party.0].candidates.len(),candidate.position);
-        }
-        res
-    }
+    Ok(())
 }
+
 
 
 struct ParsedRawVoteIterator<'a> {

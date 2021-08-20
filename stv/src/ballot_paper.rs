@@ -121,7 +121,7 @@ impl<'a> RawBallotMarkings<'a> {
         let prefs = RawBallotMarkings::look_for_continuous_streams(self.atl,|i|self.atl_parties[i],true);
         if prefs.len()>=min_atl_prefs_needed { Some(ATL{ parties: prefs, n: 1 })} else { None }
     }
-    fn interpret_vote_as_btl(&'a self,min_btl_prefs_needed:usize) -> Option<BTL> {
+    pub fn interpret_vote_as_btl(&'a self, min_btl_prefs_needed:usize) -> Option<BTL> {
         let prefs = RawBallotMarkings::look_for_continuous_streams(self.btl,|i|CandidateIndex(i),true);
         if prefs.len()>=min_btl_prefs_needed { Some(BTL{ candidates: prefs, n: 1 })} else { None }
     }

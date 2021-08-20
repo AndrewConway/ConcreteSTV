@@ -9,12 +9,14 @@ use std::collections::{HashSet, VecDeque};
 use crate::ballot_metadata::CandidateIndex;
 use crate::history::CountIndex;
 use crate::transfer_value::{TransferValue, LostToRounding};
-use std::ops::{AddAssign, Neg, SubAssign, Sub};
+use std::ops::{AddAssign, Neg, SubAssign, Sub, Range};
 use std::fmt::Display;
 use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, TransferValueSource, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, DecisionMadeByEC};
 use crate::util::{DetectUnique, CollectAll};
 use crate::tie_resolution::{MethodOfTieResolution, TieResolutionsMadeByEC};
 use std::hash::Hash;
+use std::iter::Sum;
+use std::cmp::min;
 
 /// Many systems have a special rules for termination when there are a small number of
 /// candidates left (e.g. equal to the number of if there are exactly 2 candidates left
@@ -27,13 +29,15 @@ pub enum WhenToDoElectCandidateClauseChecking {
     AfterCheckingQuota,
     /// If there is not undistributed surplus, and there is not an ongoing elimination with more papers to distribute. See Federal 2019 QLD and VIC.
     AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing,
+    /// If there is not undistributed surplus. See Federal 2016 NSW, WA, QLD and VIC.
+    AfterCheckingQuotaIfNoUndistributedSurplusExists,
     /// If there is not undistributed surplus, and there is not an ongoing elimination with more papers to distribute. See Federal 2019 QLD and VIC.
     AfterCheckingQuotaIfExclusionNotOngoing,
     /// If the distribution of papers should be interrupted by this.
     AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers,
 }
 pub trait PreferenceDistributionRules {
-    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+Ord+Sub<Output=Self::Tally>+Zero+Hash;
+    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>;
     type SplitByNumber : HowSplitByCountNumber;
     fn make_transfer_value(surplus:Self::Tally,ballots:BallotPaperCount) -> TransferValue;
     fn use_transfer_value(transfer_value:&TransferValue,ballots:BallotPaperCount) -> (Self::Tally,LostToRounding);
@@ -53,14 +57,13 @@ pub trait PreferenceDistributionRules {
     /// If all vacancies are filled but not all surplus distributions are done, do you finish the surplus distributions, even though it cannot change the result of the election?
     fn finish_all_surplus_distributions_when_all_elected() -> bool;
 
-    /// If true, then after deciding to do an exclusion, and making the candidate be not continuing,
-    /// check to see if the number of continuing candidates=number of remaining vacancies,
-    /// and if so, abort the transfer and have a special count where nothing is transferred.
-    ///  Used in Federal 2019 NSW.
-    // fn dont_do_any_transfers_in_exclusion_if_results_in_number_continuing_equals_number_vacancies() -> bool;
-
     fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking;
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking;
+
+    // how to do the elimination
+
+    /// Whether the Commonwealth Electoral Act 1918, Section 273, subsection 13A multiple elimination abomination should be used. This is defaulted to false as no one else would do such a terrible thing, and even the AEC has only sometimes done it.
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
 }
 
 struct PendingTranscript<Tally> {
@@ -227,6 +230,14 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
     }
 
+    /// Like check_for_ties_and_resolve but do in place on self.continuing_candidates_sorted_by_tally for the indices given in to_check
+    pub fn check_for_ties_and_resolve_inplace(&mut self,to_check:Range<usize>,how:MethodOfTieResolution) {
+        // can't just pass a mutable reference to self.continuing_candidates_sorted_by_tally[to_check] as there would be 2 mutable refs :-(
+        let mut tied_candidates = self.continuing_candidates_sorted_by_tally[to_check.clone()].to_vec();
+        self.check_for_ties_and_resolve(&mut tied_candidates,how);
+        self.continuing_candidates_sorted_by_tally[to_check].copy_from_slice(&tied_candidates); // copy resolved order back.
+    }
+
     pub fn check_elected_by_quota(&mut self) {
         let mut elected_by_quota : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().rev().take_while(|&&c|self.tally(c)>self.quota).cloned().collect();
         elected_by_quota.reverse(); // make sure low to high so that tie checking ordering is compatible.
@@ -277,6 +288,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing => reason_completed && self.pending_surplus_distribution.is_empty(),
             WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfExclusionNotOngoing => reason_completed || !reason.is_elimination(),
             WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers => true,
+            WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists => self.pending_surplus_distribution.is_empty(),
         }
     }
     pub fn check_elected(&mut self,reason : &ReasonForCount,reason_completed : bool) {
@@ -413,6 +425,147 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         possibilities
     }
 
+    /// There is a bizarre and horrible section of the federal election
+    /// legislation where, in an attempt to make things easier, things are
+    /// made much harder with an "optimization" to the process, whereby
+    /// multiple candidates can be eliminated simultaneously. It is
+    /// clearly designed, ineffectually, to not change the outcome of the
+    /// election. It can change the outcome through rounding or through
+    /// changing who the next candidate elected is through changing order
+    /// of elimination.
+    ///
+    /// Commonwealth Electoral Act 1918 section 273 subsection 13A:
+    /// ```text
+    /// The procedure for a bulk exclusion, and the circumstances in
+    /// which such an exclusion may be made, are as follows:
+    /// (a) a continuing candidate (in this subsection called Candidate
+    ///     A) shall be identified, if possible, who, of the continuing
+    ///     candidates who each have a number of notional votes equal
+    ///     to or greater than the vacancy shortfall, stands lower or
+    ///     lowest in the poll;
+    /// (b) a continuing candidate (in this subsection called Candidate
+    ///     B) shall be identified, if possible, who:
+    ///       (i) stands lower in the poll than Candidate A, or if
+    ///           Candidate A cannot be identified, has a number of
+    ///           notional votes that is fewer than the vacancy shortfall;
+    ///      (ii) has a number of notional votes that is fewer than the
+    ///           number of votes of the candidate standing immediately
+    ///           higher than him or her in the poll; and
+    ///     (iii) if 2 or more candidates satisfy subparagraphs (i) and
+    ///          (ii)—is the candidate who of those candidates stands
+    ///          higher or highest in the poll;
+    /// (c) in a case where Candidate B has been identified and has a
+    ///     number of notional votes fewer than the leading shortfall—
+    ///     Candidate B and any other continuing candidates who stand
+    ///     lower in the poll than that candidate may be excluded in a
+    ///     bulk exclusion; and
+    /// (d) in a case where Candidate B has been identified and has a
+    ///     number of notional votes equal to or greater than the leading
+    ///     shortfall:
+    ///        (i) a continuing candidate (in this subsection called
+    ///            Candidate C) shall be identified who:
+    ///               (A) has a number of notional votes that is fewer
+    ///                   than the leading shortfall; and
+    ///               (B) if 2 or more candidates satisfy
+    ///                   sub-subparagraph (A)—is the candidate who of
+    ///                   those candidates stands higher or highest in the
+    ///                   poll; and
+    ///        (ii) Candidate C and all other continuing candidates who
+    ///             stand lower in the poll than that candidate may be
+    ///             excluded in a bulk exclusion.
+    /// ```
+    /// Commonwealth Electoral Act 1918 section 273 subsection 13B:
+    /// ```text
+    /// Where, apart from this subsection, the number of continuing
+    /// candidates after a bulk exclusion under subsection (13A) would be
+    /// fewer than the number of remaining unfilled vacancies,
+    /// subsection (13A) shall operate to exclude only the number of
+    /// candidates, beginning with the candidate who stands lowest in the
+    /// poll, that would leave sufficient continuing candidates to fill the
+    /// remaining unfilled vacancies.
+    /// ```
+    /// There is also subsection 13C, but I believe it is now redundant, as it
+    /// deals with the case of a candidate who is elected but has not had votes
+    /// distributed. In that case, I believe rule 13 (exclusion) doesn't come into
+    /// play at all, but subsections 9, 10 or 14 (all surplus distribution) come into
+    /// play and surplus distribution takes place. So we can ignore the concept of
+    /// adjusted notional votes.
+    ///
+    /// Takes a mutable self because of the possibility of tie resolution.
+    pub fn find_candidates_for_multiple_elimination_federal_rule_13a(&mut self) -> Option<Vec<CandidateIndex>> {
+        // *shortfall*, in relation to a continuing candidate at a particular stage
+        // during the scrutiny in a Senate election, means the number of votes
+        // that the candidate requires at that stage in order to reach the quota
+        // referred to in subsection (8).
+        let shortfall = |candidate:CandidateIndex| self.quota.clone()-self.tally(candidate);
+
+        // *leading shortfall*, in relation to a particular stage during the
+        // scrutiny in a Senate election, means the shortfall of the continuing
+        // candidate standing highest in the poll at that stage.
+        let leading_shortfall : Rules::Tally = shortfall(*self.continuing_candidates_sorted_by_tally.last().unwrap());
+
+        // *vacancy shortfall*, in relation to a particular stage during the
+        // scrutiny in a Senate election, means the aggregate of the shortfalls
+        // of that number of leading candidates equal to the number of
+        // remaining unfilled vacancies, the leading candidates being
+        // ascertained by taking the continuing candidate who stands highest
+        // in the poll, the continuing candidate who stands next highest in the
+        // poll, and so on in the order in which the continuing candidates
+        // stand in the poll.
+        let vacancy_shortfall : Rules::Tally = self.continuing_candidates_sorted_by_tally.iter().rev().take(self.remaining_to_elect()).map(|c|shortfall(*c)).sum();
+        //println!("Count {} leading shortfall {} vacancy shortfall {}",self.current_count.0+1,&leading_shortfall,&vacancy_shortfall);
+
+        // *notional vote*, in relation to a continuing candidate, means the
+        // aggregate of the votes obtained by that candidate and the votes
+        // obtained by each other candidate who stands lower in the poll than
+        // him or her.
+        let mut notional_votes : Vec<Rules::Tally> = vec![];
+        for &candidate in &self.continuing_candidates_sorted_by_tally {
+            notional_votes.push(self.tally(candidate)+notional_votes.last().cloned().unwrap_or_else(Rules::Tally::zero))
+        }
+        //println!("Notional votes {}",notional_votes.iter().map(|v|v.to_string()).collect::<Vec<_>>().join("\t"));
+        // Find Candidate B. There is no point finding Candidate A, we merely need to
+        // find a candidate B who is the highest ranking candidate with fewer notional
+        // votes than the vacancy shortfall, and a number of notional votes < votes of higher person.
+        let candidate_b_standing = {
+            let num_candidates_with_fewer_notional_votes_than_the_vacancy_shortfall = notional_votes.iter().take_while(|t|**t<vacancy_shortfall).count();
+            let mut candidate_b_plus_one = min(num_candidates_with_fewer_notional_votes_than_the_vacancy_shortfall,self.continuing_candidates_sorted_by_tally.len()-1);
+            // a candidate passes test b(i) iff lower than num_candidates_with_fewer_notional_votes_than_the_vacancy_shortfall in standing. So find the highest satisfying b(ii).
+            // the min in the line above was to ensure that a candidate above exists.
+            while candidate_b_plus_one>0 && notional_votes[candidate_b_plus_one-1].clone()>=self.tally(self.continuing_candidates_sorted_by_tally[candidate_b_plus_one]) { candidate_b_plus_one-=1;}
+            if candidate_b_plus_one==0 { return None; } // there is no candidate B, and nothing can be done.
+            // candidate_b_standing is the index into self.continuing_candidates_sorted_by_tally of candidate b.
+            candidate_b_plus_one-1
+        };
+        // println!("Candidate B standing {} notional votes {} tally {} tally 1 higher {}",candidate_b_standing,notional_votes[candidate_b_standing],self.tally(self.continuing_candidates_sorted_by_tally[candidate_b_standing]),self.tally(self.continuing_candidates_sorted_by_tally[candidate_b_standing+1]));
+        // let candidate_b : CandidateIndex = self.continuing_candidates_sorted_by_tally[candidate_b_standing];
+        let candidates_to_exclude : usize = if notional_votes[candidate_b_standing]<leading_shortfall { // (c) in a case where Candidate B has been identified and has a number of notional votes fewer than the leading shortfall
+            candidate_b_standing+1 // Candidate B and any other continuing candidates who stand lower in the poll than that candidate may be excluded in a bulk exclusion
+        } else { // (d) in a case where Candidate B has been identified and has a number of notional votes equal to or greater than the leading shortfall:
+            // candidate C is the highest candidate with notional votes < leading shortfall which has to be < B as B has notional votes >=leading shortfall.
+            // note that the legislation says "[candidate C] shall be identified" which is not necessarily possible!
+            let num_candidates_with_fewer_notional_votes_than_the_leading_shortfall = notional_votes.iter().take_while(|t|**t<leading_shortfall).count();
+            if num_candidates_with_fewer_notional_votes_than_the_leading_shortfall==0 { return None } // no such candidate C exists! Legislation fails! Better rehold the election! Or maybe just don't do multiple elimination this round.
+            // let candidate_c : CandidateIndex = self.continuing_candidates_sorted_by_tally[num_candidates_with_fewer_notional_votes_than_the_leading_shortfall-1];
+            num_candidates_with_fewer_notional_votes_than_the_leading_shortfall
+        };
+        // now take into account subsection 13B:
+        let candidates_to_exclude = min(candidates_to_exclude,self.continuing_candidates_sorted_by_tally.len()-self.remaining_to_elect());
+        if candidates_to_exclude==0 { return None; }
+        // now need to check for ties. Candidate B cannot tie in a way that matters because of b(ii), but candidate C might.
+        let tally_of_highest_excluded : Rules::Tally = self.tally(self.continuing_candidates_sorted_by_tally[candidates_to_exclude-1]);
+        let mut tie_end = candidates_to_exclude;
+        while tie_end<self.continuing_candidates_sorted_by_tally.len() && tally_of_highest_excluded==self.tally(self.continuing_candidates_sorted_by_tally[tie_end]) { tie_end+=1; }
+        if tie_end>candidates_to_exclude { // there is a tie, and at least 1 of tied candidates will be excluded, and at least 1 will not, so the tie matters.
+            // Use rule 31(b) to resolve ties.
+            let mut tie_start : usize = candidates_to_exclude-1;
+            while tie_start>0 && tally_of_highest_excluded==self.tally(self.continuing_candidates_sorted_by_tally[tie_start-1]) { tie_start-=1; }
+            self.check_for_ties_and_resolve_inplace(tie_start..tie_end,Rules::resolve_ties_choose_lowest_candidate_for_exclusion());
+        }
+        // exclude the lowest candidates_to_exclude candidates.
+        Some(self.continuing_candidates_sorted_by_tally[0..candidates_to_exclude].to_vec())
+    }
+
     /// Federal legislation:
     /// > (13AA) Where a candidate is, or candidates are, excluded in accordance
     /// > with this section, the ballot papers of the excluded candidate or
@@ -442,14 +595,14 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// > candidate;
     /// > (iii) all those ballot papers must be transferred to the
     /// > continuing candidate.
-    pub fn eliminate(&mut self,candidates_to_eliminate:Vec<CandidateIndex>) {
-        for &candidate in &candidates_to_eliminate {
+    pub fn exclude(&mut self, candidates_to_exclude:Vec<CandidateIndex>) {
+        for &candidate in &candidates_to_exclude {
             println!("Excluding {}",self.data.metadata.candidate(candidate).name);
             self.no_longer_continuing(candidate,false);
         }
         if Rules::when_to_check_if_all_remaining_should_get_elected()==WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers && self.continuing_candidates_sorted_by_tally.len()==self.remaining_to_elect()
            || Rules::when_to_check_if_just_two_standing_for_shortcut_election()==WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers && self.continuing_candidates_sorted_by_tally.len()==2 && self.remaining_to_elect()==1 {
-            self.end_of_count_step(ReasonForCount::Elimination(candidates_to_eliminate.clone()), PortionOfReasonBeingDoneThisCount {
+            self.end_of_count_step(ReasonForCount::Elimination(candidates_to_exclude.clone()), PortionOfReasonBeingDoneThisCount {
                 transfer_value: None,
                 when_tv_created : None,
                 papers_came_from_counts: vec![],
@@ -457,7 +610,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             return; // Don't transfer any papers!
         }
         let mut provenances : HashSet<(<Rules::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,TransferValue)> = HashSet::default();
-        for &candidate in &candidates_to_eliminate {
+        for &candidate in &candidates_to_exclude {
             for prov in self.papers[candidate.0].get_all_provenance_keys() {
                 provenances.insert(prov);
             }
@@ -472,7 +625,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             let mut original_worth = Rules::Tally::zero();
             let mut when_tv_created = DetectUnique::<Option<CountIndex>>::default();
             let mut papers_came_from_counts = CollectAll::<CountIndex>::default();
-            for &candidate in &candidates_to_eliminate {
+            for &candidate in &candidates_to_exclude {
                 if let Some((from,votes)) = self.papers[candidate.0].extract_all_ballots_with_given_provenance(&key) {
                     when_tv_created.add(from.when_tv_created);
                     original_worth+=from.tally.clone();
@@ -485,7 +638,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             let when_tv_created=when_tv_created.take().flatten();
             self.parcel_out_votes_with_given_transfer_value(key.1.clone(),all_votes,when_tv_created,original_worth);
             togo-=1;
-            self.end_of_count_step(ReasonForCount::Elimination(candidates_to_eliminate.clone()), PortionOfReasonBeingDoneThisCount {
+            self.end_of_count_step(ReasonForCount::Elimination(candidates_to_exclude.clone()), PortionOfReasonBeingDoneThisCount {
                 transfer_value: Some(key.1),
                 when_tv_created,
                 papers_came_from_counts: papers_came_from_counts.take(),
@@ -496,9 +649,10 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
 
     pub fn distribute_lowest(&mut self) {
-        // TODO do the absurd Federal 13(A) multiple elimination
-        let candidates_to_remove = self.find_lowest_candidate();
-        self.eliminate(candidates_to_remove);
+        let candidates_to_exclude : Vec<CandidateIndex> =
+            if Rules::should_eliminate_multiple_candidates_federal_rule_13a() { self.find_candidates_for_multiple_elimination_federal_rule_13a().unwrap_or_else(||self.find_lowest_candidate()) }
+            else { self.find_lowest_candidate() };
+        self.exclude(candidates_to_exclude);
     }
     pub fn go(&mut self) {
         self.print_candidates_names();

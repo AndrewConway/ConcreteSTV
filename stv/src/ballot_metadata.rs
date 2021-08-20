@@ -65,6 +65,15 @@ impl ElectionMetadata {
         }
         res
     }
+    pub fn get_candidate_ec_id_lookup(&self) -> HashMap<String,CandidateIndex> {
+        let mut res = HashMap::default();
+        for i in 0..self.candidates.len() {
+            if let Some(id) = self.candidates[i].ec_id.as_ref() {
+                res.insert(id.to_string(),CandidateIndex(i));
+            }
+        }
+        res
+    }
 }
 
 /// Which election it was.
@@ -79,6 +88,7 @@ pub struct ElectionName {
     /// region in this contest, e.g. Vic
     pub electorate : String,
     /// modifications made to this data, e.g. simulating errors, hackers. Usually empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub modifications : Vec<String>
 }
 
@@ -107,11 +117,15 @@ pub struct Party {
     /// The name of the party
     pub name : String,
     /// an abbreviation for the party
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub abbreviation : Option<String>,
     /// true if one is allowed to vote atl for this party. "Ungrouped" it is false for, also conceivably some rare other situations (for instance, in a ticket election, where the party did not submit a ticket).
     pub atl_allowed : bool,
     /// the candidates in this party, in preference order.
-    pub candidates : Vec<CandidateIndex>
+    pub candidates : Vec<CandidateIndex>,
+    /// the group voting tickets for this party, if any.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tickets : Vec<Vec<CandidateIndex>>
 }
 
 /// information about a candidate in the contest.
@@ -121,4 +135,7 @@ pub struct Candidate {
     pub party : PartyIndex,
     // position on the party ticket. 1 means first place.
     pub position : usize,
+    // Electoral Commission internal identifier.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ec_id : Option<String>,
 }

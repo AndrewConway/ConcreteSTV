@@ -5,6 +5,7 @@ use stv::tie_resolution::MethodOfTieResolution;
 
 pub mod parse;
 mod test_federal;
+pub mod parse2013;
 
 pub struct FederalRules {
 }
@@ -166,14 +167,22 @@ impl PreferenceDistributionRules for FederalRules {
     /// I am assigning it to be done generously, which is debatable.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuota }
 
-
+    /// Commonwealth Electoral Act 1918, Section 273, subsection (13)(b)
+    /// ```text
+    /// (b) if a bulk exclusion of candidates may be effected under
+    ///     subsection (13A), those candidates must be excluded;
+    /// ```
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { true }
 }
 
-/// the actual rules used by the AEC in 2019, based on reverse engineering their published
+/// The actual rules used by the AEC in 2019, based on reverse engineering their published
 /// distribution of preferences transcripts.
-pub struct FederalRulesUsed2019 {
-
-}
+///
+/// Note that this is not possible to specify perfectly as the AEC considers their source
+/// code secret and have persecuted people who requested it under FOI. There are often
+/// multiple interpretations compatible with the actual outcome. I have tried to guess
+/// the most plausible rules used, as close as possible to my interpretation of the legislation.
+pub struct FederalRulesUsed2019 { }
 
 impl PreferenceDistributionRules for FederalRulesUsed2019 {
     type Tally = usize ;
@@ -211,5 +220,67 @@ impl PreferenceDistributionRules for FederalRulesUsed2019 {
     /// The elimination is aborted and no ballots are transferred in this count.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers }
 
+    /// Not done in TAS count 5, SA count 6, QLD 5, NSW 6.
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
+}
 
+/// the actual rules used by the AEC in 2016, based on reverse engineering their published
+/// distribution of preferences transcripts.
+///
+/// Note that this is not possible to specify perfectly as the AEC considers their source
+/// code secret and have persecuted people who requested it under FOI. There are often
+/// multiple interpretations compatible with the actual outcome. I have tried to guess
+/// the most plausible rules used, as close as possible to my interpretation of the legislation.
+pub struct FederalRulesUsed2016 { }
+
+impl PreferenceDistributionRules for FederalRulesUsed2016 {
+    type Tally = usize ;
+    type SplitByNumber = DoNotSplitByCountNumber;
+
+    fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
+        TransferValue::from_surplus(surplus,ballots)
+    }
+
+    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> (usize, LostToRounding) {
+        transfer_value.mul_rounding_down(ballots)
+    }
+
+
+    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+
+    /// In 2016, WA, on count 49, there was a 3 way tie for elimination.
+    /// M. Hercock, S. Fargher and H HENG all had 66 votes.
+    /// The latest turn that they all had different tallies was turn 4, with 65, 61 and 63 respectively.
+    /// So MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent means that S. Fargher should have been eliminated.
+    /// Actually M. Hercock was eliminated. This may be because on round 41, they had tallies 65, 66 and 66 respectively.
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
+
+
+    fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
+    fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
+
+
+    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+
+
+    /// In Queensland 2016, count 830, candidate R. McGarvie was excluded, leaving 2 candidates and 2 seats.
+    /// The exclusion was carried out in full (11 counts), and C Ketter was discovered to have a quota, leaving 1 candidate (M Roberts) and 1 vacancy.
+    /// This candidate was not elected until count 841, when C Ketter's surplus was distributed.
+    ///
+    /// A very similar thing happened in Victoria 2019, count 814, P. Bain was excluded, leaving 2 candidates and 2 seats.
+    /// The exclusion was carried out in full (11 counts), and J Rice was discovered to have a quota, leaving 1 candidate (J Hume) and 1 vacancy.
+    /// This candidate was not elected until count 825, when J Rice's surplus was distributed.
+    ///
+    /// A similar but slightly more complex thing happened in NSW 2019, count 1054. N. Hall was excluded, leaving 3 remaining candidates and 3 vacancies.
+    /// The exclusion was carried out in full (10 counts), and two candidates, J Williams and B Burston were elected on quota.
+    /// Two more surplus distributions were carried out, and on the last, D Leyonhjelm was elected.
+    ///
+    /// A different thing happened in WA 2016, o count 535, K. Muir was excluded, leaving 2 candidates and 2 seats.
+    /// The first step of the exclusion was performed, at the end of which the remaining 2 candidates were both declared elected.
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists }
+
+    /// several occasions.
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
 }

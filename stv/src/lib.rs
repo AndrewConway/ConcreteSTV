@@ -9,6 +9,7 @@ pub mod distribution_of_preferences_transcript;
 pub mod util;
 pub mod tie_resolution;
 pub mod official_dop_transcript;
+pub mod parse_util;
 
 #[cfg(test)]
 mod tests {

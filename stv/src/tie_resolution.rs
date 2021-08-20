@@ -1,6 +1,6 @@
 use crate::ballot_metadata::CandidateIndex;
 use crate::distribution_of_preferences_transcript::{Transcript, DecisionMadeByEC};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::hash::Hash;
 use anyhow::anyhow;
 
@@ -22,6 +22,11 @@ pub enum MethodOfTieResolution {
     /// order in which they shall be taken to have been elected.
     /// ```
     RequireHistoricalCountsToBeAllDifferent,
+    /// Another approach is that whenever X has a higher count than Y, Y is considered below X.
+    /// That is, whenever there are at least 2 different values, all with the lower values go before all with the higher values.
+    /// This is equivalent to always sorting by tally, and actually seems the most reasonable choice as far as I am concerned.
+    /// Of course, that is not necessarily what is legislated.
+    AnyDifferenceIsADiscriminator,
 }
 
 impl MethodOfTieResolution {
@@ -31,6 +36,7 @@ impl MethodOfTieResolution {
         let resolved = match self {
             MethodOfTieResolution::None => false,
             MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent => resolve_ties_require_all_different(tied_candidates,transcript),
+            MethodOfTieResolution::AnyDifferenceIsADiscriminator => resolve_ties_any_different(tied_candidates,transcript),
         };
         if resolved { None } else { Some(DecisionMadeByEC{ affected: tied_candidates.to_vec() }) }
     }
@@ -46,7 +52,7 @@ impl MethodOfTieResolution {
 /// in the new list. (low to high)
 ///
 /// If nothing matches, then a candidate with a smaller index (earlier on the paper generally)
-/// will be put after (generally a better position) than a candidate with a smaller index.
+/// will be put before (generally a worse position) than a candidate with a smaller index.
 /// This seems to be what many ECs do in practice.
 ///
 /// Is it possible that the same set of candidates will need two different ties resolutions?
@@ -89,12 +95,11 @@ impl TieResolutionsMadeByEC {
             }
         }
         tied_candidates.sort_by_key(|c|c.0);
-        tied_candidates.reverse();
     }
 }
 
 
-/// Sort candidates high to low based on the tie resolution rules.
+/// Sort candidates high to low based on some prior period when they each had a different tally.
 /// Return true iff ties are resolved.
 fn resolve_ties_require_all_different<Tally:Clone+Eq+Hash+Ord>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>) -> bool {
     for count in transcript.counts.iter().rev() {
@@ -105,6 +110,35 @@ fn resolve_ties_require_all_different<Tally:Clone+Eq+Hash+Ord>(tied_candidates: 
         if observed.len()==tied_candidates.len() { // All different!
             tied_candidates.sort_by_key(|candidate|count.status.tallies.candidate[candidate.0].clone());
             return true;
+        }
+    }
+    false
+}
+
+
+/// Sort candidates high to low based on the tie resolution rules.
+/// Return true iff ties are resolved.
+/// TODO make this more sophisticated, as sometimes it gives a partial resolution which may be sufficient, so a flag for EC decision should not be introduced.
+fn resolve_ties_any_different<Tally:Clone+Eq+Hash+Ord>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>) -> bool {
+    for count in transcript.counts.iter().rev() {
+        let mut observed : HashMap<Tally,Vec<CandidateIndex>> = HashMap::new();
+        for candidate in tied_candidates.iter() {
+            observed.entry(count.status.tallies.candidate[candidate.0].clone()).or_insert_with(||vec![]).push(*candidate);
+        }
+        if observed.len()>1 { // at least 1 different.
+            let mut tallies : Vec<Tally> = observed.keys().cloned().collect();
+            tallies.sort();
+            let mut ok = true;
+            let mut upto = 0;
+            for tally in tallies {
+                let who = observed.get_mut(&tally).unwrap();
+                if who.len()>1 {
+                    ok=ok&&resolve_ties_any_different(who,transcript); // could optimize to start at count currently up to.
+                }
+                tied_candidates[upto..upto+who.len()].copy_from_slice(who);
+                upto+=who.len();
+            }
+            return ok;
         }
     }
     false
