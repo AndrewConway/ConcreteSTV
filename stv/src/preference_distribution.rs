@@ -13,7 +13,7 @@ use std::ops::{AddAssign, Neg, SubAssign, Sub, Range};
 use std::fmt::Display;
 use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, TransferValueSource, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, DecisionMadeByEC};
 use crate::util::{DetectUnique, CollectAll};
-use crate::tie_resolution::{MethodOfTieResolution, TieResolutionsMadeByEC};
+use crate::tie_resolution::{MethodOfTieResolution, TieResolutionsMadeByEC, TieResolutionGranularityNeeded};
 use std::hash::Hash;
 use std::iter::Sum;
 use std::cmp::min;
@@ -213,7 +213,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// to_check (which should be already sorted by tally). If there are,
     /// resolve them, first using "how", secondly using self.ec_resolutions.
     /// Re-orders to_check to be in the appropriate order.
-    pub fn check_for_ties_and_resolve(&mut self,to_check:&mut [CandidateIndex],how:MethodOfTieResolution) {
+    pub fn check_for_ties_and_resolve(&mut self,to_check:&mut [CandidateIndex],how:MethodOfTieResolution,granularity:TieResolutionGranularityNeeded) {
         // let mut to_check = &mut self.continuing_candidates_sorted_by_tally[to_check];
         let mut i:usize = 0;
         while i<to_check.len() {
@@ -221,7 +221,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             while differs<to_check.len() && self.tally(to_check[i])==self.tally(to_check[differs]) { differs+=1; }
             if differs!=i+1 { // we have a few with identical tallies
                 let tied = &mut to_check[i..differs];
-                if let Some(decision) = how.resolve(tied,&self.transcript) {
+                if let Some(decision) = how.resolve(tied,&self.transcript,granularity) {
                     self.in_this_count.decisions.push(decision);
                     self.ec_resolutions.resolve(tied);
                 }
@@ -231,17 +231,17 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 
     /// Like check_for_ties_and_resolve but do in place on self.continuing_candidates_sorted_by_tally for the indices given in to_check
-    pub fn check_for_ties_and_resolve_inplace(&mut self,to_check:Range<usize>,how:MethodOfTieResolution) {
+    pub fn check_for_ties_and_resolve_inplace(&mut self,to_check:Range<usize>,how:MethodOfTieResolution,granularity:TieResolutionGranularityNeeded) {
         // can't just pass a mutable reference to self.continuing_candidates_sorted_by_tally[to_check] as there would be 2 mutable refs :-(
         let mut tied_candidates = self.continuing_candidates_sorted_by_tally[to_check.clone()].to_vec();
-        self.check_for_ties_and_resolve(&mut tied_candidates,how);
+        self.check_for_ties_and_resolve(&mut tied_candidates,how,granularity);
         self.continuing_candidates_sorted_by_tally[to_check].copy_from_slice(&tied_candidates); // copy resolved order back.
     }
 
     pub fn check_elected_by_quota(&mut self) {
         let mut elected_by_quota : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().rev().take_while(|&&c|self.tally(c)>self.quota).cloned().collect();
         elected_by_quota.reverse(); // make sure low to high so that tie checking ordering is compatible.
-        self.check_for_ties_and_resolve(&mut elected_by_quota,Rules::resolve_ties_elected_by_quota());
+        self.check_for_ties_and_resolve(&mut elected_by_quota,Rules::resolve_ties_elected_by_quota(),TieResolutionGranularityNeeded::Total);
         for &c in elected_by_quota.iter().rev() {
             self.declare_elected(c,ElectionReason::ReachedQuota);
             if self.tally(c)>self.quota { self.pending_surplus_distribution.push_back(c); }
@@ -260,7 +260,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn check_elected_by_highest_of_remaining_2_when_1_needed_no_tie_resolution(&mut self) {
         if self.continuing_candidates_sorted_by_tally.len()==2 && self.remaining_to_elect()==1 {
             let mut possibilities = self.continuing_candidates_sorted_by_tally.clone();
-            self.check_for_ties_and_resolve(&mut possibilities,Rules::resolve_ties_elected_one_of_last_two());
+            self.check_for_ties_and_resolve(&mut possibilities,Rules::resolve_ties_elected_one_of_last_two(),TieResolutionGranularityNeeded::Total);
             // elect the highest, Electoral officer resolved ties.
             self.declare_elected(possibilities[1],ElectionReason::HighestOfLastTwoStanding);
         }
@@ -273,7 +273,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn check_if_should_elect_all_remaining(&mut self) {
         if self.continuing_candidates_sorted_by_tally.len()==self.remaining_to_elect() {
             let mut elected_group = self.continuing_candidates_sorted_by_tally.clone();
-            self.check_for_ties_and_resolve(&mut elected_group,Rules::resolve_ties_elected_all_remaining());
+            self.check_for_ties_and_resolve(&mut elected_group,Rules::resolve_ties_elected_all_remaining(),TieResolutionGranularityNeeded::Total);
             for &c in elected_group.iter().rev() {
                 self.declare_elected(c,ElectionReason::AllRemainingMustBeElected);
             }
@@ -420,7 +420,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn find_lowest_candidate(&mut self) -> Vec<CandidateIndex> {
         let lowest_tally = self.tally(self.continuing_candidates_sorted_by_tally[0]);
         let mut possibilities : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().take_while(|&&c|self.tally(c)==lowest_tally).cloned().collect();
-        self.check_for_ties_and_resolve(&mut possibilities,Rules::resolve_ties_choose_lowest_candidate_for_exclusion());
+        self.check_for_ties_and_resolve(&mut possibilities,Rules::resolve_ties_choose_lowest_candidate_for_exclusion(),TieResolutionGranularityNeeded::LowestSeparated(1));
         possibilities.truncate(1);
         possibilities
     }
@@ -560,7 +560,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             // Use rule 31(b) to resolve ties.
             let mut tie_start : usize = candidates_to_exclude-1;
             while tie_start>0 && tally_of_highest_excluded==self.tally(self.continuing_candidates_sorted_by_tally[tie_start-1]) { tie_start-=1; }
-            self.check_for_ties_and_resolve_inplace(tie_start..tie_end,Rules::resolve_ties_choose_lowest_candidate_for_exclusion());
+            self.check_for_ties_and_resolve_inplace(tie_start..tie_end,Rules::resolve_ties_choose_lowest_candidate_for_exclusion(),TieResolutionGranularityNeeded::LowestSeparated(candidates_to_exclude-tie_start));
         }
         // exclude the lowest candidates_to_exclude candidates.
         Some(self.continuing_candidates_sorted_by_tally[0..candidates_to_exclude].to_vec())

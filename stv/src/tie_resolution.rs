@@ -29,14 +29,25 @@ pub enum MethodOfTieResolution {
     AnyDifferenceIsADiscriminator,
 }
 
+/// Sometimes you need tie resolution to distinguish all candidates (e.g. for order elected),
+/// sometimes only to single out a particular subset (e.g. elimination of 1 lowest candidate).
+/// This specifies how precise one needs to be.
+#[derive(Debug,Clone,Copy)]
+pub enum TieResolutionGranularityNeeded {
+    /// Require a unique collection of all people
+    Total,
+    /// Require the lowest provided number to be separated from the remainder.
+    LowestSeparated(usize)
+}
+
 impl MethodOfTieResolution {
     /// sort tied_candidates low to high based upon the given method of tie resolution.
     /// If the method does not resolve it, return a DecisionMadeByEC object.
-    pub fn resolve<Tally:Clone+Hash+Ord>(self,tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>) -> Option<DecisionMadeByEC> {
+    pub fn resolve<Tally:Clone+Hash+Ord>(self,tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded) -> Option<DecisionMadeByEC> {
         let resolved = match self {
             MethodOfTieResolution::None => false,
             MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent => resolve_ties_require_all_different(tied_candidates,transcript),
-            MethodOfTieResolution::AnyDifferenceIsADiscriminator => resolve_ties_any_different(tied_candidates,transcript),
+            MethodOfTieResolution::AnyDifferenceIsADiscriminator => resolve_ties_any_different(tied_candidates,transcript,granularity),
         };
         if resolved { None } else { Some(DecisionMadeByEC{ affected: tied_candidates.to_vec() }) }
     }
@@ -99,7 +110,7 @@ impl TieResolutionsMadeByEC {
 }
 
 
-/// Sort candidates high to low based on some prior period when they each had a different tally.
+/// Sort candidates low to high based on some prior period when they each had a different tally.
 /// Return true iff ties are resolved.
 fn resolve_ties_require_all_different<Tally:Clone+Eq+Hash+Ord>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>) -> bool {
     for count in transcript.counts.iter().rev() {
@@ -116,28 +127,34 @@ fn resolve_ties_require_all_different<Tally:Clone+Eq+Hash+Ord>(tied_candidates: 
 }
 
 
-/// Sort candidates high to low based on the tie resolution rules.
-/// Return true iff ties are resolved.
-/// TODO make this more sophisticated, as sometimes it gives a partial resolution which may be sufficient, so a flag for EC decision should not be introduced.
-fn resolve_ties_any_different<Tally:Clone+Eq+Hash+Ord>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>) -> bool {
+/// Sort candidates low to high based on the tie resolution rules.
+/// Return true iff ties are resolved to the required granularity.
+fn resolve_ties_any_different<Tally:Clone+Eq+Hash+Ord>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded) -> bool {
+    //println!("Resolve ties any different between {}",tied_candidates.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(","));
     for count in transcript.counts.iter().rev() {
         let mut observed : HashMap<Tally,Vec<CandidateIndex>> = HashMap::new();
         for candidate in tied_candidates.iter() {
             observed.entry(count.status.tallies.candidate[candidate.0].clone()).or_insert_with(||vec![]).push(*candidate);
         }
         if observed.len()>1 { // at least 1 different.
+            //println!("Broken into {} groups",observed.len());
             let mut tallies : Vec<Tally> = observed.keys().cloned().collect();
             tallies.sort();
             let mut ok = true;
-            let mut upto = 0;
+            let mut upto : usize = 0;
             for tally in tallies {
                 let who = observed.get_mut(&tally).unwrap();
                 if who.len()>1 {
-                    ok=ok&&resolve_ties_any_different(who,transcript); // could optimize to start at count currently up to.
+                    match granularity {
+                        TieResolutionGranularityNeeded::Total => {ok=ok&&resolve_ties_any_different(who,transcript,granularity)}  // could optimize to start at count currently up to.
+                        TieResolutionGranularityNeeded::LowestSeparated(loc) if loc>upto && loc<upto+who.len() => {ok=ok&&resolve_ties_any_different(who,transcript,TieResolutionGranularityNeeded::LowestSeparated(loc-upto))}
+                        TieResolutionGranularityNeeded::LowestSeparated(_) => {} // granularity means we don't care.
+                    }
                 }
                 tied_candidates[upto..upto+who.len()].copy_from_slice(who);
                 upto+=who.len();
             }
+            //println!("Solution is : {}",tied_candidates.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(","));
             return ok;
         }
     }
