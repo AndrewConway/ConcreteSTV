@@ -6,6 +6,9 @@ members= [
     "stv",
     "act",
     "federal",
+    "main-app",
 ]
 
 
+[profile.dev]
+opt-level = 1

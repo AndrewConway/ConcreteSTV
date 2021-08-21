@@ -323,7 +323,7 @@ impl PreferenceDistributionRules for FederalRulesUsed2013 {
     /// In SA, count 228, B. Day is elected on quota, leaving 2 candidates 1 seat. S. Birmingham is not elected until the next count, 229.
     fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
-    
+
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists }
 
     /// several occasions, e.g ACT.
