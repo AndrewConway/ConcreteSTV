@@ -63,8 +63,9 @@ function Render() {
     add(people_row,"th").innerText="Exhausted";
     add(people_row,"th").innerText="Rounding";
     add(people_row,"th").innerText="Transfer Value";
-    add(people_row,"th").innerText="From Count";
     add(people_row,"th").innerText="Count action";
+    add(people_row,"th").innerText="EC decisions needed";
+    add(people_row,"th").innerText="From Count";
     let count_number = 1;
     let elected = new Set();
     let not_continuing = new Set();
@@ -115,8 +116,9 @@ function Render() {
             if (count.created_transfer_value.original_transfer_value) title+=" original transfer value : "+count.created_transfer_value.original_transfer_value;
             tv_td.title=title;
         }
-        fullSpanTD().innerText=count.portion.papers_came_from_counts.map(format_from).join(",");
         fullSpanTD().innerText=count.reason==="FirstPreferenceCount"?"First Preference Count":count.reason.hasOwnProperty("ExcessDistribution")?"Excess distribution for "+cname(count.reason.ExcessDistribution):"Elimination of "+count.reason.Elimination.map(cname).join(" & "); // TODO prettify
+        fullSpanTD().innerText=count.decisions.map(a=>a.affected.map(candidate=>metadata.candidates[candidate].name+" ("+candidate+")").join(",")).join(" and ");
+        fullSpanTD().innerText=count.portion.papers_came_from_counts.map(format_from).join(", ");
         count_number+=1;
         last_count=count;
     }
