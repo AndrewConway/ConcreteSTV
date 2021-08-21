@@ -88,7 +88,7 @@ pub struct ElectionName {
     /// region in this contest, e.g. Vic
     pub electorate : String,
     /// modifications made to this data, e.g. simulating errors, hackers. Usually empty.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty",default)]
     pub modifications : Vec<String>
 }
 
@@ -117,14 +117,14 @@ pub struct Party {
     /// The name of the party
     pub name : String,
     /// an abbreviation for the party
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none",default)]
     pub abbreviation : Option<String>,
     /// true if one is allowed to vote atl for this party. "Ungrouped" it is false for, also conceivably some rare other situations (for instance, in a ticket election, where the party did not submit a ticket).
     pub atl_allowed : bool,
     /// the candidates in this party, in preference order.
     pub candidates : Vec<CandidateIndex>,
     /// the group voting tickets for this party, if any.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty",default)]
     pub tickets : Vec<Vec<CandidateIndex>>
 }
 
@@ -136,6 +136,6 @@ pub struct Candidate {
     // position on the party ticket. 1 means first place.
     pub position : usize,
     // Electoral Commission internal identifier.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none",default)]
     pub ec_id : Option<String>,
 }
