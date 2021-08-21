@@ -80,7 +80,7 @@ pub(crate) fn read_from_senate_group_voting_tickets_download_file2013(builder: &
 /// Parties can have multiple tickets to spread their votes over.
 fn get_deduced_aec_ticket_splits2013(state:&str) -> anyhow::Result<HashMap<&'static str,usize>> {
     match state {
-        "VIC" => Ok(HashMap::<_, _>::from_iter([("E", 0), ("F", 0), ("L", 0), ("AF", 0), ("AI", 0), ("AK", 0)])),
+        "VIC" => Ok(HashMap::<_, _>::from_iter([("E", 0), ("F", 0), ("L", 0), ("AF", 0), ("AI", 0), ("AK", 2)])),
         "NT" => Ok(HashMap::<_, _>::from_iter([("H", 1)])),
         "SA" => Ok(HashMap::<_, _>::from_iter([("A", 1), ("V",0)])),
         "WA" => Ok(HashMap::<_, _>::from_iter([("E", 2), ("P",0)])),
@@ -157,13 +157,26 @@ pub(crate) fn read_btl_votes2013(metadata:&ElectionMetadata,path:&Path,min_btl_p
                         }
                         last=Some((batch,paper));
                     }
-                    let preference = if let Ok(preference) = record[1].parse::<u16>() { RawBallotMarking::Number(preference) }
+                    let mark = record[1].trim();
+                    let preference = if let Ok(preference) = mark.parse::<u16>() { RawBallotMarking::Number(preference) }
                     else {
-                        match &record[1] {
+                        match mark {
                             "" => RawBallotMarking::Blank,
                             "??" => RawBallotMarking::Other,
-                            "*" => RawBallotMarking::Other,
-                            _ => { println!("Preference mark <{}>",&record[1]); RawBallotMarking::Other },
+                            "*" => RawBallotMarking::Other, // in 2013, ticks and crosses are not considered ones when BTL, although they are ATL.
+                            "/" => RawBallotMarking::Other, // in 2013, ticks and crosses are not considered ones when BTL, although they are ATL.
+                            _ => {
+                                /* There are some counts like 14. We could try to save them... but then we wouldn't match the AEC counts.
+                                let start_with_number : String = mark.chars().take_while(|c|c.is_numeric()).collect();
+                                if start_with_number.len()>0 {
+                                    if let Ok(preference) = start_with_number.parse::<u16>() { RawBallotMarking::Number(preference) } else {
+                                        println!("Preference mark <{}>",mark); RawBallotMarking::Other
+                                    }
+                                } else {
+                                    println!("Preference mark <{}>",mark); RawBallotMarking::Other
+                                }*/
+                                println!("Preference mark <{}>",mark); RawBallotMarking::Other
+                            },
                         }};
                     btl_markings[candidate.0]=preference;
                 }

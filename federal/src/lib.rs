@@ -269,11 +269,11 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
     /// The exclusion was carried out in full (11 counts), and C Ketter was discovered to have a quota, leaving 1 candidate (M Roberts) and 1 vacancy.
     /// This candidate was not elected until count 841, when C Ketter's surplus was distributed.
     ///
-    /// A very similar thing happened in Victoria 2019, count 814, P. Bain was excluded, leaving 2 candidates and 2 seats.
+    /// A very similar thing happened in Victoria 2016, count 814, P. Bain was excluded, leaving 2 candidates and 2 seats.
     /// The exclusion was carried out in full (11 counts), and J Rice was discovered to have a quota, leaving 1 candidate (J Hume) and 1 vacancy.
     /// This candidate was not elected until count 825, when J Rice's surplus was distributed.
     ///
-    /// A similar but slightly more complex thing happened in NSW 2019, count 1054. N. Hall was excluded, leaving 3 remaining candidates and 3 vacancies.
+    /// A similar but slightly more complex thing happened in NSW 2016, count 1054. N. Hall was excluded, leaving 3 remaining candidates and 3 vacancies.
     /// The exclusion was carried out in full (10 counts), and two candidates, J Williams and B Burston were elected on quota.
     /// Two more surplus distributions were carried out, and on the last, D Leyonhjelm was elected.
     ///
@@ -283,4 +283,49 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
 
     /// several occasions.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
+}
+
+/// the actual rules used by the AEC in 2013, based on reverse engineering their published
+/// distribution of preferences transcripts.
+///
+/// Note that this is not possible to specify perfectly as the AEC considers their source
+/// code secret and have persecuted people who requested it under FOI. There are often
+/// multiple interpretations compatible with the actual outcome. I have tried to guess
+/// the most plausible rules used, as close as possible to my interpretation of the legislation.
+pub struct FederalRulesUsed2013 { }
+
+impl PreferenceDistributionRules for FederalRulesUsed2013 {
+    type Tally = usize ;
+    type SplitByNumber = DoNotSplitByCountNumber;
+
+    fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
+        TransferValue::from_surplus(surplus,ballots)
+    }
+
+    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> (usize, LostToRounding) {
+        transfer_value.mul_rounding_down(ballots)
+    }
+
+
+    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+
+    /// In 2013 NSW, count 25, T. Dean was eliminated in a 4 way tie for 17. All candidates had 17 since count 1 other than T. Dean who had 16.
+    /// This may be coincidence - the EC could have then decided it with MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent , or it could have been an application of MethodOfTieResolution::AnyDifferenceIsADiscriminator
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
+
+
+    fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
+    fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
+
+
+    /// In SA, count 228, B. Day is elected on quota, leaving 2 candidates 1 seat. S. Birmingham is not elected until the next count, 229.
+    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+
+    
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists }
+
+    /// several occasions, e.g ACT.
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { true }
 }

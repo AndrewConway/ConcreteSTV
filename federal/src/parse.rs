@@ -159,7 +159,7 @@ impl FederalDataLoader {
         let preferences_zip_file = self.base_path.join(&filename);
         println!("Parsing {}",&preferences_zip_file.to_string_lossy());
         metadata.source[0].files.push(filename);
-        let (mut btl,informal) = read_btl_votes2013(&metadata, &preferences_zip_file, 1)?;
+        let (mut btl,informal) = read_btl_votes2013(&metadata, &preferences_zip_file, 1)?; // The 2013 formality rules are quite complex. I am assuming the AEC has applied them already to all with a 1 vote. This is a dubious assumption as there are some without a 1 vote. However since we don't get all the informal votes, it is hard to check formality properly.
         btl.extend_from_slice(&ticket_votes);
         Ok(ElectionData{ metadata, atl:vec![], btl, informal })
     }
@@ -185,11 +185,12 @@ impl FederalDataLoader {
     }
 
     /// These are deduced by looking at the actual transcript of results.
+    /// I have not included anything if all decisions are handled by the fallback "earlier on the ballot paper candidates are listed in worse positions.
     pub fn ec_decisions(&self,state:&str) -> TieResolutionsMadeByEC {
         match self.year.as_str() {
-            "2016" => match state {
-               // "TAS" => TieResolutionsMadeByEC{ resolutions: vec![vec![CandidateIndex(57), CandidateIndex(50), CandidateIndex(29)]] } , // count 26, 3 way tie for 39. Candidate 29 got eliminated.
-               // "NSW" => TieResolutionsMadeByEC{ resolutions: vec![vec![CandidateIndex(78),CandidateIndex(88) ]] } , // count 10, 2 way tie for 18. Candidate 78 got eliminated.
+            "2013" => match state {
+               "VIC" => TieResolutionsMadeByEC{ resolutions: vec![vec![CandidateIndex(54), CandidateIndex(23),CandidateIndex(85),CandidateIndex(88)]] } , // 4 way tie at count 10.
+               "NSW" => TieResolutionsMadeByEC{ resolutions: vec![vec![CandidateIndex(82),CandidateIndex(52),CandidateIndex(54)], vec![CandidateIndex(104),CandidateIndex(68),CandidateIndex(72)], vec![CandidateIndex(56),CandidateIndex(7)], vec![CandidateIndex(20),CandidateIndex(12),CandidateIndex(96)]] } ,
                 _ => Default::default(),
             },
             _ => Default::default(),
