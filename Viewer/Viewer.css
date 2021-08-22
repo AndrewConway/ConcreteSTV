@@ -1,6 +1,12 @@
 
 
-td.CandidateName {
+td.CandidateNameHoriz {
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+}
+
+td.CandidateNameVert {
     writing-mode: vertical-rl;
     text-orientation: mixed;
     text-align: center;
@@ -8,12 +14,35 @@ td.CandidateName {
     justify-content: center;
 }
 
+
+td.CandidateNameSlanted {
+    white-space: nowrap;
+    position: relative;
+}
+
+td.CandidateNameSlanted > div {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+}
+
+td.CandidateNameSlanted > div > div {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    transform-origin: bottom left;
+    transform: rotate(-45deg);
+}
+
+td.CandidateNameSlanted.LastCandidate > div > div {
+    border-bottom: 1px solid grey;
+}
+
+
 td.PartyName {
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    text-align: center;
-    align-items: center;
-    justify-content: center;
+    text-align: right;
     border-left: 1px solid grey;
     border-right: 1px solid grey;
 }
@@ -26,21 +55,27 @@ td.LastCandidate {
     border-right: 1px solid grey;
 }
 
+td.CandidateNameSlanted.FirstCandidate {
+    border-left: none;
+}
+td.CandidateNameSlanted.LastCandidate {
+    border-right: none;
+}
+
 td.Elected {
     background: #e0ffe0;
-    text-align: right;
-    padding : 0;
 }
 
 td.Eliminated {
     background: #ffe0e0;
-    text-align: right;
-    padding : 0;
 }
 
-td.Continuing {
+td.Continuing,td.Elected,td.Eliminated {
     text-align: right;
-    padding : 0;
+    padding : 0 2px 0 0;
+}
+td.BallotPapers {
+    color: grey;
 }
 
 table {

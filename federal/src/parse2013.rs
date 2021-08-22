@@ -64,8 +64,8 @@ pub(crate) fn read_from_senate_group_voting_tickets_download_file2013(builder: &
                     builder.candidates.push(Candidate {
                         name,
                         ec_id: Some(candidate_id.to_string()),
-                        party: PartyIndex(builder.parties.len() - 1),
-                        position: position_in_ticket
+                        party: Some(PartyIndex(builder.parties.len() - 1)),
+                        position: Some(position_in_ticket)
                     })
                 }
             }

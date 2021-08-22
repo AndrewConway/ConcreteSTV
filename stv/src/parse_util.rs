@@ -48,8 +48,10 @@ impl CandidateAndGroupInformationBuilder {
         }).collect();
         for candidate_index in 0..self.candidates.len() {
             let candidate = & self.candidates[candidate_index];
-            res[candidate.party.0].candidates.push(CandidateIndex(candidate_index));
-            assert_eq!(res[candidate.party.0].candidates.len(),candidate.position);
+            if let Some(party) = candidate.party {
+                res[party.0].candidates.push(CandidateIndex(candidate_index));
+                assert_eq!(Some(res[party.0].candidates.len()),candidate.position);
+            }
         }
         res
     }

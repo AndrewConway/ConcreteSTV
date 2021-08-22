@@ -310,8 +310,8 @@ fn read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(builder: 
                     // self.candidate_by_id.insert(candidate_id.to_string(),CandidateIndex(self.candidates.len()));
                     builder.candidates.push(Candidate{
                         name: record[4].to_string(),
-                        party: PartyIndex(builder.parties.len()-1),
-                        position: position_in_ticket,
+                        party: Some(PartyIndex(builder.parties.len()-1)),
+                        position: Some(position_in_ticket),
                         ec_id: Some(candidate_id.to_string()),
                     })
                 }

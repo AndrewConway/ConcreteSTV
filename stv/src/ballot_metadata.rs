@@ -40,10 +40,13 @@ impl fmt::Debug for PartyIndex {
 pub struct ElectionMetadata {
     pub name : ElectionName,
     pub candidates : Vec<Candidate>,
+    #[serde(skip_serializing_if = "Vec::is_empty",default)]
     pub parties : Vec<Party>,
     /// where the data came from, such as a URL.
+    #[serde(skip_serializing_if = "Vec::is_empty",default)]
     pub source : Vec<DataSource>,
     /// the official results, if available.
+    #[serde(skip_serializing_if = "Option::is_none",default)]
     pub results : Option<Vec<CandidateIndex>>
 }
 
@@ -132,9 +135,11 @@ pub struct Party {
 #[derive(Debug,Serialize,Deserialize,Clone)]
 pub struct Candidate {
     pub name : String,
-    pub party : PartyIndex,
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub party : Option<PartyIndex>,
     // position on the party ticket. 1 means first place.
-    pub position : usize,
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub position : Option<usize>,
     // Electoral Commission internal identifier.
     #[serde(skip_serializing_if = "Option::is_none",default)]
     pub ec_id : Option<String>,
