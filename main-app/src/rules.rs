@@ -4,7 +4,7 @@ use stv::tie_resolution::TieResolutionsMadeByEC;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::ballot_metadata::CandidateIndex;
 use std::collections::HashSet;
-use federal::FederalRulesUsed2013;
+use federal::{FederalRulesUsed2013, FederalRulesUsed2019, FederalRulesUsed2016, FederalRules};
 use stv::preference_distribution::distribute_preferences;
 use std::fmt::{Display, Formatter};
 
@@ -47,9 +47,9 @@ impl Rules {
     pub fn count(&self,data: &ElectionData,candidates_to_be_elected : usize,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC) -> TranscriptWithMetadata<usize> {
         let transcript = match self {
             Rules::AEC2013 => distribute_preferences::<FederalRulesUsed2013>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
-            Rules::AEC2016 => distribute_preferences::<FederalRulesUsed2013>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
-            Rules::AEC2019 => distribute_preferences::<FederalRulesUsed2013>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
-            Rules::Federal => distribute_preferences::<FederalRulesUsed2013>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
+            Rules::AEC2016 => distribute_preferences::<FederalRulesUsed2016>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
+            Rules::AEC2019 => distribute_preferences::<FederalRulesUsed2019>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
+            Rules::Federal => distribute_preferences::<FederalRules>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
         };
         TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript }
     }
