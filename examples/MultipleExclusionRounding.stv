@@ -1,0 +1,26 @@
+{
+  "metadata":{
+    "name":{"year":"NA","authority":"NA","name":"Federal Senate","electorate":"NA","modifications": ["This is an artificial dataset to demonstrate the effect of multiple exclusion on rounding. Run with 2 vacancies. Using or not using multiple exclusion changes who is elected."]},
+    "candidates":[
+      {"name":"Q"},
+      {"name":"W1"},
+      {"name":"W2"},
+      {"name":"L3"},
+      {"name":"L2"},
+      {"name":"L1"}
+    ]
+  },
+  "atl":[],
+  "btl":[
+    {"candidates":[3],"n":3},
+    {"candidates":[4],"n":2},
+    {"candidates":[5],"n":1},
+    {"candidates":[1],"n":245},
+    {"candidates":[2],"n":246},
+    {"candidates":[0,3,1],"n":3},
+    {"candidates":[0,4,1],"n":3},
+    {"candidates":[0,5,1],"n":3},
+    {"candidates":[0],"n":391}
+  ],
+  "informal":0
+}

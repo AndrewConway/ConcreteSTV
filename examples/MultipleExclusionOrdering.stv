@@ -1,0 +1,41 @@
+{
+  "metadata":{
+    "name":{"year":"NA","authority":"NA","name":"Federal Senate","electorate":"NA","modifications": ["This is an artificial dataset to demonstrate the effect of multiple exclusion other than rounding. Run with 6 vacancies. A different result occurs with and without multiple exclusion."]},
+    "candidates":[
+      {"name":"W1"},
+      {"name":"W2"},
+      {"name":"W3"},
+      {"name":"W4"},
+      {"name":"W5"},
+      {"name":"W6"},
+      {"name":"W7"},
+      {"name":"L1"},
+      {"name":"L2"},
+      {"name":"L3"},
+      {"name":"L4"},
+      {"name":"L5"},
+      {"name":"L6"},
+      {"name":"L7"},
+      {"name":"L8"}
+    ]
+  },
+  "atl":[],
+  "btl":[
+    {"candidates":[7,8,0,2],"n":1},
+    {"candidates":[8,0,2],"n":2},
+    {"candidates":[9,8,0],"n":2},
+    {"candidates":[10,0],"n":3},
+    {"candidates":[11,0],"n":3},
+    {"candidates":[12,0],"n":4},
+    {"candidates":[13,0],"n":4},
+    {"candidates":[14,0,1],"n":4},
+    {"candidates":[6],"n":400},
+    {"candidates":[5],"n":400},
+    {"candidates":[4],"n":400},
+    {"candidates":[3],"n":400},
+    {"candidates":[2],"n":400},
+    {"candidates":[1],"n":400},
+    {"candidates":[0],"n":400}
+  ],
+  "informal":0
+}
