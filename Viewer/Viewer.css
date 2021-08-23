@@ -89,3 +89,11 @@ tr.MinorEndCount {
 tr.MajorEndCount {
     border-bottom: 1px solid #888;
 }
+
+div.comment {
+    font-style: italic;
+}
+
+div.quota {
+    font-weight: bold;
+}

@@ -1,6 +1,6 @@
 {
   "metadata":{
-    "name":{"year":"NA","authority":"NA","name":"Federal Senate","electorate":"NA","modifications": ["This is an artificial dataset to demonstrate the effect of multiple exclusion on rounding. Run with 2 vacancies. Using or not using multiple exclusion changes who is elected."]},
+    "name":{"year":"NA","authority":"NA","name":"Federal Senate","electorate":"NA","comment": "This is an artificial dataset to demonstrate the effect of multiple exclusion on rounding. Using or not using multiple exclusion changes who is elected. L1, L2 and L3 each get 3 papers with transfer value 1/4, so eliminated separately each round down to 0; eliminated together they round down to 2."},
     "candidates":[
       {"name":"Q"},
       {"name":"W1"},
@@ -8,7 +8,8 @@
       {"name":"L3"},
       {"name":"L2"},
       {"name":"L1"}
-    ]
+    ],
+    "vacancies" : 2
   },
   "atl":[],
   "btl":[

@@ -5,14 +5,13 @@
 use crate::ballot_metadata::CandidateIndex;
 use crate::ballot_paper::VoteSource;
 use std::collections::{HashSet, HashMap};
-use crate::history::CountIndex;
 use crate::transfer_value::TransferValue;
 use num::{Zero};
 use std::ops::{AddAssign, Sub, Add};
 use serde::Deserialize;
 use serde::Serialize;
 use std::hash::Hash;
-use crate::distribution_of_preferences_transcript::PortionOfReasonBeingDoneThisCount;
+use crate::distribution_of_preferences_transcript::{PortionOfReasonBeingDoneThisCount, CountIndex};
 use crate::util::{DetectUnique, CollectAll};
 use std::fmt;
 

@@ -6,17 +6,17 @@ use num::{Zero};
 use crate::election_data::ElectionData;
 use crate::ballot_pile::{VotesWithMultipleTransferValues, HowSplitByCountNumber, PartiallyDistributedVote, BallotPaperCount, DistributedVotes, VotesWithSameTransferValue};
 use std::collections::{HashSet, VecDeque};
-use crate::ballot_metadata::CandidateIndex;
-use crate::history::CountIndex;
+use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use crate::transfer_value::{TransferValue, LostToRounding};
 use std::ops::{AddAssign, Neg, SubAssign, Sub, Range};
 use std::fmt::Display;
-use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, TransferValueSource, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, DecisionMadeByEC};
+use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, TransferValueSource, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, DecisionMadeByEC, CountIndex};
 use crate::util::{DetectUnique, CollectAll};
 use crate::tie_resolution::{MethodOfTieResolution, TieResolutionsMadeByEC, TieResolutionGranularityNeeded};
 use std::hash::Hash;
 use std::iter::Sum;
 use std::cmp::min;
+
 
 /// Many systems have a special rules for termination when there are a small number of
 /// candidates left (e.g. equal to the number of if there are exactly 2 candidates left
@@ -79,7 +79,7 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     ec_resolutions: &'a TieResolutionsMadeByEC,
     original_votes:&'a Vec<PartiallyDistributedVote<'a>>,
     num_candidates : usize,
-    candidates_to_be_elected : usize,
+    candidates_to_be_elected : NumberOfCandidates,
     quota : Rules::Tally,
     /// The tally, by candidate.
     tallys : Vec<Rules::Tally>,
@@ -104,7 +104,7 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
 
 impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 {
-    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<PartiallyDistributedVote<'a>>,candidates_to_be_elected : usize,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC) -> Self {
+    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<PartiallyDistributedVote<'a>>,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC) -> Self {
         let num_candidates = data.metadata.candidates.len();
         let tallys = vec![Rules::Tally::zero();num_candidates];
         let mut papers = vec![];
@@ -145,7 +145,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             transcript : Transcript {
                 quota: QuotaInfo { // dummy values
                     papers: BallotPaperCount(0),
-                    vacancies: 0,
+                    vacancies: NumberOfCandidates(0),
                     quota: Rules::Tally::zero(),
                 },
                 counts: vec![],
@@ -182,7 +182,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
     /// quota = round_down(first_preferences/(1+num_to_elect))+1
     pub fn compute_quota(&mut self,total_first_preferences:BallotPaperCount) {
-        self.quota = Rules::Tally::from(total_first_preferences.0/(1+self.candidates_to_be_elected)+1);
+        self.quota = Rules::Tally::from(total_first_preferences.0/(1+self.candidates_to_be_elected.0)+1);
         self.transcript.quota = QuotaInfo{
             papers: total_first_preferences,
             vacancies: self.candidates_to_be_elected,
@@ -239,7 +239,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 
     pub fn check_elected_by_quota(&mut self) {
-        let mut elected_by_quota : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().rev().take_while(|&&c|self.tally(c)>self.quota).cloned().collect();
+        let mut elected_by_quota : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().rev().take_while(|&&c|self.tally(c)>=self.quota).cloned().collect();
         elected_by_quota.reverse(); // make sure low to high so that tie checking ordering is compatible.
         self.check_for_ties_and_resolve(&mut elected_by_quota,Rules::resolve_ties_elected_by_quota(),TieResolutionGranularityNeeded::Total);
         for &c in elected_by_quota.iter().rev() {
@@ -248,7 +248,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
     }
 
-    pub fn remaining_to_elect(&self) -> usize { self.candidates_to_be_elected-self.elected_candidates.len() }
+    pub fn number_continuing_candidates(&self) -> NumberOfCandidates { NumberOfCandidates(self.continuing_candidates.len() )}
+    pub fn remaining_to_elect(&self) -> NumberOfCandidates { self.candidates_to_be_elected-NumberOfCandidates(self.elected_candidates.len()) }
 
     /// federal rule 17
     /// > (17) In respect of the last vacancy for which two continuing candidates
@@ -258,7 +259,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// > the Australian Electoral Officer for the State shall have a casting
     /// > vote but shall not otherwise vote at the election.
     pub fn check_elected_by_highest_of_remaining_2_when_1_needed_no_tie_resolution(&mut self) {
-        if self.continuing_candidates_sorted_by_tally.len()==2 && self.remaining_to_elect()==1 {
+        if self.continuing_candidates_sorted_by_tally.len()==2 && self.remaining_to_elect()==NumberOfCandidates(1) {
             let mut possibilities = self.continuing_candidates_sorted_by_tally.clone();
             self.check_for_ties_and_resolve(&mut possibilities,Rules::resolve_ties_elected_one_of_last_two(),TieResolutionGranularityNeeded::Total);
             // elect the highest, Electoral officer resolved ties.
@@ -271,7 +272,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// > number of continuing candidates is equal to the number of
     /// > remaining unfilled vacancies, those candidates shall be elected.
     pub fn check_if_should_elect_all_remaining(&mut self) {
-        if self.continuing_candidates_sorted_by_tally.len()==self.remaining_to_elect() {
+        if self.number_continuing_candidates()==self.remaining_to_elect() {
             let mut elected_group = self.continuing_candidates_sorted_by_tally.clone();
             self.check_for_ties_and_resolve(&mut elected_group,Rules::resolve_ties_elected_all_remaining(),TieResolutionGranularityNeeded::Total);
             for &c in elected_group.iter().rev() {
@@ -512,7 +513,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         // in the poll, the continuing candidate who stands next highest in the
         // poll, and so on in the order in which the continuing candidates
         // stand in the poll.
-        let vacancy_shortfall : Rules::Tally = self.continuing_candidates_sorted_by_tally.iter().rev().take(self.remaining_to_elect()).map(|c|shortfall(*c)).sum();
+        let vacancy_shortfall : Rules::Tally = self.continuing_candidates_sorted_by_tally.iter().rev().take(self.remaining_to_elect().0).map(|c|shortfall(*c)).sum();
         //println!("Count {} leading shortfall {} vacancy shortfall {}",self.current_count.0+1,&leading_shortfall,&vacancy_shortfall);
 
         // *notional vote*, in relation to a continuing candidate, means the
@@ -550,7 +551,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             num_candidates_with_fewer_notional_votes_than_the_leading_shortfall
         };
         // now take into account subsection 13B:
-        let candidates_to_exclude = min(candidates_to_exclude,self.continuing_candidates_sorted_by_tally.len()-self.remaining_to_elect());
+        let candidates_to_exclude = min(candidates_to_exclude,(self.number_continuing_candidates()-self.remaining_to_elect()).0);
         if candidates_to_exclude==0 { return None; }
         // now need to check for ties. Candidate B cannot tie in a way that matters because of b(ii), but candidate C might.
         let tally_of_highest_excluded : Rules::Tally = self.tally(self.continuing_candidates_sorted_by_tally[candidates_to_exclude-1]);
@@ -600,8 +601,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             println!("Excluding {}",self.data.metadata.candidate(candidate).name);
             self.no_longer_continuing(candidate,false);
         }
-        if Rules::when_to_check_if_all_remaining_should_get_elected()==WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers && self.continuing_candidates_sorted_by_tally.len()==self.remaining_to_elect()
-           || Rules::when_to_check_if_just_two_standing_for_shortcut_election()==WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers && self.continuing_candidates_sorted_by_tally.len()==2 && self.remaining_to_elect()==1 {
+        if Rules::when_to_check_if_all_remaining_should_get_elected()==WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers && self.number_continuing_candidates()==self.remaining_to_elect()
+           || Rules::when_to_check_if_just_two_standing_for_shortcut_election()==WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers && self.number_continuing_candidates()==NumberOfCandidates(2) && self.remaining_to_elect()==NumberOfCandidates(1) {
             self.end_of_count_step(ReasonForCount::Elimination(candidates_to_exclude.clone()), PortionOfReasonBeingDoneThisCount {
                 transfer_value: None,
                 when_tv_created : None,
@@ -643,7 +644,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 when_tv_created,
                 papers_came_from_counts: papers_came_from_counts.take(),
             }, togo==0);
-            if self.remaining_to_elect()==0 && !Rules::finish_all_counts_in_elimination_when_all_elected() { break; }
+            if self.remaining_to_elect()==NumberOfCandidates(0) && !Rules::finish_all_counts_in_elimination_when_all_elected() { break; }
         }
     }
 
@@ -657,7 +658,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn go(&mut self) {
         self.print_candidates_names();
         self.distribute_first_preferences();
-        while self.remaining_to_elect()>0 {
+        while self.remaining_to_elect()>NumberOfCandidates(0) {
             if let Some(candidate) = self.pending_surplus_distribution.pop_front() {
                 self.distribute_surplus(candidate);
             } else {
@@ -667,7 +668,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 }
 
-pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : usize,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC) -> Transcript<Rules::Tally> {
+pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC) -> Transcript<Rules::Tally> {
     let arena = typed_arena::Arena::<CandidateIndex>::new();
     let votes = data.resolve_atl(&arena);
     let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates,ec_resolutions);

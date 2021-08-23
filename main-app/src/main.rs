@@ -7,7 +7,8 @@ use stv::election_data::ElectionData;
 use crate::rules::Rules;
 use stv::tie_resolution::TieResolutionsMadeByEC;
 use std::collections::HashSet;
-
+use stv::ballot_metadata::NumberOfCandidates;
+use anyhow::anyhow;
 
 #[derive(Clap)]
 #[clap(version = "0.1", author = "Andrew Conway")]
@@ -17,7 +18,6 @@ use std::collections::HashSet;
 struct Opts {
     /// The counting rules to use.
     /// Currently supported AEC2013, AEC2016, AEC2019, Federal
-    #[clap(short, long)]
     rules : Rules,
 
     /// The name of the .stv file to get votes from
@@ -25,7 +25,8 @@ struct Opts {
     votes : PathBuf,
 
     /// The number of people to elect
-    vacancies : usize,
+    #[clap(short, long)]
+    vacancies : Option<usize>,
 
     /// An optional .transcript file to store the output in.
     /// If not specified, defaults to votes_rules.transcript where votes and rules are from above.
@@ -44,7 +45,9 @@ fn main() -> anyhow::Result<()> {
         serde_json::from_reader(file)?
     };
 
-    let transcript = opt.rules.count(&votes,opt.vacancies,&HashSet::default(),&TieResolutionsMadeByEC::default());
+    let vacancies=opt.vacancies.map(|n|NumberOfCandidates(n)).or(votes.metadata.vacancies).ok_or_else(||anyhow!("Need to specify number of vacancies"))?;
+
+    let transcript = opt.rules.count(&votes,vacancies,&HashSet::default(),&TieResolutionsMadeByEC::default());
 
     let transcript_file = match &opt.transcript {
         None => {

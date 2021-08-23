@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::fs::File;
-use stv::ballot_metadata::{ElectionName, Candidate, CandidateIndex, PartyIndex, ElectionMetadata, DataSource};
+use stv::ballot_metadata::{ElectionName, Candidate, CandidateIndex, PartyIndex, ElectionMetadata, DataSource, NumberOfCandidates};
 use stv::ballot_paper::{RawBallotMarking, parse_marking, RawBallotMarkings, FormalVote, ATL, BTL};
 use std::collections::{HashMap, HashSet};
 use csv::{StringRecord, StringRecordsIntoIter};
@@ -66,14 +66,17 @@ impl FederalDataLoader {
             authority: "AEC".to_string(),
             name: "Federal Senate".to_string(),
             electorate: state.to_string(),
-            modifications: vec![]
+            modifications: vec![],
+            comment: None,
         }
     }
 
-    pub fn candidates_to_be_elected(&self,state:&str) -> usize {
-        if state=="ACT" || state=="NT" { 2 }
-        else if self.double_dissolution { 12 }
-        else { 6 }
+    pub fn candidates_to_be_elected(&self,state:&str) -> NumberOfCandidates {
+        NumberOfCandidates(
+            if state=="ACT" || state=="NT" { 2 }
+            else if self.double_dissolution { 12 }
+            else { 6 }
+        )
     }
 
     fn name_of_candidate_source_post_election(&self) -> String {
@@ -92,6 +95,7 @@ impl FederalDataLoader {
         let mut builder = CandidateAndGroupInformationBuilder::default();
         if self.year=="2013" { read_from_senate_group_voting_tickets_download_file2013(&mut builder,self.base_path.join(self.name_of_candidate_source_post_election()).as_path(),state)?; }
         else { read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(&mut builder,self.base_path.join(self.name_of_candidate_source_post_election()).as_path(),state)?; }
+        let vacancies = self.candidates_to_be_elected(state);
         Ok(ElectionMetadata{
             name: self.name(state),
             candidates: builder.candidates.clone(),
@@ -101,7 +105,9 @@ impl FederalDataLoader {
                 files: vec![self.name_of_candidate_source_post_election()],
                 comments: None
             }],
-            results: None
+            results: None,
+            vacancies: Some(vacancies),
+            secondary_vacancies: if vacancies==NumberOfCandidates(12) { Some(NumberOfCandidates(6)) } else {None},
         })
     }
 
@@ -243,7 +249,7 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
         if last_count==0 {
             res.quota=Some(QuotaInfo{
                 papers: BallotPaperCount(record.formal_papers),
-                vacancies : record.vacancies,
+                vacancies : NumberOfCandidates(record.vacancies),
                 quota: record.quota as f64
             });
         }

@@ -2,7 +2,7 @@ use std::str::FromStr;
 use stv::election_data::ElectionData;
 use stv::tie_resolution::TieResolutionsMadeByEC;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
-use stv::ballot_metadata::CandidateIndex;
+use stv::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use std::collections::HashSet;
 use federal::{FederalRulesUsed2013, FederalRulesUsed2019, FederalRulesUsed2016, FederalRules};
 use stv::preference_distribution::distribute_preferences;
@@ -44,7 +44,7 @@ impl Display for Rules {
 
 impl Rules {
 
-    pub fn count(&self,data: &ElectionData,candidates_to_be_elected : usize,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC) -> TranscriptWithMetadata<usize> {
+    pub fn count(&self,data: &ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC) -> TranscriptWithMetadata<usize> {
         let transcript = match self {
             Rules::AEC2013 => distribute_preferences::<FederalRulesUsed2013>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
             Rules::AEC2016 => distribute_preferences::<FederalRulesUsed2016>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),

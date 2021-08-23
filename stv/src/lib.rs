@@ -2,7 +2,6 @@ pub mod ballot_paper;
 pub mod ballot_metadata;
 pub mod election_data;
 pub mod ballot_pile;
-pub mod history;
 pub mod transfer_value;
 pub mod preference_distribution;
 pub mod distribution_of_preferences_transcript;

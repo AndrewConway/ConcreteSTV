@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use crate::election_data::ElectionData;
 use std::fs::File;
 use std::collections::HashMap;
+use std::ops::Sub;
 
 /// a candidate, referred to by position on the ballot paper, 0 being first
 #[derive(Clone, Copy, PartialEq, Eq, Hash,Serialize,Deserialize)]
@@ -35,6 +36,24 @@ impl fmt::Debug for PartyIndex {
 }
 
 
+/// Represent a number of candidates. E.g. number of seats, number of remaining seats.
+#[derive(Clone, Copy, PartialEq, Eq, Hash,Serialize,Deserialize,Ord, PartialOrd)]
+pub struct NumberOfCandidates(pub usize);
+
+// type alias really, don't want long display
+impl fmt::Display for NumberOfCandidates {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.0) }
+}
+// type alias really, don't want long display
+impl fmt::Debug for NumberOfCandidates {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "#{}", self.0) }
+}
+
+impl Sub for NumberOfCandidates {
+    type Output = NumberOfCandidates;
+    fn sub(self, rhs: Self) -> Self::Output { NumberOfCandidates(self.0-rhs.0) }
+}
+
 /// Information about the election
 #[derive(Debug,Serialize,Deserialize,Clone)]
 pub struct ElectionMetadata {
@@ -47,7 +66,13 @@ pub struct ElectionMetadata {
     pub source : Vec<DataSource>,
     /// the official results, if available.
     #[serde(skip_serializing_if = "Option::is_none",default)]
-    pub results : Option<Vec<CandidateIndex>>
+    pub results : Option<Vec<CandidateIndex>>,
+    /// the number of positions to be filled, default.
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub vacancies : Option<NumberOfCandidates>,
+    /// Another number of positions to be filled. Useful for a double dissolution, where two counts are held, some candidates to get longer terms.
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub secondary_vacancies : Option<NumberOfCandidates>
 }
 
 /// Documentation on where the data files used for this data came from.
@@ -55,7 +80,7 @@ pub struct ElectionMetadata {
 pub struct DataSource {
     pub url : String,
     pub files : Vec<String>,
-    pub comments : Option<String>
+    pub comments : Option<String>,
 }
 
 impl ElectionMetadata {
@@ -92,7 +117,11 @@ pub struct ElectionName {
     pub electorate : String,
     /// modifications made to this data, e.g. simulating errors, hackers. Usually empty.
     #[serde(skip_serializing_if = "Vec::is_empty",default)]
-    pub modifications : Vec<String>
+    pub modifications : Vec<String>,
+    /// Whatever you want.
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub comment : Option<String>,
+
 }
 
 impl ElectionName {

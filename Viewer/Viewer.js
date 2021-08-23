@@ -39,8 +39,13 @@ function Render() {
         const heading_text = name.year.toString()+" "+name.name+" : "+name.electorate+(name.modifications?(" "+name.modifications.join(" ; ")):"");
         heading.innerText=heading_text;
     }
+    if (metadata&&metadata.name&&metadata.name.comment) {
+        add(render_div,"div","comment").innerText=metadata.name.comment;
+    }
     const transcript = full_transcript.transcript;
-    const above_table = add(render_div,"div");
+    const rounding_ever_used = transcript.counts.some(c=>c.status.papers.rounding || c.status.tallies.rounding);
+    const exhausted_ever_used = transcript.counts.some(c=>c.status.papers.exhausted || c.status.tallies.exhausted);
+    const above_table = add(render_div,"div","quota");
     above_table.innerText="Quota : "+transcript.quota.quota+" Formal Votes : "+transcript.quota.papers+" Vacancies : "+transcript.quota.vacancies;
     const table = add(render_div,"table");
     const FirstCandidate = new Set(); // First candidate in a party
@@ -80,10 +85,14 @@ function Render() {
         td.text.innerText=candidate.name;
         if (show_papers) td.td.colSpan=2;
     }
-    const exhausted_name_td = name_td();
-    exhausted_name_td.text.innerText="Exhausted";
-    if (show_papers) exhausted_name_td.td.colSpan=2;
-    name_td().text.innerText="Rounding";
+    if (exhausted_ever_used) {
+        const exhausted_name_td = name_td();
+        exhausted_name_td.text.innerText="Exhausted";
+        if (show_papers) exhausted_name_td.td.colSpan=2;
+    }
+    if (rounding_ever_used) {
+        name_td().text.innerText="Rounding";
+    }
     add(people_row,"th").innerText="Transfer Value";
     add(people_row,"th").innerText="Count action";
     add(people_row,"th").innerText="EC decisions needed";
@@ -134,14 +143,18 @@ function Render() {
                 }
             }
         }
-        if (deltarow) add(deltarow,"td","Continuing").innerText=delta(count.status.tallies.exhausted,last_count.status.tallies.exhausted);
-        add(row,"td","Continuing").innerText=zero_is_blank(count.status.tallies.exhausted);
-        if (show_papers) {
-            if (deltarow) add(deltarow,"td","Continuing BallotPapers").innerText=delta(count.status.papers.exhausted,last_count.status.papers.exhausted);
-            add(row,"td","Continuing BallotPapers").innerText=zero_is_blank(count.status.papers.exhausted);
+        if (exhausted_ever_used) {
+            if (deltarow) add(deltarow,"td","Continuing").innerText=delta(count.status.tallies.exhausted,last_count.status.tallies.exhausted);
+            add(row,"td","Continuing").innerText=zero_is_blank(count.status.tallies.exhausted);
+            if (show_papers) {
+                if (deltarow) add(deltarow,"td","Continuing BallotPapers").innerText=delta(count.status.papers.exhausted,last_count.status.papers.exhausted);
+                add(row,"td","Continuing BallotPapers").innerText=zero_is_blank(count.status.papers.exhausted);
+            }
         }
-        if (deltarow) add(deltarow,"td","Continuing").innerText=delta(count.status.tallies.rounding,last_count.status.tallies.rounding);
-        add(row,"td","Continuing").innerText=zero_is_blank(count.status.tallies.rounding);
+        if (rounding_ever_used) {
+            if (deltarow) add(deltarow,"td","Continuing").innerText=delta(count.status.tallies.rounding,last_count.status.tallies.rounding);
+            add(row,"td","Continuing").innerText=zero_is_blank(count.status.tallies.rounding);
+        }
         const tv_td = fullSpanTD();
         tv_td.innerText=format_transfer_value(count.created_transfer_value&&count.created_transfer_value.transfer_value || count.portion.transfer_value,format_from(count.portion.when_tv_created));
         if (count.created_transfer_value) {
