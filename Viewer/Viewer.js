@@ -48,6 +48,8 @@ function Render() {
     const above_table = add(render_div,"div","quota");
     above_table.innerText="Quota : "+transcript.quota.quota+" Formal Votes : "+transcript.quota.papers+" Vacancies : "+transcript.quota.vacancies;
     const table = add(render_div,"table");
+    const elected_list = add(render_div,"div","WinningCandidatesList");
+    add(elected_list,"h4").innerText="Winning Candidates";
     const FirstCandidate = new Set(); // First candidate in a party
     const LastCandidate = new Set(); // Last candidate in a party
     let people_before_parties = heading_orientation==="slanted";
@@ -114,7 +116,10 @@ function Render() {
         let count_desc = count_number.toString();
         fullSpanTD("count_no").innerText=count_desc;
         count_name_by_id.push(count_desc);
-        for (const e of count.elected) elected.add(e.who);
+        for (const e of count.elected) {
+            elected.add(e.who);
+            add(elected_list,"div","WinningCandidate").innerText=""+(elected.size)+". "+metadata.candidates[e.who].name;
+        }
         for (const nc of count.not_continuing) not_continuing.add(nc);
         for (let i=0;i<metadata.candidates.length;i++) {
             const status = elected.has(i)?"Elected":not_continuing.has(i)?"Eliminated":"Continuing"
