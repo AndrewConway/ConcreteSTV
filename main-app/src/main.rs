@@ -7,8 +7,9 @@ use stv::election_data::ElectionData;
 use crate::rules::Rules;
 use stv::tie_resolution::TieResolutionsMadeByEC;
 use std::collections::HashSet;
-use stv::ballot_metadata::NumberOfCandidates;
+use stv::ballot_metadata::{NumberOfCandidates, CandidateIndex};
 use anyhow::anyhow;
+use std::iter::FromIterator;
 
 #[derive(Clap)]
 #[clap(version = "0.1", author = "Andrew Conway")]
@@ -24,7 +25,7 @@ struct Opts {
     #[clap(parse(from_os_str))]
     votes : PathBuf,
 
-    /// The number of people to elect
+    /// The number of people to elect. If used, overrides the value in the .stv file.
     #[clap(short, long)]
     vacancies : Option<usize>,
 
@@ -33,6 +34,9 @@ struct Opts {
     #[clap(short, long,parse(from_os_str))]
     transcript : Option<PathBuf>,
 
+    /// An optional list of candidates to exclude.
+    #[clap(short, long,use_delimiter=true)]
+    exclude : Option<Vec<usize>>,
 
 }
 
@@ -47,7 +51,11 @@ fn main() -> anyhow::Result<()> {
 
     let vacancies=opt.vacancies.map(|n|NumberOfCandidates(n)).or(votes.metadata.vacancies).ok_or_else(||anyhow!("Need to specify number of vacancies"))?;
 
-    let transcript = opt.rules.count(&votes,vacancies,&HashSet::default(),&TieResolutionsMadeByEC::default());
+    let excluded = match &opt.exclude {
+        None => Default::default(),
+        Some(v) => HashSet::from_iter(v.iter().map(|c|CandidateIndex(*c))),
+    };
+    let transcript = opt.rules.count(&votes,vacancies,&excluded,&TieResolutionsMadeByEC::default());
 
     let transcript_file = match &opt.transcript {
         None => {

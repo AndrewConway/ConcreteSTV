@@ -250,7 +250,7 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
     fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
 
-    /// In 2016, WA, on count 49, there was a 3 way tie for elimination.
+    /// In 2016, WA (with Rod Cullerton excluded because of bankruptcy and larceny), on count 49, there was a 3 way tie for elimination.
     /// M. Hercock, S. Fargher and H HENG all had 66 votes.
     /// The latest turn that they all had different tallies was turn 4, with 65, 61 and 63 respectively.
     /// So MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent means that S. Fargher should have been eliminated.
