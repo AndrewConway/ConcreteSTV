@@ -33,7 +33,10 @@
     {"candidates":[4],"n":400},
     {"candidates":[3],"n":400},
     {"candidates":[2],"n":400},
-    {"candidates":[1],"n":400},
+    {"candidates":[1],"n":388},
+    {"candidates":[1,3],"n":6},
+    {"candidates":[1,4],"n":4},
+    {"candidates":[1,5],"n":2},
     {"candidates":[0],"n":400}
   ],
   "informal":0
