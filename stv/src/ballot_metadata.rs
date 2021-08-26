@@ -7,6 +7,7 @@ use crate::election_data::ElectionData;
 use std::fs::File;
 use std::collections::HashMap;
 use std::ops::Sub;
+use crate::tie_resolution::TieResolutionsMadeByEC;
 
 /// a candidate, referred to by position on the ballot paper, 0 being first
 #[derive(Clone, Copy, PartialEq, Eq, Hash,Serialize,Deserialize)]
@@ -72,7 +73,12 @@ pub struct ElectionMetadata {
     pub vacancies : Option<NumberOfCandidates>,
     /// Another number of positions to be filled. Useful for a double dissolution, where two counts are held, some candidates to get longer terms.
     #[serde(skip_serializing_if = "Option::is_none",default)]
-    pub secondary_vacancies : Option<NumberOfCandidates>
+    pub secondary_vacancies : Option<NumberOfCandidates>,
+    /// Candidates who are usually excluded, e.g. if they died on the election day or were ruled ineligible to stand. Looking at you 2016.
+    #[serde(skip_serializing_if = "Vec::is_empty",default)]
+    pub excluded : Vec<CandidateIndex>,
+    #[serde(flatten)]
+    pub tie_resolutions : TieResolutionsMadeByEC,
 }
 
 /// Documentation on where the data files used for this data came from.
@@ -121,12 +127,16 @@ pub struct ElectionName {
     /// Whatever you want.
     #[serde(skip_serializing_if = "Option::is_none",default)]
     pub comment : Option<String>,
-
 }
 
 impl ElectionName {
     pub fn human_readable_name(&self) -> String {
         format!("{} {} election for {}.{}",self.year,self.name,self.electorate,self.modifications.join(" & "))
+    }
+
+    /// An identifier Name_Year_Electorate that could be used as a filename component for this.
+    pub fn identifier(&self) -> String {
+        self.name.clone()+"_"+&self.year+"_"+&self.electorate+&self.modifications.join(",")
     }
 
     pub fn cache_file_name(&self) -> PathBuf {

@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::fs::File;
 use stv::ballot_metadata::{ElectionName, Candidate, CandidateIndex, PartyIndex, ElectionMetadata, DataSource, NumberOfCandidates};
 use stv::ballot_paper::{RawBallotMarking, parse_marking, RawBallotMarkings, FormalVote, ATL, BTL};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use csv::{StringRecord, StringRecordsIntoIter};
 use zip::ZipArchive;
 use zip::read::ZipFile;
@@ -13,7 +13,6 @@ use serde::Deserialize;
 use stv::ballot_pile::BallotPaperCount;
 use stv::official_dop_transcript::{candidate_elem, OfficialDistributionOfPreferencesTranscript};
 use stv::tie_resolution::TieResolutionsMadeByEC;
-use std::iter::FromIterator;
 use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder};
 use crate::parse2013::{read_from_senate_group_voting_tickets_download_file2013, read_ticket_votes2013, read_btl_votes2013};
 
@@ -108,6 +107,8 @@ impl FederalDataLoader {
             results: None,
             vacancies: Some(vacancies),
             secondary_vacancies: if vacancies==NumberOfCandidates(12) { Some(NumberOfCandidates(6)) } else {None},
+            excluded: self.excluded_candidates(state),
+            tie_resolutions : self.ec_decisions(state),
         })
     }
 
@@ -195,8 +196,8 @@ impl FederalDataLoader {
     pub fn ec_decisions(&self,state:&str) -> TieResolutionsMadeByEC {
         match self.year.as_str() {
             "2013" => match state {
-               "VIC" => TieResolutionsMadeByEC{ resolutions: vec![vec![CandidateIndex(54), CandidateIndex(23),CandidateIndex(85),CandidateIndex(88)]] } , // 4 way tie at count 10.
-               "NSW" => TieResolutionsMadeByEC{ resolutions: vec![vec![CandidateIndex(82),CandidateIndex(52),CandidateIndex(54)], vec![CandidateIndex(104),CandidateIndex(68),CandidateIndex(72)], vec![CandidateIndex(56),CandidateIndex(7)], vec![CandidateIndex(20),CandidateIndex(12),CandidateIndex(96)]] } ,
+               "VIC" => TieResolutionsMadeByEC{ tie_resolutions: vec![vec![CandidateIndex(54), CandidateIndex(23),CandidateIndex(85),CandidateIndex(88)]] } , // 4 way tie at count 10.
+               "NSW" => TieResolutionsMadeByEC{ tie_resolutions: vec![vec![CandidateIndex(82),CandidateIndex(52),CandidateIndex(54)], vec![CandidateIndex(104),CandidateIndex(68),CandidateIndex(72)], vec![CandidateIndex(56),CandidateIndex(7)], vec![CandidateIndex(20),CandidateIndex(12),CandidateIndex(96)]] } ,
                 _ => Default::default(),
             },
             _ => Default::default(),
@@ -204,15 +205,19 @@ impl FederalDataLoader {
     }
 
     /// These are due to a variety of events.
-    pub fn excluded_candidates(&self,state:&str) -> HashSet<CandidateIndex> {
+    pub fn excluded_candidates(&self,state:&str) -> Vec<CandidateIndex> {
         match self.year.as_str() {
             "2016" => match state {
-                "SA" => HashSet::from_iter(vec![CandidateIndex(38)]), // Bob Day was excluded because of indirect pecuniary interest.
-                "WA" => HashSet::from_iter(vec![CandidateIndex(45)]), // Rod Cullerton was excluded because of bankruptcy and larceny.
+                "SA" => vec![CandidateIndex(38)], // Bob Day was excluded because of indirect pecuniary interest.
+                "WA" => vec![CandidateIndex(45)], // Rod Cullerton was excluded because of bankruptcy and larceny.
                 _ => Default::default(),
             },
             _ => Default::default(),
         }
+    }
+
+    pub fn all_states_data<'a>(&'a self) -> impl Iterator<Item=anyhow::Result<ElectionData>> + 'a {
+        ["ACT","NT","TAS","VIC","NSW","QLD","SA","WA"].iter().map(move |&state|self.load_cached_data(state))
     }
 }
 

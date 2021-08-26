@@ -9,6 +9,8 @@ pub mod util;
 pub mod tie_resolution;
 pub mod official_dop_transcript;
 pub mod parse_util;
+pub mod compare_transcripts;
+pub mod compare_rules;
 
 #[cfg(test)]
 mod tests {

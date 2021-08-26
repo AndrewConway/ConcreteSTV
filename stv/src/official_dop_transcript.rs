@@ -40,7 +40,7 @@ impl OfficialDistributionOfPreferencesTranscript {
 
     /// Compare the results from the official transcript to our transcript.
     /// panic if there are differences.
-    pub fn compare_with_transcript<Tally:Clone+Zero+Sub<Output=Tally>+Display,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F) {
+    pub fn compare_with_transcript<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F) {
         if let Some(quota) = &self.quota {
             assert_eq!(quota.vacancies,transcript.quota.vacancies);
             assert_eq!(quota.papers,transcript.quota.papers);

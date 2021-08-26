@@ -10,6 +10,7 @@ mod tests {
     use stv::tie_resolution::TieResolutionsMadeByEC;
     use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
     use std::fs::File;
+    use std::iter::FromIterator;
 
     fn test2019(state:&str) -> anyhow::Result<()> {
         let loader = get_federal_data_loader_2019();
@@ -29,7 +30,7 @@ mod tests {
         let loader = get_federal_data_loader_2016();
         let data = loader.load_cached_data(state)?;
         data.print_summary();
-        let transcript = distribute_preferences::<FederalRulesUsed2016>(&data, loader.candidates_to_be_elected(state), &loader.excluded_candidates(state), &loader.ec_decisions(state));
+        let transcript = distribute_preferences::<FederalRulesUsed2016>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state));
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}2016.json",state))?;
@@ -43,7 +44,7 @@ mod tests {
         let loader = get_federal_data_loader_2013();
         let data = loader.load_cached_data(state)?;
         data.print_summary();
-        let transcript = distribute_preferences::<FederalRulesUsed2013>(&data, loader.candidates_to_be_elected(state), &loader.excluded_candidates(state), &loader.ec_decisions(state));
+        let transcript = distribute_preferences::<FederalRulesUsed2013>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state));
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}2013.json",state))?;

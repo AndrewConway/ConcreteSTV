@@ -2,6 +2,7 @@ use crate::ballot_metadata::CandidateIndex;
 use crate::distribution_of_preferences_transcript::{Transcript, DecisionMadeByEC};
 use std::collections::{HashSet, HashMap};
 use std::hash::Hash;
+use serde::{Serialize,Deserialize};
 use anyhow::anyhow;
 
 #[derive(Debug,Clone,Copy)]
@@ -74,19 +75,21 @@ impl MethodOfTieResolution {
 /// but their order of elimination is covered by (basically identical) rule 22. Both allow
 /// the EC to make a decision, and it would be conceivable for them to be different decisions.
 /// If an EC ever perversely decides to do this, I guess I will need to support it. But no need to
-/// introduce added complexity until then.
+/// introduce added complexity until then
+#[derive(Serialize,Deserialize,Debug,Clone)]
 pub struct TieResolutionsMadeByEC {
-    pub resolutions : Vec<Vec<CandidateIndex>>
+    #[serde(skip_serializing_if = "Vec::is_empty",default)]
+    pub tie_resolutions : Vec<Vec<CandidateIndex>>
 }
 
 impl Default for TieResolutionsMadeByEC {
-    fn default() -> Self { TieResolutionsMadeByEC{resolutions:vec![]}}
+    fn default() -> Self { TieResolutionsMadeByEC{tie_resolutions:vec![]}}
 }
 
 impl TieResolutionsMadeByEC {
     /// Simple constructor that checks to see that a candidate is not repeated which would cause later bugs and would be ambiguous in any case.
-    pub fn new(resolutions : Vec<Vec<CandidateIndex>>) -> anyhow::Result<Self> {
-        for decision in &resolutions {
+    pub fn new(tie_resolutions : Vec<Vec<CandidateIndex>>) -> anyhow::Result<Self> {
+        for decision in &tie_resolutions {
             let mut ordered = decision.clone();
             ordered.sort_by_key(|c|c.0);
             ordered.dedup();
@@ -94,11 +97,11 @@ impl TieResolutionsMadeByEC {
                 return Err(anyhow!("Tie resolutions {} contain at least one repeated candidate",decision.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(",")));
             }
         }
-        Ok(TieResolutionsMadeByEC{resolutions})
+        Ok(TieResolutionsMadeByEC{tie_resolutions})
     }
     /// Sort tied_candidates appropriately (low to high)
     pub fn resolve(&self,tied_candidates: &mut [CandidateIndex]) {
-        for decision in &self.resolutions {
+        for decision in &self.tie_resolutions {
             let deemed_order : Vec<CandidateIndex> = decision.iter().filter(|&c|tied_candidates.contains(c)).cloned().collect();
             if deemed_order.len()==tied_candidates.len() {
                 tied_candidates.copy_from_slice(&deemed_order);

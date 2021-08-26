@@ -17,8 +17,8 @@ pub struct CountIndex(pub(crate) usize);
 /// Generally, this is used for preserved properties such that the sum over all candidates and other destinations is always the same.
 /// For instance, ballots, which start out all assigned to candidates, are shifted around between people, but some will get exhausted.
 /// Alternatively, votes, which start out all assigned to candidates, but may get lost due to rounding or weird rules or exhaustion.
-#[derive(Clone,Serialize,Deserialize)]
-pub struct PerCandidate<X> {
+#[derive(Clone,Serialize,Deserialize, PartialEq)]
+pub struct PerCandidate<X:PartialEq> {
     /// the value for a given candidate.
     pub candidate : Vec<X>,
     /// something is exhausted if it can't go to a specific candidate as there are not enough preferences on a particular ballot.
@@ -29,7 +29,7 @@ pub struct PerCandidate<X> {
     pub set_aside : Option<X>,
 }
 
-impl <X:Default> Default for PerCandidate<X> {
+impl <X:Default+PartialEq> Default for PerCandidate<X> {
     fn default() -> Self {
         PerCandidate{
             candidate: vec![],
@@ -40,8 +40,8 @@ impl <X:Default> Default for PerCandidate<X> {
     }
 }
 /// Record the status of the count at the end of the count.
-#[derive(Clone,Serialize,Deserialize)]
-pub struct EndCountStatus<Tally> {
+#[derive(Clone,Serialize,Deserialize,PartialEq)]
+pub struct EndCountStatus<Tally:PartialEq> {
     /// tallies for each candidate
     pub tallies : PerCandidate<Tally>,
     /// the number of pieces of paper for each candidate
@@ -66,14 +66,14 @@ impl ReasonForCount {
     }
 }
 
-#[derive(Copy, Clone,Serialize,Deserialize)]
+#[derive(Copy, Clone,Serialize,Deserialize,Eq, PartialEq)]
 pub enum ElectionReason {
     ReachedQuota,
     HighestOfLastTwoStanding,
     AllRemainingMustBeElected,
 }
 
-#[derive(Copy, Clone,Serialize,Deserialize)]
+#[derive(Copy, Clone,Serialize,Deserialize,Eq, PartialEq)]
 pub struct CandidateElected {
     pub who : CandidateIndex,
     pub why : ElectionReason,
@@ -116,7 +116,7 @@ pub struct DecisionMadeByEC {
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct SingleCount<Tally> {
+pub struct SingleCount<Tally:PartialEq> {
     /// The action that is being done in said count
     pub reason : ReasonForCount,
     /// If only a sub portion of that reason is done in that count, why will be in here. Other info could also be in here (like which counts papers came from) even if it doesn't restrict things for this set of STV rules.
@@ -143,14 +143,16 @@ pub struct QuotaInfo<Tally> {
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct Transcript<Tally> {
+pub struct Transcript<Tally:PartialEq> {
+    /// The rules that were used to compute this transcript.
+    pub rules : String,
     pub quota : QuotaInfo<Tally>,
     pub counts : Vec<SingleCount<Tally>>,
     pub elected : Vec<CandidateIndex>,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct TranscriptWithMetadata<Tally> {
+pub struct TranscriptWithMetadata<Tally:PartialEq> {
     pub metadata : ElectionMetadata,
     pub transcript : Transcript<Tally>,
 }

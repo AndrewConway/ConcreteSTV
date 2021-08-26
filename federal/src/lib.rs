@@ -173,6 +173,8 @@ impl PreferenceDistributionRules for FederalRules {
     ///     subsection (13A), those candidates must be excluded;
     /// ```
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { true }
+
+    fn name() -> String { "Federal".to_string() }
 }
 
 /// The actual rules used by the AEC in 2019, based on reverse engineering their published
@@ -222,6 +224,8 @@ impl PreferenceDistributionRules for FederalRulesUsed2019 {
 
     /// Not done in TAS count 5, SA count 6, QLD 5, NSW 6.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
+
+    fn name() -> String { "AEC2019".to_string() }
 }
 
 /// the actual rules used by the AEC in 2016, based on reverse engineering their published
@@ -283,6 +287,8 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
 
     /// several occasions.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
+
+    fn name() -> String { "AEC2016".to_string() }
 }
 
 /// the actual rules used by the AEC in 2013, based on reverse engineering their published
@@ -328,4 +334,36 @@ impl PreferenceDistributionRules for FederalRulesUsed2013 {
 
     /// several occasions, e.g ACT.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { true }
+
+    fn name() -> String { "AEC2013".to_string() }
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+    use stv::election_data::ElectionData;
+    use stv::compare_rules::CompareRules;
+    use crate::{FederalRulesUsed2013, FederalRulesUsed2016, FederalRules, FederalRulesUsed2019};
+    use stv::compare_transcripts::DifferenceBetweenTranscripts::{DifferentCandidatesElected, CandidatesOrderedDifferentWay,Same};
+    use stv::compare_transcripts::DifferentCandidateLists;
+    use stv::ballot_metadata::CandidateIndex;
+
+    #[test]
+    fn example() -> anyhow::Result<()>{
+        let data : ElectionData = serde_json::from_reader(File::open("../examples/MultipleExclusionOrdering.stv")?)?;
+        let comparer = CompareRules{ dir: "tests".to_string() };
+        let (comparisons,comp) = comparer.compute_dataset::<usize,FederalRulesUsed2013,FederalRulesUsed2016,FederalRulesUsed2019,FederalRules>(&data)?;
+
+        for i in 0..comparisons.len() {
+            println!("{} : {}",comparisons[i],comp.results[i]);
+        }
+        let index = |n1:&str,n2:&str| comparisons.iter().position(|c|&c.rule1==n1 && &c.rule2==n2).unwrap();
+        assert_eq!(comp.results[index("AEC2016","AEC2013")],DifferentCandidatesElected(DifferentCandidateLists{ list1: vec![CandidateIndex(0),CandidateIndex(2),CandidateIndex(3),CandidateIndex(4),CandidateIndex(5),CandidateIndex(6)], list2: vec![CandidateIndex(0),CandidateIndex(1),CandidateIndex(6),CandidateIndex(5),CandidateIndex(4),CandidateIndex(3)] }));
+        assert_eq!(comp.results[index("AEC2019","AEC2013")],DifferentCandidatesElected(DifferentCandidateLists{ list1: vec![CandidateIndex(0),CandidateIndex(2),CandidateIndex(6),CandidateIndex(5),CandidateIndex(4),CandidateIndex(3)], list2: vec![CandidateIndex(0),CandidateIndex(1),CandidateIndex(6),CandidateIndex(5),CandidateIndex(4),CandidateIndex(3)] }));
+        assert_eq!(comp.results[index("AEC2019","AEC2016")],CandidatesOrderedDifferentWay(DifferentCandidateLists{ list1: vec![CandidateIndex(0),CandidateIndex(2),CandidateIndex(6),CandidateIndex(5),CandidateIndex(4),CandidateIndex(3)], list2: vec![CandidateIndex(0),CandidateIndex(2),CandidateIndex(3),CandidateIndex(4),CandidateIndex(5),CandidateIndex(6)] }));
+        assert_eq!(comp.results[index("Federal","AEC2013")],Same);
+        Ok(())
+    }
 }

@@ -16,6 +16,7 @@ use crate::tie_resolution::{MethodOfTieResolution, TieResolutionsMadeByEC, TieRe
 use std::hash::Hash;
 use std::iter::Sum;
 use std::cmp::min;
+use serde::Serialize;
 
 
 /// Many systems have a special rules for termination when there are a small number of
@@ -37,7 +38,7 @@ pub enum WhenToDoElectCandidateClauseChecking {
     AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers,
 }
 pub trait PreferenceDistributionRules {
-    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>;
+    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>;
     type SplitByNumber : HowSplitByCountNumber;
     fn make_transfer_value(surplus:Self::Tally,ballots:BallotPaperCount) -> TransferValue;
     fn use_transfer_value(transfer_value:&TransferValue,ballots:BallotPaperCount) -> (Self::Tally,LostToRounding);
@@ -64,6 +65,9 @@ pub trait PreferenceDistributionRules {
 
     /// Whether the Commonwealth Electoral Act 1918, Section 273, subsection 13A multiple elimination abomination should be used. This is defaulted to false as no one else would do such a terrible thing, and even the AEC has only sometimes done it.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
+
+    /// A name describing these rules.
+    fn name() -> String;
 }
 
 struct PendingTranscript<Tally> {
@@ -143,6 +147,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 decisions: vec![]
             },
             transcript : Transcript {
+                rules : Rules::name(),
                 quota: QuotaInfo { // dummy values
                     papers: BallotPaperCount(0),
                     vacancies: NumberOfCandidates(0),
