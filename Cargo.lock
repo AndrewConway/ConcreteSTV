@@ -3,18 +3,6 @@
 version = 3
 
 [[package]]
-name = "ConcreteSTV"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "federal",
- "serde",
- "serde_json",
- "stv",
-]
-
-[[package]]
 name = "act"
 version = "0.1.0"
 
@@ -241,6 +229,18 @@ name = "libc"
 version = "0.2.99"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7f823d141fe0a24df1e23b4af4e3c7ba9e5966ec514ea068c93024aa7deb765"
+
+[[package]]
+name = "main-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "federal",
+ "serde",
+ "serde_json",
+ "stv",
+]
 
 [[package]]
 name = "memchr"

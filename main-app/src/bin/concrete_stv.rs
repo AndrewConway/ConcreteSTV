@@ -1,15 +1,15 @@
-mod rules;
+
 
 use clap::{AppSettings, Clap};
 use std::path::PathBuf;
 use std::fs::File;
 use stv::election_data::ElectionData;
-use crate::rules::Rules;
 use stv::tie_resolution::TieResolutionsMadeByEC;
 use std::collections::HashSet;
 use stv::ballot_metadata::{NumberOfCandidates, CandidateIndex};
 use anyhow::anyhow;
 use std::iter::FromIterator;
+use main_app::rules::Rules;
 
 #[derive(Clap)]
 #[clap(version = "0.1", author = "Andrew Conway")]
