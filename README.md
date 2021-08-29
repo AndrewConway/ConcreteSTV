@@ -146,6 +146,30 @@ has winners W1, W3, W4, W5, W6, W7.
 ```
 has winners W1, W3, W7, W6, W5, W4.
 
+## File formats
+
+Both the .stv and .transcript files are JSON format. 
+
+The .stv files are a straight forward JSON representation of the `ElectionData` structure defined in
+[election_data.rs](stv/src/election_data.rs) which reference structures in [ballot_paper.rs](stv/src/ballot_paper.rs), 
+and metadata given by the `ElectionMetadata` structure in [ballot_metadata.rs](stv/src/ballot_metadata.rs)
+
+The .transcript files are a straight forward JSON representation of the `TranscriptWithMetadata`
+structure defined in [distribution_of_preferences_transcript.rs](stv/src/distribution_of_preferences_transcript.rs),
+which uses the same metadata format.
+
+## LaTeX tables
+
+You can convert a .stv or (more commonly) .transcript file to a LaTeX table
+by the `transcript_to_latex` program:
+```bash
+../target/release/transcript_to_latex --deltas MultipleExclusionOrdering_AEC2016.transcript > MultipleExclusionOrdering_AEC2016.tex
+```
+
+Note that these tables are generally too large to fit onto a normal page. To restrict the
+table to a small number of candidates, use the `--candidates` option. Use the `--help`
+option for details.
+
 ## Copyright
 
 This program is Copyright 2021 Andrew Conway.
