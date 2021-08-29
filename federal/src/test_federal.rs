@@ -11,9 +11,10 @@ mod tests {
     use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
     use std::fs::File;
     use std::iter::FromIterator;
+    use stv::parse_util::{RawDataSource, FileFinder};
 
     fn test2019(state:&str) -> anyhow::Result<()> {
-        let loader = get_federal_data_loader_2019();
+        let loader = get_federal_data_loader_2019(&FileFinder::find_ec_data_repository());
         let data = loader.load_cached_data(state)?;
         data.print_summary();
         let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default());
@@ -27,7 +28,7 @@ mod tests {
     }
 
     fn test2016(state:&str) -> anyhow::Result<()> {
-        let loader = get_federal_data_loader_2016();
+        let loader = get_federal_data_loader_2016(&FileFinder::find_ec_data_repository());
         let data = loader.load_cached_data(state)?;
         data.print_summary();
         let transcript = distribute_preferences::<FederalRulesUsed2016>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state));
@@ -41,7 +42,7 @@ mod tests {
     }
 
     fn test2013(state:&str) -> anyhow::Result<()> {
-        let loader = get_federal_data_loader_2013();
+        let loader = get_federal_data_loader_2013(&FileFinder::find_ec_data_repository());
         let data = loader.load_cached_data(state)?;
         data.print_summary();
         let transcript = distribute_preferences::<FederalRulesUsed2013>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state));

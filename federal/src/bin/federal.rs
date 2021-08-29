@@ -5,9 +5,10 @@ use std::fs::File;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::tie_resolution::TieResolutionsMadeByEC;
 use stv::ballot_metadata::NumberOfCandidates;
+use stv::parse_util::{FileFinder, RawDataSource};
 
 fn main()  -> anyhow::Result<()> {
-    let loader = federal::parse::get_federal_data_loader_2013();
+    let loader = federal::parse::get_federal_data_loader_2013(&FileFinder::find_ec_data_repository());
     //let metadata = loader.read_raw_metadata("ACT")?;
     //serde_json::to_writer_pretty(std::io::stdout(),&metadata)?;
     //println!("{:#?}",metadata);

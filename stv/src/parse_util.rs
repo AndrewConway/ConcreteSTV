@@ -1,10 +1,16 @@
 //! Some utility routines that make parsing files easier.
 
 
-use crate::ballot_metadata::{Candidate, Party, CandidateIndex, PartyIndex};
-use std::path::Path;
+use crate::ballot_metadata::{Candidate, Party, CandidateIndex, PartyIndex, ElectionName, NumberOfCandidates};
+use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{BufReader, Seek, BufRead, SeekFrom};
+use crate::election_data::ElectionData;
+use crate::tie_resolution::TieResolutionsMadeByEC;
+use anyhow::anyhow;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 /// A utility for helping to read a list of candidates and parties.
 #[derive(Default)]
@@ -62,3 +68,105 @@ impl CandidateAndGroupInformationBuilder {
     }
 }
 
+#[derive(Debug)]
+pub struct MissingFile {
+    pub file_name : String,
+    pub where_to_get : String,
+}
+
+impl Display for MissingFile {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"Missing file {} look in {}",self.file_name,self.where_to_get)
+    }
+}
+impl Error for MissingFile {
+}
+
+pub trait RawDataSource {
+    fn name(&self,electorate:&str) -> ElectionName;
+    /// The number of candidates to be elected in this election.
+    fn candidates_to_be_elected(&self,electorate:&str) -> NumberOfCandidates;
+    /// Get tie breaking decisions made by the EC.
+    fn ec_decisions(&self,electorate:&str) -> TieResolutionsMadeByEC;
+    /// Get candidates that are excluded by default for whatever reason.
+    fn excluded_candidates(&self,electorate:&str) -> Vec<CandidateIndex>;
+    /// Read the data for a given electorate.
+    fn read_raw_data(&self,electorate:&str) -> anyhow::Result<ElectionData>;
+    /// Get a list of all the electorates
+    fn all_electorates(&self) -> Vec<String>;
+    /// Find a raw data file, or give a meaningful message about where it could be obtained from.
+    fn find_raw_data_file(&self,filename:&str) -> Result<PathBuf,MissingFile>;
+
+    fn load_cached_data(&self,electorate:&str) -> anyhow::Result<ElectionData> {
+        match self.name(electorate).load_cached_data() {
+            Ok(data) => Ok(data),
+            Err(_) => {
+                let data = self.read_raw_data(electorate)?;
+                data.save_to_cache()?;
+                Ok(data)
+            }
+        }
+    }
+
+    /// Like read_raw_data, but with a better error message for invalid electorates.
+    fn read_raw_data_checking_electorate_valid(&self,electorate:&String) -> anyhow::Result<ElectionData> {
+        if !self.all_electorates().contains(electorate) { Err(anyhow!("No such electorate as {}. Supported electorates are : {}.",electorate,self.all_electorates().join(", "))) }
+        else { self.read_raw_data(electorate) }
+    }
+
+}
+
+/// Datafiles from Electoral Commissions could be stored in the current working directory,
+/// but may also be in some other (reference) folder. Alternatively, they could be in
+/// some archive like xxx/Federal/2013/file_used_in_federal2013election.csv
+/// A FileFinder will find a file in such a place.
+#[derive(Debug,Clone)]
+pub struct FileFinder {
+    pub path : PathBuf,
+
+}
+
+impl FromStr for FileFinder {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let path = PathBuf::from(s);
+        if !path.is_dir() { Err(format!("Path {} is not a readable directory",s))}
+        else { Ok(FileFinder{path})}
+    }
+}
+
+impl Default for FileFinder {
+    fn default() -> Self {
+        FileFinder{path:PathBuf::from(".")}
+    }
+}
+impl FileFinder {
+
+    /// Find where a file is, looking first in the directory this implies (self.path/filename),
+    /// and secondly in self.path/archive_location/filename. If found in either it will
+    /// return it, otherwise it will return an error message recommending looking for it
+    /// in the given url.
+    pub fn find_raw_data_file(&self,filename:&str,archive_location:&str,source_url:&str) -> Result<PathBuf,MissingFile> {
+        let expect = self.path.join(filename);
+        if expect.exists() { return Ok(expect) }
+        let expect = self.path.join(archive_location).join(filename);
+        if expect.exists() { return Ok(expect) }
+        Err(MissingFile{ file_name: filename.to_string(), where_to_get: source_url.to_string() })
+    }
+
+    /// Used to find an archive for testing.
+    pub fn find_ec_data_repository() -> FileFinder {
+        for possible_path in vec![
+            "votecounting/CountPreferentialVotes/Elections",
+            "../votecounting/CountPreferentialVotes/Elections",
+            "../../votecounting/CountPreferentialVotes/Elections",
+            "../../../votecounting/CountPreferentialVotes/Elections"
+        ] {
+            if Path::new(possible_path).exists() { return FileFinder{path: PathBuf::from(possible_path)} }
+        }
+        println!("Warning - unable to find testing data archive");
+        FileFinder{path: PathBuf::from(".")}
+    }
+
+}

@@ -48,6 +48,7 @@ fn main() -> anyhow::Result<()> {
 
     let separate_row_for_paper_deltas = false;
     let use_action_in_count = true;
+    let use_purple_for_elected_deltas = false;
 
     if let Ok(votes) = { let file = File::open(&opt.file)?; serde_json::from_reader::<_,ElectionData>(file) } {
         let metadata = &votes.metadata;
@@ -137,7 +138,7 @@ fn main() -> anyhow::Result<()> {
                                 candidate_delta_tally+="}";
                             }
                         }
-                        if is_elected.contains(&candidate) { tally_line+=r"{\color{RoyalPurple} ";}
+                        if use_purple_for_elected_deltas && is_elected.contains(&candidate) { tally_line+=r"{\color{RoyalPurple} ";}
                         else {
                             //if count.not_continuing.contains(&candidate) { tally_line+=r"$\downarrow$ " }
                             tally_line+=r"{\color{Gray} ";

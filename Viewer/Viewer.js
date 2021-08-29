@@ -161,7 +161,7 @@ function Render() {
             add(row,"td","Continuing").innerText=zero_is_blank(count.status.tallies.rounding);
         }
         const tv_td = fullSpanTD();
-        tv_td.innerText=format_transfer_value(count.created_transfer_value&&count.created_transfer_value.transfer_value || count.portion.transfer_value,format_from(count.portion.when_tv_created));
+        tv_td.innerText=format_transfer_value(count.created_transfer_value&&count.created_transfer_value.transfer_value || count.portion.transfer_value,count.created_transfer_value?null:format_from(count.portion.when_tv_created));
         if (count.created_transfer_value) {
             let title = "Surplus : "+count.created_transfer_value.surplus+" Ballots considered : "+count.created_transfer_value.ballots_considered+" continuing : "+count.created_transfer_value.continuing_ballots;
             if (count.created_transfer_value.original_transfer_value) title+=" original transfer value : "+count.created_transfer_value.original_transfer_value;

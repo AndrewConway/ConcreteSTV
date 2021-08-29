@@ -34,7 +34,8 @@ struct Opts {
     #[clap(short, long,parse(from_os_str))]
     transcript : Option<PathBuf>,
 
-    /// An optional list of candidates to exclude.
+    /// An optional list of candidates to exclude. This is a comma separated list of numbers,
+    /// starting counting at zero.
     #[clap(short, long,use_delimiter=true)]
     exclude : Option<Vec<usize>>,
 
