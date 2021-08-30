@@ -14,7 +14,7 @@ use stv::ballot_metadata::CandidateIndex;
 use std::collections::HashSet;
 
 #[derive(Clap)]
-#[clap(version = "0.1", author = "Andrew Conway")]
+#[clap(version = "0.1", author = "Andrew Conway", name="ConcreteSTV")]
 #[clap(setting = AppSettings::ColoredHelp)]
 /// Convert a .stv file or .transcript file to a LaTeX table.
 struct Opts {
@@ -22,17 +22,13 @@ struct Opts {
     #[clap(parse(from_os_str))]
     file : PathBuf,
 
-    /// An optional output file. If not specified, stdout is used. Currently not implemented.
-    #[clap(short, long,parse(from_os_str))]
-    out : Option<PathBuf>,
-
     /// If set, show the change effected in counts as well as the total after counts.
     /// This means two rows per count (possibly 3 if #papers are different from #votes)
     #[clap(short, long)]
     deltas : bool,
 
-    /// An optional list of candidates to restrict the table to.
-    #[clap(short, long,use_delimiter=true)]
+    /// An optional list of candidate numbers (starting counting at 0) to restrict the table to.
+    #[clap(short, long,use_delimiter=true,require_delimiter=true)]
     candidates : Option<Vec<usize>>,
 }
 

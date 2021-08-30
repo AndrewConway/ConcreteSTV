@@ -17,10 +17,10 @@ use std::iter::FromIterator;
 use main_app::rules::Rules;
 
 #[derive(Clap)]
-#[clap(version = "0.1", author = "Andrew Conway")]
+#[clap(version = "0.1", author = "Andrew Conway", name="ConcreteSTV")]
 #[clap(setting = AppSettings::ColoredHelp)]
 /// Count STV elections using a variety of rules including good approximations to
-/// those used by various electroral commissions on various elections.
+/// those used by various electoral commissions on various elections.
 struct Opts {
     /// The counting rules to use.
     /// Currently supported AEC2013, AEC2016, AEC2019, Federal
@@ -40,8 +40,9 @@ struct Opts {
     transcript : Option<PathBuf>,
 
     /// An optional list of candidates to exclude. This is a comma separated list of numbers,
-    /// starting counting at zero.
-    #[clap(short, long,use_delimiter=true)]
+    /// starting counting at zero. E.g. --exclude=5,6 would do the count assuming the candidates
+    /// with 5 and 6 other candidates listed before them are ineligible.
+    #[clap(short, long,use_delimiter=true,require_delimiter=true)]
     exclude : Option<Vec<usize>>,
 
 }

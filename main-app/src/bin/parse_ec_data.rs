@@ -15,7 +15,7 @@ use std::io::stdout;
 use stv::parse_util::FileFinder;
 
 #[derive(Clap)]
-#[clap(version = "0.1", author = "Andrew Conway")]
+#[clap(version = "0.1", author = "Andrew Conway", name="ConcreteSTV")]
 #[clap(setting = AppSettings::ColoredHelp)]
 /// Produce a .stv file with actual election data from a download from an Electoral Commission.
 struct Opts {
@@ -33,7 +33,7 @@ struct Opts {
     out : Option<PathBuf>,
 
     /// An optional list of candidate numbers (starting counting at 0) to mark as to be excluded.
-    #[clap(short, long,use_delimiter=true)]
+    #[clap(short, long,use_delimiter=true,require_delimiter=true)]
     exclude : Option<Vec<usize>>,
 
     /// An optional directory to use for finding raw data files.
