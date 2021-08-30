@@ -13,7 +13,9 @@ a variety of jurisdictions.
 ConcreteSTV is a rewrite of an [earlier project](https://github.com/SiliconEconometrics/PublicService)
 but does not yet have all the features of the earlier project. However it
 is more user friendly, and future development will be concentrating on
-this project.
+this project.  
+
+Results from the earlier project were used to find and fix bugs [in the ACT STV count](https://github.com/SiliconEconometrics/PublicService/blob/master/CountVotes/2020%20Errors%20In%20ACT%20Counting.pdf), and to identify bugs [in the NSW count](https://raw.githubusercontent.com/SiliconEconometrics/PublicService/master/CountVotes/2016%20NSW%20LGE%20Errors.pdf) which led the NSW Parliament to simplify the rules. Everyone is encouraged to use this code to double-check and correct election results.
 
 ## Currently Supported Elections
 
@@ -30,7 +32,7 @@ this project.
       - When resolving 3 way ties by looking at prior counts, any difference is used as a discriminator,
         instead of requiring that each has a different count. Evidence: NSW 2016, special count
         with Rod Cullerton excluded, count 49. Assumed 2013 same as 2016.
-      - Rules (17) is applied after all exclusions and surplus distributions are finished. 
+      - Rule (17) is applied after all exclusions and surplus distributions are finished. 
         Evidence: 2013 SA, count 228
       - Rule (18) is applied after all exclusions are finished. Assumed same as 2016, where Qld, WSW, Vic and WA
         are all evidence.
@@ -79,11 +81,11 @@ two needed election files to parse, but it tells us where to get them (or at lea
 ```text
 Error: Missing file SenateFirstPrefsByStateByVoteTypeDownload-24310.csv look in https://results.aec.gov.au/24310/Website/SenateDownloadsMenu-24310-Csv.htm
 ```
-Go to said URL, download the file into your current directory, and try again. 
+Go to said URL (or [use this direct link](https://results.aec.gov.au/24310/Website/External/SenateStateFirstPrefsByPollingPlaceDownload-24310-TAS.zip)), download 'First preferences by state by vote type (CSV)' into your current directory, then try again. 
 ```text
 Error: Missing file aec-senate-formalpreferences-24310-TAS.zip look in https://results.aec.gov.au/24310/Website/SenateDownloadsMenu-24310-Csv.htm
 ```
-Sorry, we need another file. Download it and try again
+Sorry, we need another file. Download 'Formal Preferences - Tasmania' from the website ([or this direct link](https://results.aec.gov.au/24310/Website/External/aec-senate-formalpreferences-24310-TAS.zip)), then try again
 ```bash
 ../target/release/parse_ec_data AEC2019 TAS --out TAS2019.stv
 ```
@@ -126,8 +128,8 @@ the number of papers by selecting the "Show papers" box.
 
 You can compare this to the [AEC provided transcript](https://results.aec.gov.au/24310/Website/External/SenateStateDop-24310-TAS.pdf).
 
-Other STV counting programs include [Dividabatur](https://github.com/grahame/dividebatur) 
-and its successor [Divideabtur2](https://github.com/grahame/dividebatur2)
+Other STV counting programs include Grahame Bowland's [Dividebatur](https://github.com/grahame/dividebatur) 
+and its successor [Dividebatur2](https://github.com/grahame/dividebatur2), Lee Yingtong Li's [OpenTally](https://yingtongli.me/git/OpenTally/), and Milad Ghale's [formally verified STV](https://github.com/MiladKetabGhale/STV-Counting-ProtocolVerification).
 
 ## Example data files
 
@@ -140,11 +142,11 @@ has winners W1, W2, W7, W6, W5, W4.
 ```bash
 ../target/release/concrete_stv AEC2016 MultipleExclusionOrdering.stv 
 ```
-has winners W1, W3, W4, W5, W6, W7.
+has different winners: W1, W3, W4, W5, W6, W7. This demonstrates that bulk exclusion can affect who wins, on a contrived example.
 ```bash
 ../target/release/concrete_stv AEC2019 MultipleExclusionOrdering.stv 
 ```
-has winners W1, W3, W7, W6, W5, W4.
+has winners W1, W3, W7, W6, W5, W4, the same as 2016 but in a different order. This shows that the priority of rule (18) affects the order in which candidates are considered elected.
 
 ## File formats
 
