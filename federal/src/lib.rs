@@ -289,7 +289,7 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
     /// The exclusion was carried out in full (10 counts), and two candidates, J Williams and B Burston were elected on quota.
     /// Two more surplus distributions were carried out, and on the last, D Leyonhjelm was elected.
     ///
-    /// A different thing happened in WA 2016, o count 535, K. Muir was excluded, leaving 2 candidates and 2 seats.
+    /// A different thing happened in WA 2016 (with Rod Cullerton excluded), ot count 535, K. Muir was excluded, leaving 2 candidates and 2 seats.
     /// The first step of the exclusion was performed, at the end of which the remaining 2 candidates were both declared elected.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists }
 
