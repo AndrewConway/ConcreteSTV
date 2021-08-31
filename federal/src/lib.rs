@@ -129,9 +129,11 @@ impl PreferenceDistributionRules for FederalRules {
     /// possible in principle? The different outcome did not occur in that specific case,
     /// but could easily do so in a similar situation since preference flows tend to be highly non-random.
     ///
-    /// I am assigning it a generous frequency, although I can see arguments
-    /// for other interpretations.
-    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuota }
+    /// I am assigning it to require everything else to be finished first,
+    /// as that will produce the same person elected as not having this rule
+    /// at all, which seems the most in keeping with STV general purposes, although
+    /// I am not claiming that this is what the legislation says.
+    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
     /// Commonwealth Electoral Act 1918, Section 273, (18)
     /// ```text
@@ -172,8 +174,9 @@ impl PreferenceDistributionRules for FederalRules {
     /// This is a matter of moderate importance, as it doesn't affect who is elected, just the particular
     /// timing. It could however change the order of election, so it is not insignificant.
     ///
-    /// I am assigning it to be done generously, which is debatable.
-    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuota }
+    /// I am assigning it to require everything else to be finished first,
+    /// as I have done the same for section 17, although this is debatable.
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
     /// Commonwealth Electoral Act 1918, Section 273, subsection (13)(b)
     /// ```text

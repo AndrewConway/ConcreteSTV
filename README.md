@@ -21,7 +21,7 @@ Results from the earlier project were used to find and fix bugs [in the ACT STV 
 
 - **Federal** My interpretation of the Australian Federal Senate election system. The legislation
   appears ambiguous in various places to me, in particular when rules 273(17) or 273(18) are
-  applied. I interpret it as the same time as checking quota, at the end of each count. I don't
+  applied. I interpret both as after all exclusions and surplus distributions are finished. I don't
   claim this is more reasonable than other interpretations. I also have a variety of
   interpretations of the rules the Australian Electoral Commission (AEC) actually used in recent
   elections. I cannot find out what rules they _actually_ used as the source code of their
@@ -32,10 +32,10 @@ Results from the earlier project were used to find and fix bugs [in the ACT STV 
       - When resolving 3 way ties by looking at prior counts, any difference is used as a discriminator,
         instead of requiring that each has a different count. Evidence: NSW 2016, special count
         with Rod Cullerton excluded, count 49. Assumed 2013 same as 2016.
-      - Rule (17) is applied after all exclusions and surplus distributions are finished. 
+      - Rule (17) is applied after all exclusions and surplus distributions are finished (same as my interpretation). 
         Evidence: 2013 SA, count 228
-      - Rule (18) is applied after all exclusions are finished. Assumed same as 2016, where Qld, WSW, Vic and WA
-        are all evidence.
+      - But Rule (18) is applied after all surplus distributions, and the first transfer of an exclusion are finished. 
+        Assumed same as 2016, where Qld, WSW, Vic and WA are all evidence.
   - **AEC2016** This is my interpretation of the rules actually used by the AEC for the 2016 election.
     It is very similar to *AEC2013*, except the Bulk Exclusion rules are not applied (evidence : this should crop
     up frequently)
