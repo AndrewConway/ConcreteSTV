@@ -10,6 +10,7 @@
 
 use crate::ballot_metadata::{CandidateIndex, PartyIndex};
 use serde::{Deserialize,Serialize};
+use std::collections::HashMap;
 
 /// A marking on a particular square in a ballot. This may or may not be a number.
 #[derive(Copy,Clone,Debug,Eq, PartialEq)]
@@ -131,5 +132,22 @@ impl<'a> RawBallotMarkings<'a> {
     pub fn interpret_vote_as_btl(&'a self, min_btl_prefs_needed:usize) -> Option<BTL> {
         let prefs = RawBallotMarkings::look_for_continuous_streams(self.btl,|i|CandidateIndex(i),true);
         if prefs.len()>=min_btl_prefs_needed { Some(BTL{ candidates: prefs, n: 1 })} else { None }
+    }
+}
+
+/// A utility for building up a BTL list and simplifying duplicate votes.
+#[derive(Default)]
+pub struct UniqueBTLBuilder {
+    btls : HashMap<Vec<CandidateIndex>,usize>,
+}
+
+impl UniqueBTLBuilder {
+    /// Add a vote with a given preference list
+    pub fn add(&mut self,prefs:Vec<CandidateIndex>) {
+        *self.btls.entry(prefs).or_insert(0)+=1;
+    }
+    /// Convert to a list of BTL votes.
+    pub fn to_btls(self) -> Vec<BTL> {
+        self.btls.into_iter().map(|(candidates,n)|BTL{ candidates , n }).collect()
     }
 }

@@ -12,7 +12,8 @@ use crate::ballot_pile::BallotPaperCount;
 use crate::ballot_metadata::{CandidateIndex, ElectionMetadata, NumberOfCandidates};
 use crate::transfer_value::TransferValue;
 use serde::{Serialize,Deserialize};
-
+use std::fmt::Debug;
+use crate::preference_distribution::TransferValueMethod;
 
 
 /// The index of a count. 0 means the first. This is different from the human readable
@@ -24,7 +25,7 @@ pub struct CountIndex(pub(crate) usize);
 /// Generally, this is used for preserved properties such that the sum over all candidates and other destinations is always the same.
 /// For instance, ballots, which start out all assigned to candidates, are shifted around between people, but some will get exhausted.
 /// Alternatively, votes, which start out all assigned to candidates, but may get lost due to rounding or weird rules or exhaustion.
-#[derive(Clone,Serialize,Deserialize, PartialEq)]
+#[derive(Clone,Serialize,Deserialize, PartialEq,Debug)]
 pub struct PerCandidate<X:PartialEq> {
     /// the value for a given candidate.
     pub candidate : Vec<X>,
@@ -93,13 +94,6 @@ pub struct PortionOfReasonBeingDoneThisCount {
     pub papers_came_from_counts : Vec<CountIndex>,
 }
 
-#[derive(Copy,Clone,Serialize,Deserialize)]
-pub enum TransferValueSource {
-    SurplusOverBallots,
-    SurplusOverContinuingBallots,
-    SurplusOverVotesTimesOriginalTransfer,
-    Limited,
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct TransferValueCreation<Tally> {
@@ -111,7 +105,7 @@ pub struct TransferValueCreation<Tally> {
     /// The number of the considered ballots that are continuing
     pub continuing_ballots : BallotPaperCount,
     pub transfer_value : TransferValue,
-    pub source : TransferValueSource,
+    pub source : TransferValueMethod,
 }
 
 /// Sometimes the Electoral Commission needs to make a decision, such as tie resolution.

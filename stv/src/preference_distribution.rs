@@ -14,16 +14,16 @@ use crate::election_data::ElectionData;
 use crate::ballot_pile::{VotesWithMultipleTransferValues, HowSplitByCountNumber, PartiallyDistributedVote, BallotPaperCount, DistributedVotes, VotesWithSameTransferValue};
 use std::collections::{HashSet, VecDeque};
 use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
-use crate::transfer_value::{TransferValue, LostToRounding};
+use crate::transfer_value::{TransferValue};
 use std::ops::{AddAssign, Neg, SubAssign, Sub, Range};
 use std::fmt::Display;
-use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, TransferValueSource, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, DecisionMadeByEC, CountIndex};
+use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, DecisionMadeByEC, CountIndex};
 use crate::util::{DetectUnique, CollectAll};
 use crate::tie_resolution::{MethodOfTieResolution, TieResolutionsMadeByEC, TieResolutionGranularityNeeded};
 use std::hash::Hash;
 use std::iter::Sum;
 use std::cmp::min;
-use serde::Serialize;
+use serde::{Serialize,Deserialize};
 
 
 /// Many systems have a special rules for termination when there are a small number of
@@ -44,11 +44,43 @@ pub enum WhenToDoElectCandidateClauseChecking {
     /// If the distribution of papers should be interrupted by this.
     AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers,
 }
+
+#[derive(Copy,Clone,Serialize,Deserialize)]
+pub enum TransferValueMethod {
+    SurplusOverBallots, // Used by Federal
+    SurplusOverContinuingBallots,
+    SurplusOverContinuingBallotsLimitedToPriorTransferValue, // Used by ACT
+}
+
+impl TransferValueMethod {
+    /// true if the denominator of the TV is the number of continuing ballots, false if it is the total number of ballots.
+    fn denom_is_just_continuing(&self) -> bool {
+        match *self {
+            TransferValueMethod::SurplusOverBallots => false,
+            TransferValueMethod::SurplusOverContinuingBallots => true,
+            TransferValueMethod::SurplusOverContinuingBallotsLimitedToPriorTransferValue => true,
+        }
+    }
+    /// true iff the TV should be limited to the incoming TV.
+    fn limit_to_incoming_transfer_value(&self) -> bool {
+        match *self {
+            TransferValueMethod::SurplusOverBallots => false,
+            TransferValueMethod::SurplusOverContinuingBallots => false,
+            TransferValueMethod::SurplusOverContinuingBallotsLimitedToPriorTransferValue => true,
+        }
+    }
+}
+
 pub trait PreferenceDistributionRules {
+    /// The type for the number of votes. Usually an integer.
     type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>;
     type SplitByNumber : HowSplitByCountNumber;
+
+    /// Whether to transfer all the votes or just the last parcel.
+    fn use_last_parcel_for_surplus_distribution() -> bool;
+    fn transfer_value_method() -> TransferValueMethod;
     fn make_transfer_value(surplus:Self::Tally,ballots:BallotPaperCount) -> TransferValue;
-    fn use_transfer_value(transfer_value:&TransferValue,ballots:BallotPaperCount) -> (Self::Tally,LostToRounding);
+    fn use_transfer_value(transfer_value:&TransferValue,ballots:BallotPaperCount) -> Self::Tally;
 
     // ***  Tie resolution issues ***
 
@@ -72,6 +104,9 @@ pub trait PreferenceDistributionRules {
 
     /// Whether the Commonwealth Electoral Act 1918, Section 273, subsection 13A multiple elimination abomination should be used. This is defaulted to false as no one else would do such a terrible thing, and even the AEC has only sometimes done it.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
+
+    /// If the TV calculation is limited due to incoming TV (such as in ACT) this causes votes to be set aside. These will normally be counted as set aside, but Elections ACT counts them as lost to rounding. Set to true if you want to do this. This is defaulted to false as no one else would do such a terrible thing. Yes, I know, there are a lot of terrible things that no one else would do, but sic.
+    fn count_set_aside_due_to_transfer_value_limit_as_rounding() -> bool { false }
 
     /// A name describing these rules.
     fn name() -> String;
@@ -352,7 +387,15 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         self.in_this_count.decisions.clear();
     }
 
-    /// Transfer votes using a single transfer value. Used for Federal and Victoria
+    /// add some given number to the set_aside value. This is behind an option making it non-trivial.
+    fn add_set_aside(&mut self,set_aside:Rules::Tally) {
+        let new_value = match self.tally_set_aside.take() {
+            Some(v) => v+set_aside,
+            None => set_aside,
+        };
+        self.tally_set_aside = Some(new_value);
+    }
+    /// Transfer votes using a single transfer value. Used for Federal and Victoria and ACT
     ///
     /// Federal Legislation:
     /// > (9) Unless all the vacancies have been filled, the number (if any) of
@@ -375,46 +418,65 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let votes : Rules::Tally = self.tally(candidate_to_distribute);
         let surplus: Rules::Tally  = votes.clone()-self.quota.clone();
         self.tallys[candidate_to_distribute.0]=self.quota.clone();
-        let (ballots,provenance) = self.papers[candidate_to_distribute.0].extract_all_ballots_ignoring_transfer_value();
+        let (ballots,provenance) =
+            if Rules::use_last_parcel_for_surplus_distribution() {self.papers[candidate_to_distribute.0].extract_last_parcel()}
+            else {self.papers[candidate_to_distribute.0].extract_all_ballots_ignoring_transfer_value()};
         let ballots_considered : BallotPaperCount = ballots.num_ballots;
-        let transfer_value : TransferValue = Rules::make_transfer_value(surplus.clone(),ballots.num_ballots);
-        let exhausted : BallotPaperCount = self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),ballots,Some(self.current_count),surplus.clone());
-        let continuing_ballots = ballots_considered-exhausted;
+        let distributed = DistributedVotes::distribute(&ballots.votes,&self.continuing_candidates,self.num_candidates);
+        let continuing_ballots = ballots_considered-distributed.exhausted;
+        let tv_denom = if Rules::transfer_value_method().denom_is_just_continuing() {continuing_ballots} else {ballots.num_ballots};
+        let mut transfer_value : TransferValue = Rules::make_transfer_value(surplus.clone(),tv_denom);
+        let mut original_worth : Rules::Tally = surplus.clone();
+        if Rules::transfer_value_method().limit_to_incoming_transfer_value() {
+            let old_tv = provenance.transfer_value.clone().expect("If you are going to limit to an incoming transfer value, there must be a unique one.");
+            if old_tv<transfer_value {
+                if !Rules::count_set_aside_due_to_transfer_value_limit_as_rounding() {
+                    // work out how many votes lost this way.
+                    let set_aside : Rules::Tally = surplus.clone()-Rules::use_transfer_value(&old_tv,tv_denom);
+                    // println!("Set aside {} of {} votes to deal with rule limiting transfer value to incoming",set_aside,original_worth);
+                    original_worth-=set_aside.clone();
+                    self.add_set_aside(set_aside);
+                }
+                transfer_value=old_tv;
+            }
+        }
+        // println!("Parcelling out {} votes with TV {} over {} ballots",original_worth,transfer_value,tv_denom);
+        self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),distributed,Some(self.current_count),original_worth,!Rules::transfer_value_method().denom_is_just_continuing());
         self.in_this_count.created_transfer_value=Some(TransferValueCreation{
             surplus,
             votes,
-            original_transfer_value: None,
+            original_transfer_value: provenance.transfer_value.clone(),
             ballots_considered,
             continuing_ballots,
             transfer_value,
-            source: TransferValueSource::SurplusOverBallots
+            source: Rules::transfer_value_method(),
         });
         provenance
     }
 
     /// Parcel out votes by next continuing candidate with a given transfer value.
-    /// Return the number of exhausted votes.
-    pub fn parcel_out_votes_with_given_transfer_value(&mut self,transfer_value:TransferValue,ballots:VotesWithSameTransferValue<'a>,when_tv_created:Option<CountIndex>,original_worth:Rules::Tally) -> BallotPaperCount {
-        let distributed = DistributedVotes::distribute(&ballots.votes,&self.continuing_candidates,self.num_candidates);
+    pub fn parcel_out_votes_with_given_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,when_tv_created:Option<CountIndex>,original_worth:Rules::Tally,distribute_exhausted_votes:bool) {
         let mut tally_distributed = Rules::Tally::zero();
         for (candidate_index,candidate_ballots) in distributed.by_candidate.into_iter().enumerate() {
             if candidate_ballots.num_ballots.0>0 {
-                let (worth ,_lost_to_rounding) = Rules::use_transfer_value(&transfer_value,candidate_ballots.num_ballots);
+                let worth:Rules::Tally = Rules::use_transfer_value(&transfer_value,candidate_ballots.num_ballots);
                 self.tallys[candidate_index]+=worth.clone();
                 tally_distributed +=worth.clone();
                 self.papers[candidate_index].add(&candidate_ballots, transfer_value.clone(), self.current_count, when_tv_created, worth);
             }
         }
         if distributed.exhausted.0>0 {
-            let (worth ,_lost_to_rounding) = Rules::use_transfer_value(&transfer_value,distributed.exhausted);
-            self.tally_exhausted+=worth.clone();
-            tally_distributed +=worth.clone();
+            if distribute_exhausted_votes {
+                let worth:Rules::Tally = Rules::use_transfer_value(&transfer_value,distributed.exhausted);
+                self.tally_exhausted+=worth.clone();
+                tally_distributed +=worth.clone();
+            }
+            // always distribute the papers.
             self.exhausted+=distributed.exhausted;
             self.exhausted_atl+=distributed.exhausted_atl;
         }
         self.tally_lost_to_rounding+=original_worth;
         self.tally_lost_to_rounding-= tally_distributed;
-        distributed.exhausted
     }
 
     pub fn distribute_surplus(&mut self,candidate_to_distribute:CandidateIndex) {
@@ -645,11 +707,12 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                     papers_came_from_counts.extend(from.counts_comes_from.into_iter());
                     self.tallys[candidate.0]-=from.tally;
                     if all_votes.num_ballots.0==0 { all_votes=votes; }
-                    else { all_votes.add(&votes.votes) }
+                    else { all_votes.add(&votes.votes); }
                 }
             }
             let when_tv_created=when_tv_created.take().flatten();
-            self.parcel_out_votes_with_given_transfer_value(key.1.clone(),all_votes,when_tv_created,original_worth);
+            let distributed = DistributedVotes::distribute(&all_votes.votes,&self.continuing_candidates,self.num_candidates);
+            self.parcel_out_votes_with_given_transfer_value(key.1.clone(),distributed,when_tv_created,original_worth,true);
             togo-=1;
             self.end_of_count_step(ReasonForCount::Elimination(candidates_to_exclude.clone()), PortionOfReasonBeingDoneThisCount {
                 transfer_value: Some(key.1),

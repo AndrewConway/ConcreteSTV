@@ -30,6 +30,8 @@ pub struct OfficialDOPForOneCount {
 pub struct OfficialDistributionOfPreferencesTranscript {
     pub quota : Option<QuotaInfo<f64>>,
     pub counts : Vec<OfficialDOPForOneCount>,
+    /// true if the record does not contain negative papers amounts.
+    pub missing_negatives_in_papers_delta : bool,
 }
 
 impl OfficialDOPForOneCount {
@@ -72,7 +74,7 @@ impl OfficialDistributionOfPreferencesTranscript {
             };
             let assert_papers_candidate_delta = |official:isize,our1:BallotPaperCount,our_prev:BallotPaperCount,what:&str,who:CandidateIndex|{
                 let our = our1.0 as isize - our_prev.0 as isize;
-                if official!=our {
+                if official!=our && !(self.missing_negatives_in_papers_delta && our<0) {
                     panic!("Count {} Official result {} our result {} for {} candidate {}",i+1,official,our,what,who)
                 }
             };

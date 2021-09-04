@@ -13,8 +13,6 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 use num::rational::{ParseRatioError, Ratio};
 
-pub struct LostToRounding(pub f64);
-
 #[derive(Clone,Debug,Serialize,Deserialize,Ord, PartialOrd, Eq, PartialEq,Hash)]
 #[serde(into = "String")]
 #[serde(try_from = "String")]
@@ -33,11 +31,10 @@ impl TransferValue {
         BigRational::new(self.0.numer().clone()*BigInt::from(papers.0),self.0.denom().clone())
     }
 
-    pub fn mul_rounding_down(&self,papers:BallotPaperCount) -> (usize,LostToRounding) {
+    pub fn mul_rounding_down(&self,papers:BallotPaperCount) -> usize {
         let exact = self.mul(papers);
         let rounded_down = exact.numer().clone()/exact.denom().clone();
-        let frac = (exact-rounded_down.clone()).to_f64().unwrap();
-        (rounded_down.to_usize().unwrap(),LostToRounding(frac))
+        rounded_down.to_usize().unwrap()
     }
 }
 

@@ -7,3 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+csv = "1.1"
+anyhow = "1.0"
+stv = { path = "../stv" }
+zip = "0.5"
+serde = {version="1.0", features = ["derive"]}
+serde_json = "1.0"
+calamine = "0.18"

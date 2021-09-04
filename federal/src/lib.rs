@@ -6,9 +6,9 @@
 
 //! Describe the rules used for Federal elections, as best I can tell.
 
-use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking};
+use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber};
-use stv::transfer_value::{TransferValue, LostToRounding};
+use stv::transfer_value::TransferValue;
 use stv::tie_resolution::MethodOfTieResolution;
 
 pub mod parse;
@@ -22,11 +22,14 @@ impl PreferenceDistributionRules for FederalRules {
     type Tally = usize;
     type SplitByNumber = DoNotSplitByCountNumber;
 
+    fn use_last_parcel_for_surplus_distribution() -> bool { false }
+    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
+
     fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus,ballots)
     }
 
-    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> (usize, LostToRounding) {
+    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
         transfer_value.mul_rounding_down(ballots)
     }
 
@@ -201,11 +204,14 @@ impl PreferenceDistributionRules for FederalRulesUsed2019 {
     type Tally = usize ;
     type SplitByNumber = DoNotSplitByCountNumber;
 
+    fn use_last_parcel_for_surplus_distribution() -> bool { false }
+    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
+
     fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus,ballots)
     }
 
-    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> (usize, LostToRounding) {
+    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
         transfer_value.mul_rounding_down(ballots)
     }
 
@@ -252,11 +258,14 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
     type Tally = usize ;
     type SplitByNumber = DoNotSplitByCountNumber;
 
+    fn use_last_parcel_for_surplus_distribution() -> bool { false }
+    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
+
     fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus,ballots)
     }
 
-    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> (usize, LostToRounding) {
+    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
         transfer_value.mul_rounding_down(ballots)
     }
 
@@ -315,11 +324,14 @@ impl PreferenceDistributionRules for FederalRulesUsed2013 {
     type Tally = usize ;
     type SplitByNumber = DoNotSplitByCountNumber;
 
+    fn use_last_parcel_for_surplus_distribution() -> bool { false }
+    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
+
     fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus,ballots)
     }
 
-    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> (usize, LostToRounding) {
+    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
         transfer_value.mul_rounding_down(ballots)
     }
 

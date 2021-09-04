@@ -117,10 +117,13 @@ pub trait RawDataSource {
 
     /// Like read_raw_data, but with a better error message for invalid electorates.
     fn read_raw_data_checking_electorate_valid(&self,electorate:&String) -> anyhow::Result<ElectionData> {
-        if !self.all_electorates().contains(electorate) { Err(anyhow!("No such electorate as {}. Supported electorates are : {}.",electorate,self.all_electorates().join(", "))) }
+        if !self.all_electorates().contains(electorate) { Err(self.bad_electorate(electorate)) }
         else { self.read_raw_data(electorate) }
     }
 
+    fn bad_electorate(&self,electorate:&str) -> anyhow::Error {
+        anyhow!("No such electorate as {}. Supported electorates are : {}.",electorate,self.all_electorates().join(", "))
+    }
 }
 
 /// Datafiles from Electoral Commissions could be stored in the current working directory,

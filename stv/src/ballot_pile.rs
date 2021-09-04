@@ -14,7 +14,7 @@ use crate::ballot_paper::VoteSource;
 use std::collections::{HashSet, HashMap};
 use crate::transfer_value::TransferValue;
 use num::{Zero};
-use std::ops::{AddAssign, Sub, Add};
+use std::ops::{AddAssign, Sub, Add, SubAssign};
 use serde::Deserialize;
 use serde::Serialize;
 use std::hash::Hash;
@@ -29,6 +29,9 @@ pub struct BallotPaperCount(pub usize);
 
 impl AddAssign for BallotPaperCount {
     fn add_assign(&mut self, rhs: Self) { self.0+=rhs.0; }
+}
+impl SubAssign for BallotPaperCount {
+    fn sub_assign(&mut self, rhs: Self) { self.0-=rhs.0; }
 }
 
 impl Sub for BallotPaperCount {
@@ -124,6 +127,11 @@ impl <'a> Default for VotesWithSameTransferValue<'a> {
     }
 }
 
+/// For jurisdictions that use a last parcel, sufficient information to revert to an earlier state. Used with struct [VotesWithSameTransferValue]
+pub struct StateBeforeAddition {
+    votes_len : usize, // length of the votes vector
+}
+
 impl <'a> VotesWithSameTransferValue<'a> {
     // number of below the line ballots in this pile
     pub fn num_btl_ballots(&self) -> BallotPaperCount {  BallotPaperCount(self.num_ballots.0-self.num_atl_ballots.0)  }
@@ -133,10 +141,23 @@ impl <'a> VotesWithSameTransferValue<'a> {
         if vote.is_atl() { self.num_atl_ballots+=vote.n; }
         self.votes.push(vote);
     }
-    pub fn add(&mut self,votes:&Vec<PartiallyDistributedVote<'a>>) {
+    /// Add in some votes, and give a token that can be passed to [extract_last_parcel] to revert to the current state.
+    pub fn add(&mut self,votes:&Vec<PartiallyDistributedVote<'a>>) -> StateBeforeAddition {
+        let old_state = StateBeforeAddition{votes_len:self.votes.len()};
         for v in votes {
             self.add_vote(*v);
         }
+        old_state
+    }
+    /// revert to the prior state with a token from [add], returning the votes removed. Used to get the last parcel.
+    fn extract_last_parcel(&mut self,old_state:StateBeforeAddition) -> VotesWithSameTransferValue<'a> {
+        let mut res = VotesWithSameTransferValue::default();
+        for v in self.votes.drain(old_state.votes_len..) {
+            res.add_vote(v);
+        }
+        self.num_atl_ballots-=res.num_atl_ballots;
+        self.num_ballots-=res.num_ballots;
+        res
     }
 }
 
@@ -193,18 +214,24 @@ impl HowSplitByCountNumber for SplitByWhenTransferValueWasCreated {
     fn key(_count_index: CountIndex, when_tv_created: Option<CountIndex>) -> Self::KeyToDivide { when_tv_created.unwrap() }
 }
 
-
+struct LastParcelInfo {
+    prior_state : StateBeforeAddition,
+    transfer_value : TransferValue,
+    when_tv_created:Option<CountIndex>,
+    count_index:CountIndex,
+}
 /// A set of votes potentially with multiple transfer values or sources.
 /// These would typically be the votes given to a particular individual.
 pub struct VotesWithMultipleTransferValues<'a,S:HowSplitByCountNumber,Tally> {
 
+    last_parcel : Option<LastParcelInfo>,
     by_provenance : HashMap<(S::KeyToDivide,TransferValue),(PileProvenance<Tally>,VotesWithSameTransferValue<'a>)>
 
 }
 
 impl <'a,S:HowSplitByCountNumber,Tally> Default for VotesWithMultipleTransferValues<'a,S,Tally> {
     fn default() -> Self {
-        VotesWithMultipleTransferValues{ by_provenance: HashMap::default() }
+        VotesWithMultipleTransferValues{ last_parcel: None, by_provenance: HashMap::default() }
     }
 }
 
@@ -214,7 +241,13 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero> VotesWithMultipleTransfer
         let entry = self.by_provenance.entry(key).or_insert_with(||
             (PileProvenance{ counts_comes_from: Default::default(),when_tv_created,tally:Tally::zero()}, VotesWithSameTransferValue::default()));
         entry.0.add(count_index,when_tv_created,tally);
-        entry.1.add(&votes.votes)
+        let prior_state = entry.1.add(&votes.votes);
+        self.last_parcel = Some(LastParcelInfo{
+            prior_state,
+            transfer_value,
+            when_tv_created,
+            count_index,
+        });
     }
 
     pub fn get_all_provenance_keys(&self) -> Vec<(S::KeyToDivide,TransferValue)> {
@@ -240,7 +273,22 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero> VotesWithMultipleTransfer
         res
     }
 
-
+    /// Removes the last parcel from this object, returning the object created.
+    pub fn extract_last_parcel(&'_ mut self) -> (VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount) {
+        if let Some(last_parcel) = self.last_parcel.take() {
+            let key = (S::key(last_parcel.count_index,last_parcel.when_tv_created),last_parcel.transfer_value.clone());
+            let (_,votes) = self.by_provenance.get_mut(&key).expect("Last parcel has vanished!");
+            let res = votes.extract_last_parcel(last_parcel.prior_state);
+            let provenance = PortionOfReasonBeingDoneThisCount{
+                transfer_value: Some(last_parcel.transfer_value),
+                when_tv_created: last_parcel.when_tv_created,
+                papers_came_from_counts: vec![last_parcel.count_index],
+            };
+            (res,provenance)
+        } else {
+            panic!("No last parcel");
+        }
+    }
     /// Extracts all the ballots, adding all together, ignoring everything but pieces of paper.
     /// Clears this object.
     pub fn extract_all_ballots_ignoring_transfer_value(&'_ mut self) -> (VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount) {
@@ -254,7 +302,7 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero> VotesWithMultipleTransfer
             tv_came_from_count.add(prov.when_tv_created);
             match &mut sum {
                 None => { sum=Some(votes);  }
-                Some(accum) => accum.add(&votes.votes),
+                Some(accum) => { accum.add(&votes.votes); }
             }
         }
         let res = sum.unwrap_or_else(||VotesWithSameTransferValue::default());

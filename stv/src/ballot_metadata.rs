@@ -99,10 +99,20 @@ pub struct DataSource {
 impl ElectionMetadata {
     pub fn party(&self,index:PartyIndex) -> &Party { &self.parties[index.0] }
     pub fn candidate(&self,index:CandidateIndex) -> &Candidate { &self.candidates[index.0] }
+    /// Get a hashmap going from candidate name to index
     pub fn get_candidate_name_lookup(&self) -> HashMap<String,CandidateIndex> {
         let mut res = HashMap::default();
         for i in 0..self.candidates.len() {
             res.insert(self.candidates[i].name.clone(),CandidateIndex(i));
+        }
+        res
+    }
+    /// Get a hashmap going from candidate name to index. Include both candidate name and no_comma_name
+    pub fn get_candidate_name_lookup_multiple_ways(&self) -> HashMap<String,CandidateIndex> {
+        let mut res = HashMap::default();
+        for i in 0..self.candidates.len() {
+            res.insert(self.candidates[i].name.clone(),CandidateIndex(i));
+            res.insert(self.candidates[i].no_comma_name(),CandidateIndex(i));
         }
         res
     }
@@ -189,4 +199,13 @@ pub struct Candidate {
     // Electoral Commission internal identifier.
     #[serde(skip_serializing_if = "Option::is_none",default)]
     pub ec_id : Option<String>,
+}
+
+impl Candidate {
+    /// if the candidate name is "Surname, first", change to "first Surname"
+    pub fn no_comma_name(&self) -> String {
+        if let Some((surname,first)) = self.name.split_once(',') {
+            first.trim().to_string()+" "+surname.trim()
+        } else { self.name.clone() }
+    }
 }
