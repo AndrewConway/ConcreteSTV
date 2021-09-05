@@ -21,10 +21,11 @@ use std::hash::Hash;
 use crate::distribution_of_preferences_transcript::{PortionOfReasonBeingDoneThisCount, CountIndex};
 use crate::util::{DetectUnique, CollectAll};
 use std::fmt;
+use std::str::FromStr;
 
 /// A number representing a count of pieces of paper.
 /// This is distinct from votes which may be fractional in the presence of weights.
-#[derive(Copy,Clone,Eq, PartialEq,Serialize,Deserialize)]
+#[derive(Copy,Clone,Eq, PartialEq,Serialize,Deserialize,Ord, PartialOrd)]
 pub struct BallotPaperCount(pub usize);
 
 impl AddAssign for BallotPaperCount {
@@ -51,6 +52,18 @@ impl fmt::Display for BallotPaperCount {
 impl fmt::Debug for BallotPaperCount {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.0) }
 }
+impl Zero for BallotPaperCount {
+    fn zero() -> Self { BallotPaperCount(0) }
+    fn is_zero(&self) -> bool { self.0 == 0 }
+}
+impl FromStr for BallotPaperCount {
+    type Err = <usize as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(BallotPaperCount(s.parse()?))
+    }
+}
+
 
 /// A vote, resolved into BTL, that is somewhere through being distributed.
 /// Ignore preferences with index less than upto.
@@ -185,7 +198,7 @@ impl <'a> DistributedVotes<'a> {
 
 /// Different jurisdictions split up parcels of shares by their provenence in different ways. This abstracts that.
 pub trait HowSplitByCountNumber {
-    type KeyToDivide : Eq+Hash+Clone;
+    type KeyToDivide : Eq+Hash+Clone+Ord;
     fn key(count_index:CountIndex,when_tv_created:Option<CountIndex>) -> Self::KeyToDivide;
 }
 

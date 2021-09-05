@@ -7,7 +7,8 @@
 use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod};
 use stv::tie_resolution::MethodOfTieResolution;
 use stv::transfer_value::{TransferValue};
-use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber};
+use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber, SplitByWhenTransferValueWasCreated};
+use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 
 pub mod parse;
 mod test_act;
@@ -139,4 +140,105 @@ impl PreferenceDistributionRules for ACTPre2020 {
     fn count_set_aside_due_to_transfer_value_limit_as_rounding() -> bool { true }
 
     fn name() -> String { "ACTPre2020".to_string() }
+}
+
+
+
+/// The rules used after the 2020 changes
+///   * Votes should be rounded down to 6 decimal places rather than an integer
+///   * The legislation has a probably unintended situation whereby a surplus less than
+///     1 is not considered a surplus by a literal reading. ElectionsACT looked at this
+///     carefully and concluded that the intention was to count it as a surplus. It
+///     certainly seems to me as if that not adjusting the ">=1" clause to ">0" was an
+///     unintentional oversight by the people writing the legislation. So I think that
+///     ElectionACT's position on this is reasonable, and I will do the same.
+///
+/// This is labeled ACT2021 as ElectionsACT didn't actually use these rules in 2020, but
+/// had three classes of bugs. After we pointed them out, they denied the worst, but then
+/// in 2021 quietly fixed them and replaced their transcript of distributions of preferences on
+/// their website, and used the corrected rules when an elected candidate had to be replaced in 2021.
+pub struct ACT2021 {
+}
+
+impl PreferenceDistributionRules for ACT2021 {
+    type Tally = FixedPrecisionDecimal<6>;
+    type SplitByNumber = DoNotSplitByCountNumber;
+
+    fn use_last_parcel_for_surplus_distribution() -> bool { true }
+    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverContinuingBallotsLimitedToPriorTransferValue }
+    fn make_transfer_value(surplus: Self::Tally, ballots: BallotPaperCount) -> TransferValue {
+        TransferValue::from_surplus(surplus.get_scaled_value() as usize,BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize)))
+    }
+
+    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> Self::Tally {
+        Self::Tally::from_scaled_value(transfer_value.mul_rounding_down(BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize))) as u64)
+    }
+
+    // all below same as ACTpre2020.
+    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
+    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
+    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
+    fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
+    fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
+    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+    fn count_set_aside_due_to_transfer_value_limit_as_rounding() -> bool { true }
+
+    fn name() -> String { "ACT2021".to_string() }
+}
+
+
+/// The rules used by ElectionsACT in 2020, as best I can reverse engineer.
+/// Like ACT2021, except
+///  * Round to nearest instead of down
+///  * Round transfer values to six digits if rule 1C(4) applies.
+///  * Count transfer values computed in rule 1C(4) as having a different value to all other transfer values with the same value.
+///  * Round exhausted votes to an integer when doing exclusions (instead of 6 decimal places). This can't change who is elected, just the transcript.
+///  * Surplus distribution is completed even after everyone is elected. This can't change who is elected, just the transcript.
+/// See our report for more details.
+pub struct ACT2020 {
+}
+
+impl PreferenceDistributionRules for ACT2020 {
+    type Tally = FixedPrecisionDecimal<6>;
+    /// * Count transfer values computed in rule 1C(4) as having a different value to all other transfer values with the same value.
+    /// E.g. Ginninderra Count 39
+    type SplitByNumber = SplitByWhenTransferValueWasCreated;
+
+    fn use_last_parcel_for_surplus_distribution() -> bool { true }
+    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverContinuingBallotsLimitedToPriorTransferValue }
+    fn make_transfer_value(surplus: Self::Tally, ballots: BallotPaperCount) -> TransferValue {
+        TransferValue::from_surplus(surplus.get_scaled_value() as usize,BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize)))
+    }
+
+    /// Round to nearest instead of down
+    /// E.g. Murrumbidgee count 22
+    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> Self::Tally {
+        Self::Tally::from_scaled_value(transfer_value.mul_rounding_nearest(BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize))) as u64)
+    }
+
+    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
+    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
+    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
+    fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
+    /// Surplus distribution is completed even after everyone is elected. This can't change who is elected, just the transcript.
+    fn finish_all_surplus_distributions_when_all_elected() -> bool { true }
+    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+    fn count_set_aside_due_to_transfer_value_limit_as_rounding() -> bool { true }
+
+    /// Round exhausted votes to an integer when doing exclusions (instead of 6 decimal places).
+    /// e.g. Ginninderra count 25
+    fn munge_exhausted_votes(exhausted:Self::Tally,is_exclusion:bool) -> Self::Tally { if is_exclusion { exhausted.round_down() } else {exhausted} }
+
+    /// Round transfer values to 6 decimal places when rule 1C(4) is used.
+    /// e.g Murrumbidgee count 32
+    fn munge_transfer_value_when_used_as_limit(original:TransferValue) -> TransferValue {
+        let num = original.mul_rounding_nearest(BallotPaperCount(1000000));
+        TransferValue::from_surplus(num,BallotPaperCount(1000000))
+    }
+
+    fn name() -> String { "ACT2020".to_string() }
 }

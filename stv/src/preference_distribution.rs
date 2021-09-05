@@ -24,6 +24,8 @@ use std::hash::Hash;
 use std::iter::Sum;
 use std::cmp::min;
 use serde::{Serialize,Deserialize};
+use std::str::FromStr;
+use crate::signed_version::SignedVersion;
 
 
 /// Many systems have a special rules for termination when there are a small number of
@@ -73,7 +75,7 @@ impl TransferValueMethod {
 
 pub trait PreferenceDistributionRules {
     /// The type for the number of votes. Usually an integer.
-    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>;
+    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>;
     type SplitByNumber : HowSplitByCountNumber;
 
     /// Whether to transfer all the votes or just the last parcel.
@@ -110,6 +112,13 @@ pub trait PreferenceDistributionRules {
 
     /// A name describing these rules.
     fn name() -> String;
+
+    // Things just to support weird bugs. Defaults are given as who would otherwise do these?
+
+    /// Change the votes otherwise being classified as exhausted. Changes will go into the lost due to rounding tally.
+    fn munge_exhausted_votes(exhausted:Self::Tally,_is_exclusion:bool) -> Self::Tally { exhausted }
+    /// Change the transfer value when it is being used as a limit (e.g. in ACT rule 1C(4))
+    fn munge_transfer_value_when_used_as_limit(original:TransferValue) -> TransferValue { original }
 }
 
 struct PendingTranscript<Tally> {
@@ -136,7 +145,7 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     continuing_candidates_sorted_by_tally : Vec<CandidateIndex>,
     exhausted : BallotPaperCount,
     exhausted_atl : BallotPaperCount,
-    tally_lost_to_rounding : Rules::Tally,
+    tally_lost_to_rounding : SignedVersion<Rules::Tally>, // may be negative if rounding is up.
     tally_exhausted : Rules::Tally,
     tally_set_aside : Option<Rules::Tally>,
     current_count : CountIndex,
@@ -176,7 +185,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             continuing_candidates_sorted_by_tally,
             exhausted : BallotPaperCount(0),
             exhausted_atl : BallotPaperCount(0),
-            tally_lost_to_rounding: Rules::Tally::zero(),
+            tally_lost_to_rounding: Zero::zero(),
             tally_exhausted: Rules::Tally::zero(),
             tally_set_aside: None,
             current_count : CountIndex(0),
@@ -372,13 +381,13 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 papers: PerCandidate {
                     candidate: self.papers.iter().map(|p|p.num_ballots()).collect(),
                     exhausted: self.exhausted,
-                    rounding:  BallotPaperCount(0),
+                    rounding:  Zero::zero(),
                     set_aside: None
                 },
                 atl_papers: Some(PerCandidate {
                     candidate: self.papers.iter().map(|p|p.num_atl_ballots()).collect(),
                     exhausted: self.exhausted_atl,
-                    rounding:  BallotPaperCount(0),
+                    rounding:  Zero::zero(),
                     set_aside: None
                 }),
             }
@@ -429,6 +438,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let mut original_worth : Rules::Tally = surplus.clone();
         if Rules::transfer_value_method().limit_to_incoming_transfer_value() {
             let old_tv = provenance.transfer_value.clone().expect("If you are going to limit to an incoming transfer value, there must be a unique one.");
+            let old_tv = Rules::munge_transfer_value_when_used_as_limit(old_tv);
             if old_tv<transfer_value {
                 if !Rules::count_set_aside_due_to_transfer_value_limit_as_rounding() {
                     // work out how many votes lost this way.
@@ -441,7 +451,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             }
         }
         // println!("Parcelling out {} votes with TV {} over {} ballots",original_worth,transfer_value,tv_denom);
-        self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),distributed,Some(self.current_count),original_worth,!Rules::transfer_value_method().denom_is_just_continuing());
+        self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),distributed,Some(self.current_count),original_worth,!Rules::transfer_value_method().denom_is_just_continuing(),false);
         self.in_this_count.created_transfer_value=Some(TransferValueCreation{
             surplus,
             votes,
@@ -455,7 +465,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 
     /// Parcel out votes by next continuing candidate with a given transfer value.
-    pub fn parcel_out_votes_with_given_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,when_tv_created:Option<CountIndex>,original_worth:Rules::Tally,distribute_exhausted_votes:bool) {
+    pub fn parcel_out_votes_with_given_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,when_tv_created:Option<CountIndex>,original_worth:Rules::Tally,distribute_exhausted_votes:bool,is_exclusion:bool) {
         let mut tally_distributed = Rules::Tally::zero();
         for (candidate_index,candidate_ballots) in distributed.by_candidate.into_iter().enumerate() {
             if candidate_ballots.num_ballots.0>0 {
@@ -468,6 +478,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         if distributed.exhausted.0>0 {
             if distribute_exhausted_votes {
                 let worth:Rules::Tally = Rules::use_transfer_value(&transfer_value,distributed.exhausted);
+                let worth:Rules::Tally = Rules::munge_exhausted_votes(worth,is_exclusion); // support emulation of weird bugs.
                 self.tally_exhausted+=worth.clone();
                 tally_distributed +=worth.clone();
             }
@@ -691,7 +702,9 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             }
         }
         let mut provenances : Vec<(<Rules::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,TransferValue)> = provenances.into_iter().collect();
-        // TODO sort by S::KeyToDivide
+        // First sort by S::KeyToDivide
+        provenances.sort_by_key(|f|f.0.clone()); // stable sort, will preserve ordering of other key stull
+        // Then stable sort by TransferValue
         provenances.sort_by_key(|f|f.1.0.clone().neg()); // stable sort, will preserve ordering of other key stull
         let mut togo = provenances.len();
         for key in provenances {
@@ -712,7 +725,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             }
             let when_tv_created=when_tv_created.take().flatten();
             let distributed = DistributedVotes::distribute(&all_votes.votes,&self.continuing_candidates,self.num_candidates);
-            self.parcel_out_votes_with_given_transfer_value(key.1.clone(),distributed,when_tv_created,original_worth,true);
+            self.parcel_out_votes_with_given_transfer_value(key.1.clone(),distributed,when_tv_created,original_worth,true,true);
             togo-=1;
             self.end_of_count_step(ReasonForCount::Elimination(candidates_to_exclude.clone()), PortionOfReasonBeingDoneThisCount {
                 transfer_value: Some(key.1),
@@ -733,7 +746,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn go(&mut self) {
         self.print_candidates_names();
         self.distribute_first_preferences();
-        while self.remaining_to_elect()>NumberOfCandidates(0) {
+        while self.remaining_to_elect()>NumberOfCandidates(0) || (Rules::finish_all_surplus_distributions_when_all_elected() && (!self.continuing_candidates_sorted_by_tally.is_empty()) && !self.pending_surplus_distribution.is_empty()) {
             if let Some(candidate) = self.pending_surplus_distribution.pop_front() {
                 self.distribute_surplus(candidate);
             } else {

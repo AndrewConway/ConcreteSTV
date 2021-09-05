@@ -269,9 +269,9 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
             res.count().vote_delta().exhausted= record.votes_transferred as f64;
             res.count().vote_total().exhausted= record.votes_total as f64;
         } else if record.surname=="Gain/Loss" {
-            res.count().paper_delta().rounding= record.papers_transferred as isize;
-            res.count().vote_delta().rounding= record.votes_transferred as f64;
-            res.count().vote_total().rounding= record.votes_total as f64;
+            res.count().paper_delta().rounding= (record.papers_transferred as isize).into();
+            res.count().vote_delta().rounding= (record.votes_transferred as f64).into();
+            res.count().vote_total().rounding= (record.votes_total as f64).into();
         } else {
             let name = record.surname+", "+&record.given_name;
             match lookup_names.get(&name) {

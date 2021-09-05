@@ -18,6 +18,8 @@ pub mod official_dop_transcript;
 pub mod parse_util;
 pub mod compare_transcripts;
 pub mod compare_rules;
+pub mod fixed_precision_decimal;
+pub mod signed_version;
 
 #[cfg(test)]
 mod tests {

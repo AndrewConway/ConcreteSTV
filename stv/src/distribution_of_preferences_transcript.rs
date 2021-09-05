@@ -12,8 +12,10 @@ use crate::ballot_pile::BallotPaperCount;
 use crate::ballot_metadata::{CandidateIndex, ElectionMetadata, NumberOfCandidates};
 use crate::transfer_value::TransferValue;
 use serde::{Serialize,Deserialize};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use crate::preference_distribution::TransferValueMethod;
+use crate::signed_version::SignedVersion;
+use std::str::FromStr;
 
 
 /// The index of a count. 0 means the first. This is different from the human readable
@@ -26,30 +28,30 @@ pub struct CountIndex(pub(crate) usize);
 /// For instance, ballots, which start out all assigned to candidates, are shifted around between people, but some will get exhausted.
 /// Alternatively, votes, which start out all assigned to candidates, but may get lost due to rounding or weird rules or exhaustion.
 #[derive(Clone,Serialize,Deserialize, PartialEq,Debug)]
-pub struct PerCandidate<X:PartialEq> {
+pub struct PerCandidate<X:PartialEq+Clone+Display+FromStr> {
     /// the value for a given candidate.
     pub candidate : Vec<X>,
     /// something is exhausted if it can't go to a specific candidate as there are not enough preferences on a particular ballot.
     pub exhausted : X,
     /// something goes to rounding if it can't go to a specific candidate as fractions are not allowed.
-    pub rounding : X,
+    pub rounding : SignedVersion<X>,
     /// something gets set aside if some feature of the the rules means it doesn't go to a particular candidate. None if not applicable.
     pub set_aside : Option<X>,
 }
 
-impl <X:Default+PartialEq> Default for PerCandidate<X> {
+impl <X:Default+PartialEq+Clone+Display+FromStr> Default for PerCandidate<X> {
     fn default() -> Self {
         PerCandidate{
             candidate: vec![],
             exhausted: X::default(),
-            rounding: X::default(),
+            rounding: Default::default(),
             set_aside: None
         }
     }
 }
 /// Record the status of the count at the end of the count.
 #[derive(Clone,Serialize,Deserialize,PartialEq)]
-pub struct EndCountStatus<Tally:PartialEq> {
+pub struct EndCountStatus<Tally:PartialEq+Clone+Display+FromStr> {
     /// tallies for each candidate
     pub tallies : PerCandidate<Tally>,
     /// the number of pieces of paper for each candidate
@@ -117,7 +119,7 @@ pub struct DecisionMadeByEC {
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct SingleCount<Tally:PartialEq> {
+pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
     /// The action that is being done in said count
     pub reason : ReasonForCount,
     /// If only a sub portion of that reason is done in that count, why will be in here. Other info could also be in here (like which counts papers came from) even if it doesn't restrict things for this set of STV rules.
@@ -144,7 +146,7 @@ pub struct QuotaInfo<Tally> {
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct Transcript<Tally:PartialEq> {
+pub struct Transcript<Tally:PartialEq+Clone+Display+FromStr> {
     /// The rules that were used to compute this transcript.
     pub rules : String,
     pub quota : QuotaInfo<Tally>,
@@ -153,7 +155,7 @@ pub struct Transcript<Tally:PartialEq> {
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct TranscriptWithMetadata<Tally:PartialEq> {
+pub struct TranscriptWithMetadata<Tally:PartialEq+Clone+Display+FromStr> {
     pub metadata : ElectionMetadata,
     pub transcript : Transcript<Tally>,
 }

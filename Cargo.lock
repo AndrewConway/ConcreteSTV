@@ -288,6 +288,7 @@ dependencies = [
  "anyhow",
  "clap",
  "federal",
+ "num",
  "serde",
  "serde_json",
  "stv",

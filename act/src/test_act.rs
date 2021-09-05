@@ -17,50 +17,80 @@ mod tests {
     use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
     use std::fs::File;
     use stv::parse_util::{RawDataSource, FileFinder};
-    use crate::{ACTPre2020};
+    use crate::{ACTPre2020, ACT2021, ACT2020};
 
-
-    fn test2020(electorate: &str) -> anyhow::Result<()> {
-        let loader = get_act_data_loader_2020(&FileFinder::find_ec_data_repository())?;
-        let data = loader.load_cached_data(electorate)?;
-        data.print_summary();
-        let transcript = distribute_preferences::<ACTPre2020>(&data, loader.candidates_to_be_elected(electorate), &HashSet::default(), &TieResolutionsMadeByEC::default());
-        let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
-        std::fs::create_dir_all("test_transcripts")?;
-        let file = File::create(format!("test_transcripts/transcript{}2020.json",electorate))?;
-        serde_json::to_writer_pretty(file,&transcript)?;
-        let official_transcript = loader.read_official_dop_transcript(&transcript.metadata,None)?;
-        official_transcript.compare_with_transcript(&transcript.transcript,|tally|tally as f64);
-        Ok(())
-    }
-
-    fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&str,loader:ACTDataLoader,decode:F) -> anyhow::Result<()> {
+    fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&str,loader:ACTDataLoader,decode:F,sub_folder:Option<&str>) -> anyhow::Result<()> {
         let data = loader.load_cached_data(electorate)?;
         data.print_summary();
         let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &HashSet::default(), &TieResolutionsMadeByEC::default());
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
-        let file = File::create(format!("test_transcripts/transcript{}{}.json",electorate,transcript.metadata.name.year))?;
+        let file = File::create(format!("test_transcripts/transcript{}{}{}.json",electorate,transcript.metadata.name.year,sub_folder.unwrap_or("")))?;
         serde_json::to_writer_pretty(file,&transcript)?;
-        let official_transcript = loader.read_official_dop_transcript(&transcript.metadata,None)?;
+        let official_transcript = loader.read_official_dop_transcript(&transcript.metadata,sub_folder)?;
         official_transcript.compare_with_transcript(&transcript.transcript,decode);
         Ok(())
     }
 
+    fn test2021(electorate: &str) -> anyhow::Result<()> {
+        let loader = get_act_data_loader_2020(&FileFinder::find_ec_data_repository())?;
+        test::<ACT2021,_>(electorate,loader,|tally|tally.into(),Some("D of P as at 26 Mar 2021"))
+    }
+
+    fn test2020(electorate: &str) -> anyhow::Result<()> {
+        let loader = get_act_data_loader_2020(&FileFinder::find_ec_data_repository())?;
+        test::<ACT2020,_>(electorate,loader,|tally|tally.into(),None)
+    }
+
     fn test2016(electorate: &str) -> anyhow::Result<()> {
         let loader = get_act_data_loader_2016(&FileFinder::find_ec_data_repository())?;
-        test::<ACTPre2020,_>(electorate,loader,|tally|tally as f64)
+        test::<ACTPre2020,_>(electorate,loader,|tally|tally as f64,None)
     }
 
     fn test2012(electorate: &str) -> anyhow::Result<()> {
         let loader = get_act_data_loader_2012(&FileFinder::find_ec_data_repository())?;
-        test::<ACTPre2020,_>(electorate,loader,|tally|tally as f64)
+        test::<ACTPre2020,_>(electorate,loader,|tally|tally as f64,None)
     }
 
     fn test2008(electorate: &str) -> anyhow::Result<()> {
         let loader = get_act_data_loader_2008(&FileFinder::find_ec_data_repository())?;
-        test::<ACTPre2020,_>(electorate,loader,|tally|tally as f64)
+        test::<ACTPre2020,_>(electorate,loader,|tally|tally as f64,None)
     }
+
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Brindabella2021() { test2021("Brindabella").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Ginninderra2021() { test2021("Ginninderra").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Kurrajong2021() { test2021("Kurrajong").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Murrumbidgee2021() { test2021("Murrumbidgee").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Yerrabi2021() { test2021("Yerrabi").unwrap() }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Brindabella2020() { test2020("Brindabella").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Ginninderra2020() { test2020("Ginninderra").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Kurrajong2020() { test2020("Kurrajong").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Murrumbidgee2020() { test2020("Murrumbidgee").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Yerrabi2020() { test2020("Yerrabi").unwrap() }
+
+
 
 
     #[test]

@@ -36,6 +36,14 @@ impl TransferValue {
         let rounded_down = exact.numer().clone()/exact.denom().clone();
         rounded_down.to_usize().unwrap()
     }
+    /// like mul_rounding_down, but round up if the fraction is >0.5
+    pub fn mul_rounding_nearest(&self,papers:BallotPaperCount) -> usize {
+        let exact = self.mul(papers);
+        let rounded_down = exact.numer().clone()/exact.denom().clone();
+        let rounded_down = rounded_down.to_usize().unwrap();
+        let remainder = exact.numer().clone()%exact.denom().clone();
+        if &(remainder*2) > exact.denom() { rounded_down+1 } else {rounded_down}
+    }
 }
 
 impl Display for TransferValue {

@@ -342,6 +342,7 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
                 //println!("Processing remark {}",remark);
                 if let Some((name,_)) = remark.split_once(" elected ") {
                     let name=name.trim();
+                    let name = name.trim_start_matches("First preferences "); // in 2021 runs into elected candidate name without period.
                     //println!("Found election of {}",name);
                     let candidate = *candidate_of_name.get(name).ok_or_else(|| anyhow!("Can't find elected candidate name {}",name))?;
                     elected.push(candidate);
@@ -359,19 +360,19 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
         let vote_delta : Option<PerCandidate<f64>>=Some(PerCandidate{
             candidate: table2_col_for_candidate.iter().map(|c|parse_num_possibly_blank(sheet2.get_value((row_index,*c)))).collect(),
             exhausted: parse_num_possibly_blank(sheet2.get_value((row_index,table2_col_for_exhausted_votes))),
-            rounding: parse_num_possibly_blank(sheet2.get_value((row_index,table2_col_for_loss_by_fraction))),
+            rounding: parse_num_possibly_blank(sheet2.get_value((row_index,table2_col_for_loss_by_fraction))).into(),
             set_aside: None,
         });
         let vote_total : Option<PerCandidate<f64>> = if only_1_row { vote_delta.clone() } else {Some(PerCandidate{
             candidate: table2_col_for_candidate.iter().map(|c|parse_num_possibly_blank(sheet2.get_value((row_index+1,*c)))).collect(),
             exhausted: parse_num_possibly_blank(sheet2.get_value((row_index+1,table2_col_for_exhausted_votes))),
-            rounding: parse_num_possibly_blank(sheet2.get_value((row_index+1,table2_col_for_loss_by_fraction))),
+            rounding: parse_num_possibly_blank(sheet2.get_value((row_index+1,table2_col_for_loss_by_fraction))).into(),
             set_aside: None,
         })};
         let paper_delta : Option<PerCandidate<isize>>=Some(PerCandidate{
             candidate: table1_col_for_candidate.iter().map(|c|parse_num_possibly_blank(sheet1.get_value((paper_row_index,*c))) as isize).collect(),
             exhausted: parse_num_possibly_blank(sheet1.get_value((paper_row_index,table1_col_for_exhausted_papers))) as isize,
-            rounding: 0,
+            rounding: 0.into(),
             set_aside: None,
         });
         //println!("{:?}",paper_delta.as_ref().unwrap());

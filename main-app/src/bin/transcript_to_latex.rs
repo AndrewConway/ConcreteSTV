@@ -12,6 +12,8 @@ use stv::election_data::ElectionData;
 use stv::distribution_of_preferences_transcript::{TranscriptWithMetadata, ReasonForCount};
 use stv::ballot_metadata::CandidateIndex;
 use std::collections::HashSet;
+use num::Zero;
+use std::ops::Sub;
 
 #[derive(Clap)]
 #[clap(version = "0.1", author = "Andrew Conway", name="ConcreteSTV")]
@@ -32,11 +34,13 @@ struct Opts {
     candidates : Option<Vec<usize>>,
 }
 
-fn possibly_blank(t:usize) -> String {
-    if t==0 { "".to_string() }
+fn  possibly_blank<T:ToString+Zero>(t:T) -> String {
+    if t.is_zero() { "".to_string() }
     else { t.to_string() }
 }
-fn possibly_blank_delta(t_old:usize,t_new:usize) -> String {
+fn possibly_blank_delta<T:ToString+Eq+Ord+Sub>(t_old:T,t_new:T) -> String
+where <T as Sub>::Output: ToString
+{
     if t_old==t_new { "".to_string() }
     else if t_old < t_new { "+".to_string()+&(t_new-t_old).to_string() }
     else  { "-".to_string()+&(t_old-t_new).to_string() }
@@ -67,7 +71,7 @@ fn main() -> anyhow::Result<()> {
         let mut ever_used_papers_line: bool = false;
         let metadata = &transcript.metadata;
         let use_exhausted : bool = opt.candidates.is_none() && transcript.transcript.counts.iter().any(|v|v.status.tallies.exhausted>0 || v.status.papers.exhausted.0>0);
-        let use_rounding : bool = opt.candidates.is_none() && transcript.transcript.counts.iter().any(|v|v.status.tallies.rounding>0 );
+        let use_rounding : bool = opt.candidates.is_none() && transcript.transcript.counts.iter().any(|v|!v.status.tallies.rounding.is_zero() );
         let mut heading_justifications = vec!["r|"];
         let mut headings = vec!["Count"];
         for i in 0..metadata.candidates.len() {
@@ -183,7 +187,7 @@ fn main() -> anyhow::Result<()> {
                     tally_line+=" & ";
                     papers_line+=" & ";
                     tally_line+=r"{\color{Gray}$ ";
-                    tally_line+=&possibly_blank_delta(prev_status.tallies.rounding,status.tallies.rounding);
+                    tally_line+=&possibly_blank_delta(prev_status.tallies.rounding.clone(),status.tallies.rounding.clone());
                     tally_line+="$}";
                 }
                 if opt.candidates.is_none() {
@@ -238,7 +242,7 @@ fn main() -> anyhow::Result<()> {
             }
             if use_rounding {
                 line+=" & ";
-                line+=&possibly_blank(status.tallies.rounding);
+                line+=&possibly_blank(status.tallies.rounding.clone());
             }
             if opt.candidates.is_none() {
                 line+=" & ";
