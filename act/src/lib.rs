@@ -14,7 +14,7 @@ pub mod parse;
 mod test_act;
 
 
-/// The rules used pre2020, when votes were integers
+/// The rules used pre2020 for the ACT Legislative Assembly, when votes were integers
 pub struct ACTPre2020 {
 }
 

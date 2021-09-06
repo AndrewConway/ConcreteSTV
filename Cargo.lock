@@ -285,6 +285,7 @@ dependencies = [
 name = "main-app"
 version = "0.1.0"
 dependencies = [
+ "act",
  "anyhow",
  "clap",
  "federal",

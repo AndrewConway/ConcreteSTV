@@ -24,16 +24,16 @@ use calamine::{open_workbook_auto, DataType};
 use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
 
 pub fn get_act_data_loader_2020(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
-    ACTDataLoader::new(finder,"2020","https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections/2020-election")
+    ACTDataLoader::new(finder,"2020","https://www.elections.act.gov.au/elections_and_voting/2020_legislative_assembly_election/ballot-paper-preference-data-2020-election")
 }
 pub fn get_act_data_loader_2016(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
-    ACTDataLoader::new(finder,"2016","https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections/2016-election")
+    ACTDataLoader::new(finder,"2016","https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections/2016-election/ballot-paper-preference-data-2016-election")
 }
 pub fn get_act_data_loader_2012(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
-    ACTDataLoader::new(finder,"2012","https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections/2012_act_legislative_assembly_election")
+    ACTDataLoader::new(finder,"2012","https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections/2012_act_legislative_assembly_election/ballot_paper_preference_data_-_2012_election")
 }
 pub fn get_act_data_loader_2008(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
-    ACTDataLoader::new(finder,"2008","https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections/2008_election")
+    ACTDataLoader::new(finder,"2008","https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections/2008_election/ballot_paper_preference_data_2008_election")
 }
 
 pub struct ACTDataLoader {
