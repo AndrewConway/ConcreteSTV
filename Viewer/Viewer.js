@@ -15,6 +15,14 @@ function delta(newV,oldV) {
     const diff = newV-oldV;
     if (diff===0) return "";
     let res = diff.toString();
+    if (res.length>newV.toString().length+2) {
+        // probably a rounding issue. Round to 6 decimal places which is the longest currently supported.
+        res=diff.toFixed(6);
+        if (res.includes(".")) { // delete trailing zeros, in case res is an integer.
+            while (res.endsWith("0")) res=res.substring(0,res.length-1);
+            if (res.endsWith(".")) res=res.substring(0,res.length-1);
+        }
+    }
     if (diff>0) res="+"+res;
     return res;
 }
