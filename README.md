@@ -20,65 +20,24 @@ Results from the earlier project were used to find and fix bugs [in the 2020 ACT
 
 ## Currently Supported Election Rules
 
-- **Federal** My interpretation of the Australian Federal Senate election system. The federal rules have
-  surplus distributed among all ballots, continuing or not, with one shared transfer value. The legislation changed
-  significantly between 2013 and 2016, removing formal party tickets and changing formality
-  requirements, but those get dealt with in this system before these count rules apply. The legislation
-  appears ambiguous in various places to me, in particular when rules 273(17) or 273(18) are
-  applied. I interpret both as after all exclusions and surplus distributions are finished. I don't
-  claim this is more reasonable than other interpretations. I also have a variety of
-  interpretations of the rules the Australian Electoral Commission (AEC) actually used in recent
-  elections. I cannot find out what rules they _actually_ used as the source code of their
-  program to count them is a tightly held secret, but one can make a good guess by looking
-  at the provided distribution of preferences. See [Our Report](reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf) for
-  details of the differences between the below specific rules.
-  - **AEC2013** This is my interpretation of the rules actually used by the AEC for the 2013 election. 
-    It is very similar to *Federal* except
-      - When resolving 3 way ties by looking at prior counts, any difference is used as a discriminator,
-        instead of requiring that each has a different count. Evidence: NSW 2016, special count
-        with Rod Cullerton excluded, count 49. Assumed 2013 same as 2016.
-      - Rule (17) is applied after all exclusions and surplus distributions are finished (same as my interpretation). 
-        Evidence: 2013 SA, count 228
-      - But Rule (18) is applied after all surplus distributions, and the first transfer of an exclusion are finished. 
-        Assumed same as 2016, where Qld, WSW, Vic and WA are all evidence.
-  - **AEC2016** This is my interpretation of the rules actually used by the AEC for the 2016 election.
-    It is very similar to *AEC2013*, except the Bulk Exclusion rules are not applied (evidence : this should crop
-    up frequently)
-  - **AEC2019** This is my interpretation of the rules actually used by the AEC for the 2019 election.
-    It is very similar to *AEC2016*, except rule (18) is applied after determining who to exclude but
-    before transferring any votes (evidence 2019 NSW, count 429)
-    
-- The ACT Legislative Assembly is elected by STV with a generally well written and minimal
-  set of rules, with surplus distributed amongst continuing ballots in the last parcel.
-  A rule for restricting the resulting transfer value from exceeding the transfer value in the
-  last parcel can lead to votes effectively set aside; such votes are counted by ElectionsACT
-  as lost to rounding, which is harmless other than being mildly confusing. I have emulated
-  this behaviour.
-  In 2000 the legislation changed to count votes to 6 decimal digits instead of 
-  as integers. This introduced a (probably unintended) problem in the legislation as a surplus 
-  was constrained to having at least 1 vote above quota. This made sense and was equivalent to
-  greater than zero when counts were all integers, but was unsatisfying with fractional votes - what
-  should one do with a candidate who got 0.5 votes above a quota? ElectionsACT investigated this
-  question in depth and concluded (sensibly IMHO) that anything above zero was actually intended to be a surplus. 
-  This seems consistent with the spirit and implied intention if not the literal wording of the legislation, so I have
-  adopted the same behaviour. They did however also introduce a variety of new [bugs](reports/2020%20Errors%20In%20ACT%20Counting.pdf) 
-  at the same time which we pointed out. In March 2021 ElectionsACT quietly changed the distribution of preferences on their
-  website having fixed the bugs we reported. This leads to different rules needed for 2020 and 2021.
-  - **ACTPre2020** : This is my interpretation of the rules used by ElectionsACT for the 2008, 2012, and 2016
-  elections. It seems to match the legislation well.
-  - **ACT2020** : This is my interpretation of the buggy set of rules used by ElectionsACT for the 2020 election.
-    Use this ruleset to match the [now removed](https://web.archive.org/web/20201127025950/https://www.elections.act.gov.au/elections_and_voting/2020_legislative_assembly_election/distribution-of-preferences-2020) original 2020 election results.
-    It differs from ACT2021 by emulating the following bugs:
-    * Round votes to nearest instead of down. (Generally small effect, but it allows negative votes to be lost to rounding, and thus for more than the allowed number of candidates to achieve a quota. Acknowledged by ElectionsACT and fixed in 2021.)
-    * Round transfer values to six digits if rule 1C(4) applies. (Like previous, except larger effect. Acknowledged by ElectionsACT and fixed in 2021)
-    * Count transfer values computed in rule 1C(4) as having a different value to all other transfer values with the same value. (Big effect, as it can change which vote batch is the last parcel. [Denied](https://www.elections.act.gov.au/__data/assets/pdf_file/0011/1696160/Letter-to-V-Teague-30-Nov-2020_Redacted.pdf) by ElectionsACT but still fixed in 2021.)
-    * Round exhausted votes to an integer when doing exclusions (instead of 6 decimal places). This can't change who is elected, just the transcript.
-    * Surplus distribution is completed even after everyone is elected. This can't change who is elected, just the transcript.
-  - **ACT2021** : This is my interpretation of the fixed set of rules used by ElectionsACT to recount the 2020 election in 2021.
-    It differs from ACTPre2020 in counting votes to 6 decimal places. To match the results currently (as of March 2021) on the 
-    [ElectionsACT website](https://www.elections.act.gov.au/elections_and_voting/2020_legislative_assembly_election/distribution-of-preferences-2020)
-    use ACT2021 ruleset rather than ACT2020.
-    
+ConcreteSTV supports a variety of different rules. Each jurisdiction generally has its own legislation,
+which changes over time, and then there is the actual implementation by the electoral commission which
+is often buggy. ConcreteSTV aims to both provide the option of a correct count, and also the ability
+to emulate the bugs of present in a particular year's count. There are also often ambiguities in the legislation,
+in which case ConcreteSTV generally follows the corresponding electoral commissions's interpretation, unless that
+changes over time.
+
+See [ElectionRules.md](ElectionRules.md) for a detailed description of what each of the below options means.
+- **Federal** Federal Senate, my interpretation of the correct rules.
+- **AEC2013** Buggy rules used by AEC in 2013 Federal Senate election
+- **AEC2016** Buggy rules used by AEC in 2016 Federal Senate election
+- **AEC2019** Buggy rules used by AEC in 2019 Federal Senate election
+- **ACTPre2020** Rules used for ACT Legislative Assembly by ElectionsACT prior to 2020.
+- **ACT2020** Buggy rules used by ElectionsACT in 2020
+- **ACT2021** Rules that should have been used by ElectionsACT in 2020 and were used for the 2021 recount.
+
+
+
 
 ## To compile
 
