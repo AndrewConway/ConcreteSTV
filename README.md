@@ -36,8 +36,32 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **ACT2020** Buggy rules used by ElectionsACT in 2020
 - **ACT2021** Rules that should have been used by ElectionsACT in 2020 and were used for the 2021 recount.
 
+This list is expected to grow as ConcreteSTV supports more jurisdictions.
 
+### A short note on bugs
 
+Bugs are expected in any computer program. I am sure ConcreteSTV contains lots of bugs. Electoral
+Commissions are not chosen for their competence in computer software. It is unreasonable to expect
+them to not have lots of bugs in their programs. What should be expected but is sadly rare
+is that they be transparent enough to demonstrate what they do, and commit to the rules 
+they will use before the election.
+
+The rules that I have implemented are my best guesses at a plausible set of rules
+that would produce the output that actually happens. There may well be a different
+set of rules that also would produce the same output.
+
+If my program matches their output exactly, is that evidence that the correct candidates
+were elected? Only very weak evidence. For a start, I may have the same bug as the electoral
+commission. This sounds unlikely, but it actually
+happened once in prior work - my transcripts matched the AEC's perfectly, but later I found a bug
+in my code. More importantly, the accuracy depends on the list of the votes provided by the
+electroral commission, and there is rarely any meaningful evidence provided either to the public
+or scrutineers that these
+correspond to the physical ballots, and are not affected by hackers, malicious insiders, supply chain
+insiders, OCR errors or other bugs. This could be mitigated by public random auditing.
+
+If you notice any bugs in ConcreteSTV, please contact me at the address at the bottom
+of this file.
 
 ## To compile
 

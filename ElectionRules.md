@@ -1,6 +1,7 @@
 # Election Rules supported by ConcreteSTV
 
-This document described in details the rules options for ConcreteSTV
+This document described in details the rules options for ConcreteSTV. Allowed options are presented in bold
+in the text below.
 
 ## Federal Senate
 
@@ -27,10 +28,10 @@ asking for the source code of the counting algorithm under FOI, so the actual ru
           instead of requiring that each has a different count. Evidence: NSW 2016, special count
           with Rod Cullerton excluded, count 49. I assume 2013 same as 2016.
   - Rule (17) is applied after all exclusions and surplus distributions are finished (same as my interpretation).
-    as can be seen in 2013 SA, count 228. However Rule (18) is applied after all surplus distributions, and the first transfer 
+    This can be seen in 2013 SA, count 228. However I believe Rule (18) is applied after all surplus distributions, and the first transfer 
     of an exclusion are finished. This is assumed  same as 2016, where Qld, WSW, Vic and WA are all evidence.
 - **AEC2016** This is my interpretation of the rules actually used by the AEC for the 2016 election.
-  It is very similar to *AEC2013*, except the Bulk Exclusion rules are not applied (evidence : this should crop
+  It is very similar to *AEC2013*, except the Bulk Exclusion rules are not applied (evidence : this crops
   up frequently)
 - **AEC2019** This is my interpretation of the rules actually used by the AEC for the 2019 election.
   It is very similar to *AEC2016*, except rule (18) is applied after determining who to exclude but
