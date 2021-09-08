@@ -29,11 +29,11 @@ changes over time.
 
 See [ElectionRules.md](ElectionRules.md) for a detailed description of what each of the below options means.
 - **Federal** Federal Senate, my interpretation of the correct rules.
-- **AEC2013** Buggy rules used by AEC in 2013 Federal Senate election
+- **AEC2013** Possibly buggy rules used by AEC in 2013 Federal Senate election
 - **AEC2016** Buggy rules used by AEC in 2016 Federal Senate election
-- **AEC2019** Buggy rules used by AEC in 2019 Federal Senate election
+- **AEC2019** Probably Buggy rules used by AEC in 2019 Federal Senate election
 - **ACTPre2020** Rules used for ACT Legislative Assembly by ElectionsACT prior to 2020.
-- **ACT2020** Buggy rules used by ElectionsACT in 2020
+- **ACT2020** Very buggy rules used by ElectionsACT in 2020
 - **ACT2021** Rules that should have been used by ElectionsACT in 2020 and were used for the 2021 recount.
 
 This list is expected to grow as ConcreteSTV supports more jurisdictions.
@@ -59,6 +59,10 @@ electroral commission, and there is rarely any meaningful evidence provided eith
 or scrutineers that these
 correspond to the physical ballots, and are not affected by hackers, malicious insiders, supply chain
 insiders, OCR errors or other bugs. This could be mitigated by public random auditing.
+
+Note that prior to 2020, the ACT counting code was publicly available on their website. It
+also appears to be the least buggy EC code in practice. This was partially due to
+third parties who pointed out issues before they cropped up in elections.
 
 If you notice any bugs in ConcreteSTV, please contact me at the address at the bottom
 of this file.
