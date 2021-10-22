@@ -36,9 +36,22 @@ asking for the source code of the counting algorithm under FOI, so the actual ru
 - **AEC2019** This is my interpretation of the rules actually used by the AEC for the 2019 election.
   It is very similar to *AEC2016*, except rule (18) is applied after determining who to exclude but
   before transferring any votes (evidence 2019 NSW, count 429)
-
-
-
+  
+Update: A [personal communication](reports/RecommendedAmendmentsSenateCountingAndScrutinyResponse/18_10_2021_-_Dr_Andrew_Conway_and_Prof._Vanessa_teague_-_Senate_Counting_and_Scrutiny.pdf) 
+from the Electoral Commissioner clarified some of these interpretations. Note that the personal response
+incorrectly claimed that our report "validates the accuracy of the Senate election outcomes", which is the 
+opposite of our view, and "this is a more appropriate interpretation as acknowledged in your paper". I don't
+know exactly what that was intended to mean, but we certainly don't think that what they did was an appropriate interpretation
+of the legislation. I will try not to put words into his mouth in this interpretation of said letter.
+He stated something difficult to interpret about the tie elimination, which I believe confirms that
+they do it the way we believed, rather than the way specified by the legislation. 
+He also verified our interpretation of the bulk exclusion rules (that they are compulsory),
+and that rule (18) should not cut short an exclusion. He did not comment on the fact that that was not
+what the AEC did for either in 2019, or for the bulk exclusion in 2016. We interpret his interpretation
+of rule (17) to be our interpretation for surplus distributions, but he did not mention the (very likely to
+change an election outcome) priority of exclusions with respect to rule (17). He did not comment on whether
+any of these would be fixed for the next election, or whether they would adopt any of our recommendations. We are
+seeking clarification. 
 
 ## ACT Legislative Assembly
 

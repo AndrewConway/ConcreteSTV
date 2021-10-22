@@ -118,7 +118,8 @@ impl PreferenceDistributionRules for FederalRules {
     /// but does after exclusions. But even that is tenuous, as (15) talks about
     /// reaching Quota rather than being elected.
     ///
-    /// It seems to have been done differently in different years, so precedent is not much use.
+    /// There is not enough information to be sure of what has been done
+    /// in previous years, so precedent is not much use.
     ///
     /// This is actually a very significant issue, as it can easily affect who
     /// is elected. For instance (has happened in the Federal election 2019,
@@ -239,7 +240,21 @@ impl PreferenceDistributionRules for FederalRulesUsed2019 {
     /// The elimination is aborted and no ballots are transferred in this count.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers }
 
-    /// Not done in TAS count 5, SA count 6, QLD 5, NSW 6.
+    /// Not done in ACT count 3, SA count 80, Vic count 6.
+    /// Details ACT count 3: 13(A) should exclude 5 candidates, only 1 excluded.
+    /// At the end of count 2, quota=90,078, remaining seats=1, SESELJA is on 84,666, vacancy shortfall and leading shortfall both 5412.
+    /// Candidate   Votes    Notional Votes
+    /// BIRKETT      80        80
+    /// HODGSON     181       261
+    /// KENT        219       480
+    /// COWTON      308       788
+    /// ANGEL       309      1097
+    /// KIM        1251      2348
+    /// HOUSTON    1378      3726
+    /// DAVIDSON   2126      5852
+    /// 13(A)(a) Candidate A is DAVIDSON
+    /// 13(A)(b) Candidate B is ANGEL (1097 notional votes < KIM's 1251 votes)
+    /// 13(A)(c) Applies, and BIRKETT, HODGSON, KENT, COWTON, ANGEL should all be excluded.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
 
     fn name() -> String { "AEC2019".to_string() }
@@ -302,10 +317,18 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
     /// Two more surplus distributions were carried out, and on the last, D Leyonhjelm was elected.
     ///
     /// A different thing happened in WA 2016 (with Rod Cullerton excluded), ot count 535, K. Muir was excluded, leaving 2 candidates and 2 seats.
-    /// The first step of the exclusion was performed, at the end of which the remaining 2 candidates were both declared elected.
+    /// The first step of the exclusion was performed, at the end of which the remaining 2 candidates were both declared elected. (both had a quota)
+    /// That is in the re-count. The description in the text was "SIEWERT, R, GEORGIOU, P have been elected to the remaining positions."
+    /// In the original, a similar thing happened with 2 candidates elected, after 1 round of exclusion, but both had obtained quotas.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists }
 
-    /// several occasions.
+    /// ACT count 11, TAS count 10, VIC count 13 all trigger rule 13(a) but it is not applied.
+    /// Details for ACT count 11: 13(a) should exclude MONTAGNE, Jessica and TYE, Martin, but only MONTAGNE, Jessica was excluded.
+    /// At the end of count 10, MONTAGNE was on 106, TYE was on 133 (239 notional votes), HANSON on 315 (554 notional), SWAN on 360 (914 notional), WAREHAM on 595 (1509 notional), HAY on 706 (2215 notional)
+    /// There was 1 seat remaining. Quota 84923, SESELJA leading on 83010, vacancy shortfall and leading shortfall both 1913.
+    /// 13A(a) Candidate A is HAY.
+    /// 13A(b) Candidate B is TYE (239 notional is less than HANSON on 315).
+    /// 13A(c) applies and HAY and TYE should be excluded.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
 
     fn name() -> String { "AEC2016".to_string() }
