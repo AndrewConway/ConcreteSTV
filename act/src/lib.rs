@@ -4,9 +4,9 @@
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
-use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod};
+use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational};
 use stv::tie_resolution::MethodOfTieResolution;
-use stv::transfer_value::{TransferValue};
+use stv::transfer_value::{TransferValue, convert_usize_to_rational, round_rational_down_to_usize};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber, SplitByWhenTransferValueWasCreated};
 use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 
@@ -59,10 +59,14 @@ impl PreferenceDistributionRules for ACTPre2020 {
     fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus,ballots)
     }
+    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
+    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }
 
     fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
         transfer_value.mul_rounding_down(ballots)
     }
+    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
+    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
 
     /// Not applicable.
     fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
@@ -132,6 +136,7 @@ impl PreferenceDistributionRules for ACTPre2020 {
     /// 6(4) is surplus distribution
     /// 9(2)(d) is excluded candidates, for a single transfer value.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
 
     /// If the TV calculation is limited due to incoming TV (such as in ACT) this causes votes to be set aside.
     /// These will normally be counted as set aside, but Elections ACT counts them as lost to rounding.
@@ -169,10 +174,14 @@ impl PreferenceDistributionRules for ACT2021 {
     fn make_transfer_value(surplus: Self::Tally, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus.get_scaled_value() as usize,BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize)))
     }
+    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { tally.to_rational()  }
+    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { Self::Tally::from_rational_rounding_down(rational) }
 
     fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> Self::Tally {
         Self::Tally::from_scaled_value(transfer_value.mul_rounding_down(BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize))) as u64)
     }
+    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
+    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
 
     // all below same as ACTpre2020.
     fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
@@ -184,6 +193,7 @@ impl PreferenceDistributionRules for ACT2021 {
     fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
     fn count_set_aside_due_to_transfer_value_limit_as_rounding() -> bool { true }
+    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
 
     fn name() -> String { "ACT2021".to_string() }
 }
@@ -211,12 +221,16 @@ impl PreferenceDistributionRules for ACT2020 {
     fn make_transfer_value(surplus: Self::Tally, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus.get_scaled_value() as usize,BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize)))
     }
+    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { tally.to_rational()  }
+    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { Self::Tally::from_rational_rounding_down(rational) }
 
     /// Round to nearest instead of down
     /// E.g. Murrumbidgee count 22
     fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> Self::Tally {
         Self::Tally::from_scaled_value(transfer_value.mul_rounding_nearest(BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize))) as u64)
     }
+    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
+    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
 
     fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
@@ -239,6 +253,7 @@ impl PreferenceDistributionRules for ACT2020 {
         let num = original.mul_rounding_nearest(BallotPaperCount(1000000));
         TransferValue::from_surplus(num,BallotPaperCount(1000000))
     }
+    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
 
     fn name() -> String { "ACT2020".to_string() }
 }

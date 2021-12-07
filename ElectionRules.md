@@ -37,7 +37,7 @@ asking for the source code of the counting algorithm under FOI, so the actual ru
   It is very similar to *AEC2016*, except rule (18) is applied after determining who to exclude but
   before transferring any votes (evidence 2019 NSW, count 429)
   
-Update: A [personal communication](reports/RecommendedAmendmentsSenateCountingAndScrutinyResponse/18_10_2021_-_Dr_Andrew_Conway_and_Prof._Vanessa_teague_-_Senate_Counting_and_Scrutiny.pdf) 
+Update: A [personal communication (reproduced with permission)](reports/RecommendedAmendmentsSenateCountingAndScrutinyResponse/18_10_2021_-_Dr_Andrew_Conway_and_Prof._Vanessa_teague_-_Senate_Counting_and_Scrutiny.pdf) 
 from the Electoral Commissioner clarified some of these interpretations. Note that the personal response
 incorrectly claimed that our report "validates the accuracy of the Senate election outcomes", which is the 
 opposite of our view, and "this is a more appropriate interpretation as acknowledged in your paper". I don't
@@ -52,6 +52,15 @@ of rule (17) to be our interpretation for surplus distributions, but he did not 
 change an election outcome) priority of exclusions with respect to rule (17). He did not comment on whether
 any of these would be fixed for the next election, or whether they would adopt any of our recommendations. We are
 seeking clarification. 
+
+Update 2: The resolution has largely been to change the legislation (Dec 2021) to match what the AEC did.
+The tie breaking has been changed to what the AEC did (which is arguably better than what the legislation
+had required), and the horrible Bulk Exclusion rules no longer apply when the count is done by computer
+(but do apply when the count is done by hand, which could produce different results). The error in
+the AEC's handling of rule 18 is not addressed in the legislation. The legislation does include a 
+clause requiring some checking of the listed votes against the paper ballots, which is a great thing
+as it will encourage the AEC to actually provide some meaningful evidence that the election result is correct.
+I will create new rulesets taking the new legislation into account very soon.
 
 ## ACT Legislative Assembly
 
@@ -90,3 +99,17 @@ In 2020 they made it a secret (just in time for the bugs).
   It differs from ACTPre2020 in counting votes to 6 decimal places. To match the results currently (as of March 2021) on the
   [ElectionsACT website](https://www.elections.act.gov.au/elections_and_voting/2020_legislative_assembly_election/distribution-of-preferences-2020)
   use ACT2021 ruleset rather than ACT2020.
+  
+## NSW Local Government
+
+The NSW local government elections used to use similar legislation to the NSW legislative council,
+but drastically changed prior to the 2021 election as the old legislation was probabilistic, and frequently
+gave different results when counted multiple times.
+
+The [new legislation](nsw/NSWLocalCouncilLegislation2021.md) is very ambiguous, and while I have
+made an [interpretation](nsw/NSWLocalCouncilLegislation2021Commentary.md) of it, I would not say
+that my interpretation precludes just as valid other interpretations which are likely to result
+in different candidates being elected. At the time of writing, I have not heard anything about
+the NSWEC interpretation, nor seen any output of their interpretation; I anticipate it will
+be significantly different.
+

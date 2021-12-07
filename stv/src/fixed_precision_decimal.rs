@@ -9,7 +9,7 @@
 //! A fixed precision decimal type for jurisdictions like ACT who count votes to a particular number of decimal places.
 
 use std::ops::{AddAssign, SubAssign, Sub, Add};
-use num::Zero;
+use num::{Zero, BigRational, BigInt, ToPrimitive};
 use std::fmt::{Display, Formatter};
 use std::iter::Sum;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
@@ -40,6 +40,9 @@ impl <const DIGITS:usize> FixedPrecisionDecimal<DIGITS> {
     pub fn from_scaled_value(scaled_value:u64) -> Self { FixedPrecisionDecimal{scaled_value}}
 
     pub fn round_down(&self) -> Self { FixedPrecisionDecimal{scaled_value:Self::SCALE * (self.scaled_value/Self::SCALE)} }
+
+    pub fn to_rational(&self) -> BigRational { BigRational::new(BigInt::from(self.scaled_value),BigInt::from(Self::SCALE)) }
+    pub fn from_rational_rounding_down(rational:BigRational) -> Self { FixedPrecisionDecimal{scaled_value: ((rational.numer().clone()*BigInt::from(Self::SCALE))/rational.denom()).to_u64().unwrap()} }
 }
 
 impl <const DIGITS:usize> From<FixedPrecisionDecimal<DIGITS>> for f64 {

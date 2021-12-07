@@ -179,9 +179,11 @@ function Render() {
         if (count.created_transfer_value) {
             let title = "Surplus : "+count.created_transfer_value.surplus+" Ballots considered : "+count.created_transfer_value.ballots_considered+" continuing : "+count.created_transfer_value.continuing_ballots;
             if (count.created_transfer_value.original_transfer_value) title+=" original transfer value : "+count.created_transfer_value.original_transfer_value;
+            if (count.created_transfer_value.multiplied_transfer_value) title+=" common multiple "+count.created_transfer_value.multiplied_transfer_value;
+            if (count.created_transfer_value.excluded_exhausted_tally) title+=" exhausted tally "+count.created_transfer_value.excluded_exhausted_tally;
             tv_td.title=title;
         }
-        fullSpanTD().innerText=count.reason==="FirstPreferenceCount"?"First Preference Count":count.reason.hasOwnProperty("ExcessDistribution")?"Excess distribution for "+cname(count.reason.ExcessDistribution):"Elimination of "+count.reason.Elimination.map(cname).join(" & "); // TODO prettify
+        fullSpanTD().innerText=count.reason==="FirstPreferenceCount"?"First Preference Count":count.reason.hasOwnProperty("ExcessDistribution")?"Surplus distribution for "+cname(count.reason.ExcessDistribution):"Exclusion of "+count.reason.Elimination.map(cname).join(" & "); // TODO prettify
         fullSpanTD().innerText=count.decisions.map(a=>a.affected.map(candidate=>metadata.candidates[candidate].name+" ("+candidate+")").join(",")).join(" and ");
         fullSpanTD().innerText=count.portion.papers_came_from_counts.map(format_from).join(", ");
         count_number+=1;

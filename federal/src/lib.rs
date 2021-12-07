@@ -6,9 +6,9 @@
 
 //! Describe the rules used for Federal elections, as best I can tell.
 
-use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod};
+use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber};
-use stv::transfer_value::TransferValue;
+use stv::transfer_value::{TransferValue, round_rational_down_to_usize, convert_usize_to_rational};
 use stv::tie_resolution::MethodOfTieResolution;
 
 pub mod parse;
@@ -25,6 +25,9 @@ impl PreferenceDistributionRules for FederalRules {
     fn use_last_parcel_for_surplus_distribution() -> bool { false }
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
 
+    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
+    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }
+
     fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus,ballots)
     }
@@ -32,6 +35,9 @@ impl PreferenceDistributionRules for FederalRules {
     fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
         transfer_value.mul_rounding_down(ballots)
     }
+
+    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
+    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
 
     /// Require that at some prior point *all* the counts were different
     /// ```text
@@ -88,6 +94,7 @@ impl PreferenceDistributionRules for FederalRules {
     /// those candidates in the poll.
     /// ```
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+
 
 
     fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
@@ -182,6 +189,8 @@ impl PreferenceDistributionRules for FederalRules {
     /// as I have done the same for section 17, although this is debatable.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
+    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
+
     /// Commonwealth Electoral Act 1918, Section 273, subsection (13)(b)
     /// ```text
     /// (b) if a bulk exclusion of candidates may be effected under
@@ -207,6 +216,8 @@ impl PreferenceDistributionRules for FederalRulesUsed2019 {
 
     fn use_last_parcel_for_surplus_distribution() -> bool { false }
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
+    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
+    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }
 
     fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus,ballots)
@@ -226,6 +237,8 @@ impl PreferenceDistributionRules for FederalRulesUsed2019 {
     fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
     fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
 
+    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
+    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
 
     /// In 2019 QLD, in count 287, a surplus distribution, G. Rennick gets elected for achieving a quota.
     /// This leaves 2 candidates, and 1 vacancy. The 2 standing rules is not applied until
@@ -239,6 +252,7 @@ impl PreferenceDistributionRules for FederalRulesUsed2019 {
     /// In 2019 NSW, count 429, K. McCulloch is excluded. This leaves 2 candidates, 2 vacancies.
     /// The elimination is aborted and no ballots are transferred in this count.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers }
+    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
 
     /// Not done in ACT count 3, SA count 80, Vic count 6.
     /// Details ACT count 3: 13(A) should exclude 5 candidates, only 1 excluded.
@@ -275,6 +289,8 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
 
     fn use_last_parcel_for_surplus_distribution() -> bool { false }
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
+    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
+    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }
 
     fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus,ballots)
@@ -300,6 +316,8 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
     fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
     fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
 
+    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
+    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
 
     fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
@@ -321,6 +339,7 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
     /// That is in the re-count. The description in the text was "SIEWERT, R, GEORGIOU, P have been elected to the remaining positions."
     /// In the original, a similar thing happened with 2 candidates elected, after 1 round of exclusion, but both had obtained quotas.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists }
+    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
 
     /// ACT count 11, TAS count 10, VIC count 13 all trigger rule 13(a) but it is not applied.
     /// Details for ACT count 11: 13(a) should exclude MONTAGNE, Jessica and TYE, Martin, but only MONTAGNE, Jessica was excluded.
@@ -349,6 +368,8 @@ impl PreferenceDistributionRules for FederalRulesUsed2013 {
 
     fn use_last_parcel_for_surplus_distribution() -> bool { false }
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
+    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
+    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }
 
     fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus,ballots)
@@ -371,12 +392,15 @@ impl PreferenceDistributionRules for FederalRulesUsed2013 {
     fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
     fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
 
+    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
+    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
 
     /// In SA, count 228, B. Day is elected on quota, leaving 2 candidates 1 seat. S. Birmingham is not elected until the next count, 229.
     fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
 
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists }
+    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
 
     /// several occasions, e.g ACT.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { true }

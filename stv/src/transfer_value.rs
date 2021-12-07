@@ -33,8 +33,7 @@ impl TransferValue {
 
     pub fn mul_rounding_down(&self,papers:BallotPaperCount) -> usize {
         let exact = self.mul(papers);
-        let rounded_down = exact.numer().clone()/exact.denom().clone();
-        rounded_down.to_usize().unwrap()
+        round_rational_down_to_usize(exact)
     }
     /// like mul_rounding_down, but round up if the fraction is >0.5
     pub fn mul_rounding_nearest(&self,papers:BallotPaperCount) -> usize {
@@ -44,6 +43,15 @@ impl TransferValue {
         let remainder = exact.numer().clone()%exact.denom().clone();
         if &(remainder*2) > exact.denom() { rounded_down+1 } else {rounded_down}
     }
+}
+
+/// Round a rational number down to a usize.
+pub fn round_rational_down_to_usize(rational:BigRational) -> usize {
+    let rounded_down = rational.numer().clone()/rational.denom().clone();
+    rounded_down.to_usize().unwrap()
+}
+pub fn convert_usize_to_rational(tally:usize) -> BigRational {
+    BigRational::new(BigInt::from(tally),BigInt::one())
 }
 
 impl Display for TransferValue {
@@ -64,4 +72,30 @@ impl FromStr for TransferValue {
 impl TryFrom<String> for TransferValue {
     type Error = ParseRatioError;
     fn try_from(s: String) -> Result<Self, Self::Error> { Ok(TransferValue(Ratio::from_str(&s)?)) }
+}
+
+#[derive(Clone,Debug,Serialize,Deserialize,Ord, PartialOrd, Eq, PartialEq,Hash)]
+#[serde(into = "String")]
+#[serde(try_from = "String")]
+/// A rational number that should be serialized/deserialized as a string. Equivalent to TransferValue in most ways, except without the TransferValue specific methods and name.
+pub struct StringSerializedRational(pub num::rational::BigRational);
+
+impl Display for StringSerializedRational {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"{}",self.0)
+    }
+}
+
+impl From<StringSerializedRational> for String {
+    fn from(t: StringSerializedRational) -> Self { t.0.to_string() }
+}
+
+impl FromStr for StringSerializedRational {
+    type Err = ParseRatioError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(StringSerializedRational(Ratio::from_str(s)?)) }
+}
+
+impl TryFrom<String> for StringSerializedRational {
+    type Error = ParseRatioError;
+    fn try_from(s: String) -> Result<Self, Self::Error> { Ok(StringSerializedRational(Ratio::from_str(&s)?)) }
 }

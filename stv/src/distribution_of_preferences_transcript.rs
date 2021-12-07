@@ -10,7 +10,7 @@
 
 use crate::ballot_pile::BallotPaperCount;
 use crate::ballot_metadata::{CandidateIndex, ElectionMetadata, NumberOfCandidates};
-use crate::transfer_value::TransferValue;
+use crate::transfer_value::{TransferValue, StringSerializedRational};
 use serde::{Serialize,Deserialize};
 use std::fmt::{Debug, Display};
 use crate::preference_distribution::TransferValueMethod;
@@ -74,6 +74,12 @@ impl ReasonForCount {
             _ => false,
         }
     }
+    pub fn is_surplus(&self) -> bool {
+        match self {
+            ReasonForCount::ExcessDistribution(_) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Copy, Clone,Serialize,Deserialize,Eq, PartialEq)]
@@ -81,6 +87,7 @@ pub enum ElectionReason {
     ReachedQuota,
     HighestOfLastTwoStanding,
     AllRemainingMustBeElected,
+    OverwhelmingTally,
 }
 
 #[derive(Copy, Clone,Serialize,Deserialize,Eq, PartialEq)]
@@ -101,7 +108,11 @@ pub struct PortionOfReasonBeingDoneThisCount {
 pub struct TransferValueCreation<Tally> {
     pub surplus : Tally,
     pub votes : Tally,
+    #[serde(default)] // added post first release, so old files may not have it.
+    pub excluded_exhausted_tally : Option<StringSerializedRational>,
     pub original_transfer_value : Option<TransferValue>,
+    #[serde(default)] // added post first release, so old files may not have it.
+    pub multiplied_transfer_value : Option<TransferValue>,
     /// The number of ballots considered for redistribution. This may be all or a last parcel.
     pub ballots_considered : BallotPaperCount,
     /// The number of the considered ballots that are continuing

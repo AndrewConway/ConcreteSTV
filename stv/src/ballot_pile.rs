@@ -302,33 +302,71 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero> VotesWithMultipleTransfer
             panic!("No last parcel");
         }
     }
+    /// Extracts all the ballots, adding all with same transfer value together.
+    /// Clears this object.
+    pub fn extract_all_ballots_separated_by_transfer_value(&'_ mut self) -> Vec<(TransferValue,(Tally,VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount))> {
+        let mut helpers : HashMap<TransferValue,MergeVotesHelper<Tally>> = HashMap::default();
+        for ((_,tv),(prov,votes)) in self.by_provenance.drain() {
+            let helper = helpers.entry(tv.clone()).or_insert_with(||MergeVotesHelper::default());
+            helper.add(tv,prov,votes);
+        }
+        helpers.into_iter().map(|(tv,helper)|(tv,helper.extract())).collect()
+    }
     /// Extracts all the ballots, adding all together, ignoring everything but pieces of paper.
     /// Clears this object.
-    pub fn extract_all_ballots_ignoring_transfer_value(&'_ mut self) -> (VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount) {
-        let mut sum : Option<VotesWithSameTransferValue> = None;
-        let mut papers_came_from_counts = CollectAll::<CountIndex>::default();
-        let mut transfer_value = DetectUnique::<TransferValue>::default();
-        let mut tv_came_from_count = DetectUnique::<Option<CountIndex>>::default();
+    pub fn extract_all_ballots_ignoring_transfer_value(&'_ mut self) -> (Tally,VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount) {
+        let mut helper = MergeVotesHelper::default();
         for ((_,tv),(prov,votes)) in self.by_provenance.drain() {
-            papers_came_from_counts.extend(prov.counts_comes_from.iter());
-            transfer_value.add(tv);
-            tv_came_from_count.add(prov.when_tv_created);
-            match &mut sum {
-                None => { sum=Some(votes);  }
-                Some(accum) => { accum.add(&votes.votes); }
-            }
+            helper.add(tv,prov,votes);
         }
-        let res = sum.unwrap_or_else(||VotesWithSameTransferValue::default());
-        let provenance = PortionOfReasonBeingDoneThisCount{
-            transfer_value: transfer_value.take(),
-            when_tv_created: tv_came_from_count.take().flatten(),
-            papers_came_from_counts: papers_came_from_counts.take(),
-        };
-        (res,provenance)
+        helper.extract()
     }
 
     /// Extracts all the ballots with a given provenance from this key.
     pub fn extract_all_ballots_with_given_provenance(&'_ mut self, key:&'_ (S::KeyToDivide,TransferValue)) -> Option<(PileProvenance<Tally>, VotesWithSameTransferValue<'a>)> {
         self.by_provenance.remove(key)
+    }
+}
+
+/// A helper for extract_all_ballots_ignoring_transfer_value and extract_all_ballots_separated_by_transfer_value
+struct MergeVotesHelper<'a,Tally> {
+    tally : Tally,
+    sum : Option<VotesWithSameTransferValue<'a>>,
+    papers_came_from_counts : CollectAll<CountIndex>,
+    transfer_value : DetectUnique<TransferValue>,
+    tv_came_from_count : DetectUnique<Option<CountIndex>>,
+}
+
+impl <'a,Tally : Zero> Default for MergeVotesHelper<'a,Tally> {
+    fn default() -> Self {
+        MergeVotesHelper{
+            tally: Tally::zero(),
+            sum: None,
+            papers_came_from_counts: Default::default(),
+            transfer_value: Default::default(),
+            tv_came_from_count: Default::default()
+        }
+    }
+}
+impl <'a,Tally : AddAssign> MergeVotesHelper<'a,Tally> {
+    /// add a set of votes to the data structure.
+    fn add(&mut self,tv:TransferValue,prov:PileProvenance<Tally>,votes:VotesWithSameTransferValue<'a>) {
+        self.tally+=prov.tally;
+        self.papers_came_from_counts.extend(prov.counts_comes_from.iter());
+        self.transfer_value.add(tv);
+        self.tv_came_from_count.add(prov.when_tv_created);
+        match &mut self.sum {
+            None => { self.sum=Some(votes);  }
+            Some(accum) => { accum.add(&votes.votes); }
+        }
+    }
+    fn extract(mut self) -> (Tally,VotesWithSameTransferValue<'a>, PortionOfReasonBeingDoneThisCount) {
+        let res = self.sum.unwrap_or_else(||VotesWithSameTransferValue::default());
+        let provenance = PortionOfReasonBeingDoneThisCount{
+            transfer_value: self.transfer_value.take(),
+            when_tv_created: self.tv_came_from_count.take().flatten(),
+            papers_came_from_counts: self.papers_came_from_counts.take(),
+        };
+        (self.tally,res,provenance)
     }
 }

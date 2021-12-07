@@ -9,12 +9,13 @@
 //! Unlike IRV, there are many ambiguities in the conceptual description of STV, so parameterized
 
 
-use num::{Zero};
+use num::Zero;
+pub use num::BigRational as BigRational;
 use crate::election_data::ElectionData;
 use crate::ballot_pile::{VotesWithMultipleTransferValues, HowSplitByCountNumber, PartiallyDistributedVote, BallotPaperCount, DistributedVotes, VotesWithSameTransferValue};
 use std::collections::{HashSet, VecDeque};
 use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
-use crate::transfer_value::{TransferValue};
+use crate::transfer_value::{TransferValue, StringSerializedRational};
 use std::ops::{AddAssign, Neg, SubAssign, Sub, Range};
 use std::fmt::Display;
 use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, DecisionMadeByEC, CountIndex};
@@ -81,8 +82,13 @@ pub trait PreferenceDistributionRules {
     /// Whether to transfer all the votes or just the last parcel.
     fn use_last_parcel_for_surplus_distribution() -> bool;
     fn transfer_value_method() -> TransferValueMethod;
-    fn make_transfer_value(surplus:Self::Tally,ballots:BallotPaperCount) -> TransferValue;
+    fn convert_tally_to_rational(tally:Self::Tally) -> num::rational::BigRational;
+    /// convert a rational value to the tally type, rounding as if one would do after applying a transfer value.
+    fn convert_rational_to_tally_after_applying_transfer_value(rational:num::rational::BigRational) -> Self::Tally;
+    fn make_transfer_value(surplus:Self::Tally,ballots:BallotPaperCount) -> TransferValue; // could be implemented using Self::convert_tally_to_rational { TransferValue::new(BigInt::from(surplus),BigInt::from(ballots.0)) }
     fn use_transfer_value(transfer_value:&TransferValue,ballots:BallotPaperCount) -> Self::Tally;
+    /// if true, then distribute all votes with a single transfer value. If false, separate by incoming transfer value
+    fn distribute_surplus_all_with_same_transfer_value() -> bool;
 
     // ***  Tie resolution issues ***
 
@@ -94,6 +100,8 @@ pub trait PreferenceDistributionRules {
 
     // *** When the actual counting stops ***
 
+    /// If true, then don't check quota or for election when part way through a surplus distribution.
+    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool;
     /// An elimination may involve multiple steps. If all vacancies are filled but not all steps are finished, do you finish all the counts, even though it cannot change the result of the election?
     fn finish_all_counts_in_elimination_when_all_elected() -> bool;
     /// If all vacancies are filled but not all surplus distributions are done, do you finish the surplus distributions, even though it cannot change the result of the election?
@@ -101,6 +109,8 @@ pub trait PreferenceDistributionRules {
 
     fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking;
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking;
+    /// if there are V vacancies, and the candidate ranked V highest has more votes than all lower put together plus undistributed surpluses, then elect V highest.
+    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking;
 
     // how to do the elimination
 
@@ -337,6 +347,33 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
     }
 
+    /// Implement the following, taken from NSW local government clause 11:
+    /// ```text
+    ///     (2)  When only one vacancy remains unfilled and the votes of one continuing candidate exceed the total of all the votes of the other continuing candidates, together with any surplus not transferred, that candidate is elected.
+    ///
+    ///     (3)  When more than one vacancy remains unfilled and the votes of the candidate who (if all the vacancies were filled by the successive election of the continuing candidates with the largest number of votes) would be the last to be elected exceed the total of any surplus not transferred plus the votes of all the continuing candidates with fewer votes than that candidate, that candidate and all the other continuing candidates who do not have fewer votes than that candidate are elected.
+    /// ```
+    pub fn check_if_top_few_have_overwhelming_votes(&mut self) {
+        if self.remaining_to_elect().0>0 {
+            let num_candidates_below_potential_winners = self.continuing_candidates_sorted_by_tally.len()-self.remaining_to_elect().0;
+            let possibly_overwhelming_tally = self.tally(self.continuing_candidates_sorted_by_tally[num_candidates_below_potential_winners]);
+            let mut others : Rules::Tally = Rules::Tally::zero();
+            for &candidate in self.continuing_candidates_sorted_by_tally.iter().take(num_candidates_below_potential_winners) {
+                others+=self.tally(candidate);
+            }
+            for &candidate in self.pending_surplus_distribution.iter() {
+                others+=self.tally(candidate)-self.quota.clone();
+            }
+            println!("remaining seats {} corresponding candidate tally {} others {}",self.remaining_to_elect(),possibly_overwhelming_tally,others);
+            if possibly_overwhelming_tally>others {
+                let candidates_to_elect : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().rev().take(self.remaining_to_elect().0).cloned().collect();
+                for c in candidates_to_elect {
+                    self.declare_elected(c,ElectionReason::OverwhelmingTally);
+                }
+            }
+        }
+    }
+
     /// See if one should check a particular termination rule
     pub fn should_check(&self,when:WhenToDoElectCandidateClauseChecking,reason : &ReasonForCount,reason_completed : bool) -> bool {
         match when  {
@@ -356,11 +393,16 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         if self.should_check(Rules::when_to_check_if_all_remaining_should_get_elected(),reason,reason_completed) {
             self.check_if_should_elect_all_remaining();
         }
+        if self.should_check(Rules::when_to_check_if_top_few_have_overwhelming_votes(),reason,reason_completed) {
+            self.check_if_top_few_have_overwhelming_votes();
+        }
     }
 
     pub fn end_of_count_step(&mut self,reason : ReasonForCount,portion : PortionOfReasonBeingDoneThisCount,reason_completed : bool) {
         self.resort_candidates();
-        self.check_elected(&reason,reason_completed);
+        if !(Rules::dont_check_elected_if_in_middle_of_surplus_distribution()&&reason.is_surplus()&&!reason_completed) {
+            self.check_elected(&reason,reason_completed);
+        }
         self.print_tallys();
         self.current_count=CountIndex(self.current_count.0+1);
         self.transcript.counts.push(SingleCount{
@@ -429,7 +471,10 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         self.tallys[candidate_to_distribute.0]=self.quota.clone();
         let (ballots,provenance) =
             if Rules::use_last_parcel_for_surplus_distribution() {self.papers[candidate_to_distribute.0].extract_last_parcel()}
-            else {self.papers[candidate_to_distribute.0].extract_all_ballots_ignoring_transfer_value()};
+            else {
+                let (_tally,ballots,provenance) = self.papers[candidate_to_distribute.0].extract_all_ballots_ignoring_transfer_value();
+                (ballots,provenance)
+            };
         let ballots_considered : BallotPaperCount = ballots.num_ballots;
         let distributed = DistributedVotes::distribute(&ballots.votes,&self.continuing_candidates,self.num_candidates);
         let continuing_ballots = ballots_considered-distributed.exhausted;
@@ -451,11 +496,13 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             }
         }
         // println!("Parcelling out {} votes with TV {} over {} ballots",original_worth,transfer_value,tv_denom);
-        self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),distributed,Some(self.current_count),original_worth,!Rules::transfer_value_method().denom_is_just_continuing(),false);
+        self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),distributed,Some(self.current_count),original_worth,!Rules::transfer_value_method().denom_is_just_continuing(),false,None);
         self.in_this_count.created_transfer_value=Some(TransferValueCreation{
             surplus,
             votes,
+            excluded_exhausted_tally: None,
             original_transfer_value: provenance.transfer_value.clone(),
+            multiplied_transfer_value: None,
             ballots_considered,
             continuing_ballots,
             transfer_value,
@@ -464,8 +511,63 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         provenance
     }
 
+    /// Distribute a surplus as multiple parcels, with a general ratio with denominator based on votes rather than ballots (typically surplus/votes, possibly taking exhausted votes into account somehow)
+    /// Then multiply this ratio by the transfer value that everything came with.
+    pub fn distribute_surplus_by_scaling_incoming_transfer_values(&mut self,candidate_to_distribute:CandidateIndex)  {
+        let votes : Rules::Tally = self.tally(candidate_to_distribute);
+        let surplus: Rules::Tally  = votes.clone()-self.quota.clone();
+        let mut votes_to_distribute : Vec<(TransferValue,(Rules::Tally,VotesWithSameTransferValue,PortionOfReasonBeingDoneThisCount))> = self.papers[candidate_to_distribute.0].extract_all_ballots_separated_by_transfer_value();
+        votes_to_distribute.sort_unstable_by(|(a,_), (b,_)| b.cmp(a)); // sort highest to lowest.
+        let mut partially_distributed = vec![];
+        let mut total_value_of_exhausted_votes = BigRational::zero();
+        let continuing_candidates_when_distribution_done = self.continuing_candidates_sorted_by_tally.len();
+        for (tv,(step_tally,ballots,prov)) in votes_to_distribute {
+            let distributed = DistributedVotes::distribute(&ballots.votes,&self.continuing_candidates,self.num_candidates);
+            let exhausted_value = tv.mul(distributed.exhausted);
+            total_value_of_exhausted_votes+=exhausted_value.clone();
+            partially_distributed.push((tv,step_tally,ballots,prov,distributed,exhausted_value));
+        }
+        let general_tv_denom : BigRational = if Rules::transfer_value_method().denom_is_just_continuing()  { Rules::convert_tally_to_rational(votes.clone())-total_value_of_exhausted_votes.clone() } else { Rules::convert_tally_to_rational(votes.clone()) } ;
+        let quota : BigRational = Rules::convert_tally_to_rational(self.quota.clone());
+        let special_factor_excluded : Option<BigRational> = if Rules::transfer_value_method().denom_is_just_continuing() || total_value_of_exhausted_votes<=quota || Rules::count_set_aside_due_to_transfer_value_limit_as_rounding() { None } else { Some((total_value_of_exhausted_votes.clone()-quota.clone())/total_value_of_exhausted_votes.clone()) }; // (AV-Q)/Av
+        let original_worth_ratio = Rules::convert_tally_to_rational(surplus.clone())/Rules::convert_tally_to_rational(votes.clone());
+        let surplus_rational = Rules::convert_tally_to_rational(surplus.clone());
+        //println!("TV based on surplus {} = {}-{} divided by {} = {}-{}",surplus_rational,votes,self.quota,general_tv_denom,votes,total_value_of_exhausted_votes);
+        let general_tv = if general_tv_denom<=surplus_rational { TransferValue::one() } else { TransferValue(surplus_rational/general_tv_denom) };
+        //println!("quota {} exhausted {} special factor excluded {:?} TV {}",self.quota,total_value_of_exhausted_votes,special_factor_excluded,general_tv);
+        let max_tv = partially_distributed.last().unwrap().0.clone();
+        let mut current_remaining_tally_for_candidate_being_distributed : BigRational = Rules::convert_tally_to_rational(votes.clone());
+        for (tv,step_tally,ballots,provenance,distributed,_exhausted_value) in partially_distributed {
+            let is_final_step = tv==max_tv;
+            // println!("Parcelling out {} votes with TV {} over {} ballots",original_worth,transfer_value,tv_denom);
+            let original_worth = Rules::convert_tally_to_rational(step_tally)*original_worth_ratio.clone();
+            current_remaining_tally_for_candidate_being_distributed-=original_worth;
+            let before : Rules::Tally = self.tally(candidate_to_distribute);
+            let after : Rules::Tally = Rules::convert_rational_to_tally_after_applying_transfer_value(current_remaining_tally_for_candidate_being_distributed.clone());
+            self.tallys[candidate_to_distribute.0] = after.clone();
+            let original_worth = before-after;
+            let distributed = if continuing_candidates_when_distribution_done == self.continuing_candidates_sorted_by_tally.len() {distributed} else { DistributedVotes::distribute(&ballots.votes,&self.continuing_candidates,self.num_candidates) }; // recompute if the continuing candidates list changed.
+            let transfer_value = TransferValue(tv.0*general_tv.0.clone());
+            let continuing_ballots = ballots.num_ballots-distributed.exhausted;
+            self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),distributed,Some(self.current_count),original_worth,special_factor_excluded.is_some() || !Rules::transfer_value_method().denom_is_just_continuing(),false,special_factor_excluded.as_ref());
+            self.in_this_count.created_transfer_value=Some(TransferValueCreation{
+                surplus: surplus.clone(),
+                votes : votes.clone(),
+                excluded_exhausted_tally: Some(StringSerializedRational(total_value_of_exhausted_votes.clone())),
+                original_transfer_value: provenance.transfer_value.clone(),
+                multiplied_transfer_value : Some(general_tv.clone()),
+                ballots_considered : ballots.num_ballots,
+                continuing_ballots,
+                transfer_value,
+                source: Rules::transfer_value_method(),
+            });
+            self.end_of_count_step(ReasonForCount::ExcessDistribution(candidate_to_distribute), provenance, is_final_step);
+
+        }
+    }
+
     /// Parcel out votes by next continuing candidate with a given transfer value.
-    pub fn parcel_out_votes_with_given_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,when_tv_created:Option<CountIndex>,original_worth:Rules::Tally,distribute_exhausted_votes:bool,is_exclusion:bool) {
+    pub fn parcel_out_votes_with_given_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,when_tv_created:Option<CountIndex>,original_worth:Rules::Tally,distribute_exhausted_votes:bool,is_exclusion:bool,extra_multiple_for_exhausted:Option<&BigRational>) {
         let mut tally_distributed = Rules::Tally::zero();
         for (candidate_index,candidate_ballots) in distributed.by_candidate.into_iter().enumerate() {
             if candidate_ballots.num_ballots.0>0 {
@@ -477,7 +579,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
         if distributed.exhausted.0>0 {
             if distribute_exhausted_votes {
-                let worth:Rules::Tally = Rules::use_transfer_value(&transfer_value,distributed.exhausted);
+                let exhausted_tv = if let Some(em) = extra_multiple_for_exhausted { TransferValue(transfer_value.0*em) } else { transfer_value };
+                let worth:Rules::Tally = Rules::use_transfer_value(&exhausted_tv,distributed.exhausted);
                 let worth:Rules::Tally = Rules::munge_exhausted_votes(worth,is_exclusion); // support emulation of weird bugs.
                 self.tally_exhausted+=worth.clone();
                 tally_distributed +=worth.clone();
@@ -492,8 +595,12 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
     pub fn distribute_surplus(&mut self,candidate_to_distribute:CandidateIndex) {
         println!("Distributing surplus for {}",self.data.metadata.candidate(candidate_to_distribute).name);
-        let provenance = self.distribute_surplus_all_with_same_transfer_value(candidate_to_distribute);
-        self.end_of_count_step(ReasonForCount::ExcessDistribution(candidate_to_distribute), provenance, true);
+        if Rules::distribute_surplus_all_with_same_transfer_value() {
+            let provenance = self.distribute_surplus_all_with_same_transfer_value(candidate_to_distribute);
+            self.end_of_count_step(ReasonForCount::ExcessDistribution(candidate_to_distribute), provenance, true);
+        } else {
+            self.distribute_surplus_by_scaling_incoming_transfer_values(candidate_to_distribute);
+        }
     }
 
     pub fn print_candidates_names(&self) {
@@ -725,7 +832,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             }
             let when_tv_created=when_tv_created.take().flatten();
             let distributed = DistributedVotes::distribute(&all_votes.votes,&self.continuing_candidates,self.num_candidates);
-            self.parcel_out_votes_with_given_transfer_value(key.1.clone(),distributed,when_tv_created,original_worth,true,true);
+            self.parcel_out_votes_with_given_transfer_value(key.1.clone(),distributed,when_tv_created,original_worth,true,true,None);
             togo-=1;
             self.end_of_count_step(ReasonForCount::Elimination(candidates_to_exclude.clone()), PortionOfReasonBeingDoneThisCount {
                 transfer_value: Some(key.1),

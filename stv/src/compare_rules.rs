@@ -21,6 +21,7 @@ use crate::transfer_value::{TransferValue};
 use crate::tie_resolution::MethodOfTieResolution;
 use std::marker::PhantomData;
 use std::str::FromStr;
+use num::BigRational;
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct CompareRules {
@@ -86,16 +87,26 @@ impl CompareRules {
 
                 fn use_last_parcel_for_surplus_distribution() -> bool { R::use_last_parcel_for_surplus_distribution() }
                 fn transfer_value_method() -> TransferValueMethod { R::transfer_value_method() }
+                fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { R::convert_tally_to_rational(tally) }
+                fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { R::convert_rational_to_tally_after_applying_transfer_value(rational) }
                 fn make_transfer_value(surplus: Self::Tally, ballots: BallotPaperCount) -> TransferValue { R::make_transfer_value(surplus,ballots) }
                 fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> Self::Tally { R::use_transfer_value(transfer_value,ballots) }
+
+                fn distribute_surplus_all_with_same_transfer_value() -> bool { R::distribute_surplus_all_with_same_transfer_value() }
+
                 fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { R::resolve_ties_elected_one_of_last_two() }
                 fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { R::resolve_ties_elected_by_quota() }
                 fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { R::resolve_ties_elected_all_remaining() }
                 fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { R::resolve_ties_choose_lowest_candidate_for_exclusion() }
+
+                fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { R::dont_check_elected_if_in_middle_of_surplus_distribution() }
                 fn finish_all_counts_in_elimination_when_all_elected() -> bool { R::finish_all_counts_in_elimination_when_all_elected() }
                 fn finish_all_surplus_distributions_when_all_elected() -> bool { R::finish_all_surplus_distributions_when_all_elected() }
                 fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers }
                 fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { R::when_to_check_if_all_remaining_should_get_elected() }
+
+                fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { R::when_to_check_if_top_few_have_overwhelming_votes() }
+
                 fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { R::should_eliminate_multiple_candidates_federal_rule_13a() }
                 fn count_set_aside_due_to_transfer_value_limit_as_rounding() -> bool { R::count_set_aside_due_to_transfer_value_limit_as_rounding() }
                 fn name() -> String { R::name()+"_Earliest1of2" }
@@ -114,12 +125,21 @@ impl CompareRules {
                 type SplitByNumber = R::SplitByNumber;
                 fn use_last_parcel_for_surplus_distribution() -> bool { R::use_last_parcel_for_surplus_distribution() }
                 fn transfer_value_method() -> TransferValueMethod { R::transfer_value_method() }
+                fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { R::convert_tally_to_rational(tally) }
+                fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { R::convert_rational_to_tally_after_applying_transfer_value(rational) }
                 fn make_transfer_value(surplus: Self::Tally, ballots: BallotPaperCount) -> TransferValue { R::make_transfer_value(surplus,ballots) }
                 fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> Self::Tally { R::use_transfer_value(transfer_value,ballots) }
+
+                fn distribute_surplus_all_with_same_transfer_value() -> bool { R::distribute_surplus_all_with_same_transfer_value() }
+
                 fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { R::resolve_ties_elected_one_of_last_two() }
                 fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { R::resolve_ties_elected_by_quota() }
                 fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { R::resolve_ties_elected_all_remaining() }
                 fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { R::resolve_ties_choose_lowest_candidate_for_exclusion() }
+
+                fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { R::dont_check_elected_if_in_middle_of_surplus_distribution() }
+                fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { R::when_to_check_if_top_few_have_overwhelming_votes() }
+
                 fn finish_all_counts_in_elimination_when_all_elected() -> bool { R::finish_all_counts_in_elimination_when_all_elected() }
                 fn finish_all_surplus_distributions_when_all_elected() -> bool { R::finish_all_surplus_distributions_when_all_elected() }
                 fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
