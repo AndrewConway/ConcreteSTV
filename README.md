@@ -27,7 +27,7 @@ to emulate the bugs of present in a particular year's count. There are also ofte
 in which case ConcreteSTV generally follows the corresponding electoral commissions's interpretation, unless that
 changes over time.
 
-See [ElectionRules.md](ElectionRules.md) for a detailed description of what each of the below options means.
+See [ElectionRules.md](ElectionRules.md) for a detailed description of what each of the below options means. 
 - **Federal** Federal Senate, my interpretation of the correct rules.
 - **AEC2013** Possibly buggy rules used by AEC in 2013 Federal Senate election
 - **AEC2016** Buggy rules used by AEC in 2016 Federal Senate election
@@ -126,7 +126,8 @@ Currently parse_ec_data can accept (as first argument) the following elections:
 
 The `concrete_stv` program takes in a rule specification and a .stv file, and produces
 a *.transcript* file containing the distribution of preferences for each count. We will
-use the AEC2019 rules for this.
+use the AEC2019 rules for this. Use the bold names in the section "Currently Supported Election Rules" above
+as the name for the appropriate rules.
 
 ```bash
 ../target/release/concrete_stv AEC2019 TAS2019.stv
@@ -208,6 +209,11 @@ by the `transcript_to_latex` program:
 Note that these tables are generally too large to fit onto a normal page. To restrict the
 table to a small number of candidates, use the `--candidates` option. Use the `--help`
 option for details.
+
+## Testing
+
+Some of the tests (run with `cargo test`) require real data files downloaded from the
+appropriate electoral commissions. See [ElectionDatabase.md](ElectionDatabase.md) for details.
 
 ## Copyright
 

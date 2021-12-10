@@ -165,18 +165,26 @@ impl FileFinder {
         Err(MissingFile{ file_name: filename.to_string(), where_to_get: source_url.to_string() })
     }
 
+    /// find an expected path in the current dir. If not there, check the parent, and continue recursively. Return the full path if found.
+    fn look_in_ancestral_paths(expected_path:&str) -> Option<PathBuf> {
+        let mut search = Path::new(".").canonicalize().ok();
+        while let Some(p) = search {
+            let possible = p.join(expected_path);
+            if possible.exists() { return Some(possible)}
+            search = p.parent().map(|p|p.to_path_buf());
+        }
+        None
+    }
+
     /// Used to find an archive for testing.
     pub fn find_ec_data_repository() -> FileFinder {
-        for possible_path in vec![
-            "votecounting/CountPreferentialVotes/Elections",
-            "../votecounting/CountPreferentialVotes/Elections",
-            "../../votecounting/CountPreferentialVotes/Elections",
-            "../../../votecounting/CountPreferentialVotes/Elections"
-        ] {
-            if Path::new(possible_path).exists() { return FileFinder{path: PathBuf::from(possible_path)} }
+        let expected_path = "vote_data/Elections";
+        if let Some(path) = Self::look_in_ancestral_paths(expected_path) {
+            FileFinder{path}
+        } else {
+            println!("Warning - unable to find testing data archive");
+            FileFinder{path: PathBuf::from(".")}
         }
-        println!("Warning - unable to find testing data archive");
-        FileFinder{path: PathBuf::from(".")}
     }
 
 }

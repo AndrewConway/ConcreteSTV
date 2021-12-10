@@ -226,13 +226,13 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
     let mut reader = csv::ReaderBuilder::new().flexible(false).has_headers(true).from_reader(file);
     #[derive(Debug, Deserialize)]
     struct Record {
-        #[serde(rename = "State")] state: String,
+        #[serde(rename = "State")] _state: String,
         #[serde(rename = "No Of Vacancies")] vacancies: usize,
         #[serde(rename = "Total Formal Papers")] formal_papers: usize,
         #[serde(rename = "Quota")] quota : usize,
         #[serde(rename = "Count")] count : usize,
-        #[serde(rename = "Ballot Position")] ballot_position : usize,
-        #[serde(rename = "Ticket")] ticket : String,
+        #[serde(rename = "Ballot Position")] _ballot_position : usize,
+        #[serde(rename = "Ticket")] _ticket : String,
         #[serde(rename = "Surname")] surname : String,
         #[serde(rename = "GivenNm")] given_name : String,
         #[serde(rename = "Papers")] papers_transferred : isize,
@@ -242,7 +242,7 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
         #[serde(rename = "Status")] status : String, // blank, Elected, Excluded
         #[serde(rename = "Changed")] changed : String, // True or blank.
         #[serde(rename = "Order Elected")] order_elected : usize,
-        #[serde(rename = "Comment")] comment: Option<String>,
+        #[serde(rename = "Comment")] _comment: Option<String>,
     }
     let lookup_names : HashMap<String,CandidateIndex> = metadata.get_candidate_name_lookup();
     let mut res = OfficialDistributionOfPreferencesTranscript::default();
