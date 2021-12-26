@@ -20,11 +20,4 @@ pub mod compare_transcripts;
 pub mod compare_rules;
 pub mod fixed_precision_decimal;
 pub mod signed_version;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub mod download;

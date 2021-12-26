@@ -9,6 +9,7 @@
 
 
 
+use std::cmp::Ordering;
 use crate::ballot_metadata::CandidateIndex;
 use crate::ballot_paper::VoteSource;
 use std::collections::{HashSet, HashMap};
@@ -18,9 +19,10 @@ use std::ops::{AddAssign, Sub, Add, SubAssign};
 use serde::Deserialize;
 use serde::Serialize;
 use std::hash::Hash;
-use crate::distribution_of_preferences_transcript::{PortionOfReasonBeingDoneThisCount, CountIndex};
+use crate::distribution_of_preferences_transcript::{PortionOfReasonBeingDoneThisCount, CountIndex, Transcript};
 use crate::util::{DetectUnique, CollectAll};
 use std::fmt;
+use std::fmt::{Debug, Display};
 use std::str::FromStr;
 
 /// A number representing a count of pieces of paper.
@@ -198,7 +200,7 @@ impl <'a> DistributedVotes<'a> {
 
 /// Different jurisdictions split up parcels of shares by their provenence in different ways. This abstracts that.
 pub trait HowSplitByCountNumber {
-    type KeyToDivide : Eq+Hash+Clone+Ord;
+    type KeyToDivide : Eq+Hash+Clone+Ord+Debug;
     fn key(count_index:CountIndex,when_tv_created:Option<CountIndex>) -> Self::KeyToDivide;
 }
 
@@ -248,7 +250,7 @@ impl <'a,S:HowSplitByCountNumber,Tally> Default for VotesWithMultipleTransferVal
     }
 }
 
-impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero> VotesWithMultipleTransferValues<'a,S,Tally> {
+impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero+Clone+Display+FromStr+PartialEq> VotesWithMultipleTransferValues<'a,S,Tally> {
     pub fn add(& mut self,votes:&'_ VotesWithSameTransferValue<'a>,transfer_value:TransferValue,count_index:CountIndex,when_tv_created:Option<CountIndex>,tally:Tally) {
         let key = (S::key(count_index,when_tv_created),transfer_value.clone());
         let entry = self.by_provenance.entry(key).or_insert_with(||
@@ -302,7 +304,7 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero> VotesWithMultipleTransfer
             panic!("No last parcel");
         }
     }
-    /// Extracts all the ballots, adding all with same transfer value together.
+    /// Extracts all the ballots, adding all with same transfer value together. Sort highest to lowest.
     /// Clears this object.
     pub fn extract_all_ballots_separated_by_transfer_value(&'_ mut self) -> Vec<(TransferValue,(Tally,VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount))> {
         let mut helpers : HashMap<TransferValue,MergeVotesHelper<Tally>> = HashMap::default();
@@ -310,7 +312,30 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero> VotesWithMultipleTransfer
             let helper = helpers.entry(tv.clone()).or_insert_with(||MergeVotesHelper::default());
             helper.add(tv,prov,votes);
         }
-        helpers.into_iter().map(|(tv,helper)|(tv,helper.extract())).collect()
+        let mut res : Vec<(TransferValue,(Tally,VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount))> = helpers.into_iter().map(|(tv,helper)|(tv,helper.extract())).collect();
+        res.sort_unstable_by(|(a,_), (b,_)| b.cmp(a)); // sort highest to lowest.
+        res
+    }
+    /// Extracts all the ballots, without doing any merging.
+    /// Clears this object.
+    /// Sorting will be by  the standard Ord on the key, unless overridden by a custom function.
+    pub fn extract_all_ballots_separated_by_key(&'_ mut self,custom_sort:Option<Box<dyn FnMut(&Transcript<Tally>,<S as HowSplitByCountNumber>::KeyToDivide,<S as HowSplitByCountNumber>::KeyToDivide)->Ordering>>,transcript:&Transcript<Tally>) -> Vec<(TransferValue,(Tally,VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount))> {
+        let mut res = vec![];
+        let mut sorted_by_key : Vec<_> = self.by_provenance.drain().collect(); // not sorted yet
+        if let Some(mut f) = custom_sort {
+            sorted_by_key.sort_by(|((key1,_),_),((key2,_),_)|f(transcript,key1.clone(),key2.clone()));
+        } else {
+            sorted_by_key.sort_by_key(|((key,_),_)|key.clone()); // now sorted.
+        }
+        for ((_key,tv),(prov,votes)) in sorted_by_key {
+            let provenance = PortionOfReasonBeingDoneThisCount{
+                transfer_value: Some(tv.clone()),
+                when_tv_created: prov.when_tv_created,
+                papers_came_from_counts: prov.counts_comes_from.iter().cloned().collect(),
+            };
+            res.push((tv.clone(),(prov.tally,votes,provenance)));
+        }
+        res
     }
     /// Extracts all the ballots, adding all together, ignoring everything but pieces of paper.
     /// Clears this object.

@@ -8,6 +8,7 @@
 use crate::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo, Transcript};
 use crate::ballot_metadata::CandidateIndex;
 use std::cmp::min;
+use std::collections::HashSet;
 use num::{abs, Zero};
 use std::ops::Sub;
 use std::fmt::Display;
@@ -21,10 +22,11 @@ pub struct OfficialDOPForOneCount {
     pub transfer_value : Option<f64>,
     pub elected : Vec<CandidateIndex>,
     pub excluded : Vec<CandidateIndex>,
-    pub vote_total : Option<PerCandidate<f64>>,
-    pub paper_total : Option<PerCandidate<usize>>,
-    pub vote_delta : Option<PerCandidate<f64>>,
-    pub paper_delta : Option<PerCandidate<isize>>,
+    pub vote_total : Option<PerCandidate<f64>>, // A NaN means unknown
+    pub paper_total : Option<PerCandidate<usize>>, // an isize::MAX means unknown
+    pub vote_delta : Option<PerCandidate<f64>>, // A NaN means unknown
+    pub paper_delta : Option<PerCandidate<isize>>, // an isize::MAX means unknown
+    pub count_name : Option<String>,
 }
 
 /// Information from
@@ -34,6 +36,10 @@ pub struct OfficialDistributionOfPreferencesTranscript {
     pub counts : Vec<OfficialDOPForOneCount>,
     /// true if the record does not contain negative papers amounts.
     pub missing_negatives_in_papers_delta : bool,
+    /// true if members of "elected" are in order of election.
+    pub elected_candidates_are_in_order : bool,
+    /// true if exhausted votes all go to rounding.
+    pub all_exhausted_go_to_rounding : bool,
 }
 
 impl OfficialDOPForOneCount {
@@ -52,6 +58,13 @@ impl OfficialDistributionOfPreferencesTranscript {
     /// Compare the results from the official transcript to our transcript.
     /// panic if there are differences.
     pub fn compare_with_transcript<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F) {
+        let ec_decision = self.compare_with_transcript_checking_for_ec_decisions(transcript,decode);
+        if let Some((favoured,unfavoured)) = ec_decision {
+            panic!("An EC decision was not made the way we expected: {} was favoured over {}",favoured,unfavoured);
+        }
+    }
+    /// like compare_with_transcript but don't panic if the first difference is caused by a difference in EC decision making. If so, return Some(candidate_favoured_by_ec,candidate_excluded_by_ec).
+    pub fn compare_with_transcript_checking_for_ec_decisions<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F) -> Option<(CandidateIndex,CandidateIndex)> {
         if let Some(quota) = &self.quota {
             assert_eq!(quota.vacancies,transcript.quota.vacancies);
             assert_eq!(quota.papers,transcript.quota.papers);
@@ -116,17 +129,39 @@ impl OfficialDistributionOfPreferencesTranscript {
                     panic!("Count {} Official result {} our result {} for {} candidate {}",i+1,official,our_f64,what,who)
                 }
             };
-            println!("Checking count {}",i+1);
             let my_count = &transcript.counts[i];
             let official_count = &self.counts[i];
-            assert_eq!(official_count.elected,my_count.elected.iter().map(|e|e.who).collect::<Vec<CandidateIndex>>());
+            println!("Checking count {} {}",i+1,my_count.count_name.clone().unwrap_or_default());
+            assert_eq!(my_count.count_name,official_count.count_name);
+            if self.elected_candidates_are_in_order {
+                assert_eq!(official_count.elected,my_count.elected.iter().map(|e|e.who).collect::<Vec<CandidateIndex>>());
+            } else {
+                assert_eq!(official_count.elected.iter().cloned().collect::<HashSet<CandidateIndex>>(),my_count.elected.iter().map(|e|e.who).collect::<HashSet<CandidateIndex>>());
+            }
             for who in &official_count.excluded {
+                if !my_count.not_continuing.contains(who) {
+                    if let Some(relevant_decision) = my_count.decisions.iter().find(|d|d.affected.contains(who)) { // may exclude a different candidate because of random decisions.
+                        // The EC excluded "who". Work out whom I excluded.
+                        if let Some(&who_was_lucky) = relevant_decision.affected.iter().find(|&c|my_count.not_continuing.contains(c)) {
+                            // I excluded "who_was_lucky". They should have a higher priority than "who".
+                            return Some((who_was_lucky,*who));
+                            // panic!("I excluded candidate {} but the EC excluded candidate {}. This was chosen by lot.",who_was_lucky,who);
+                        } else {
+                            panic!("{} was not in the list of not continuing. There was a relevant decision involving {:?} but I didn't exclude any.",who,relevant_decision.affected);
+                        }
+                    }
+                    panic!("{} was not in the list of not continuing",who);
+                }
                 assert!(my_count.not_continuing.contains(who),"{} was not in the list of not continuing",who);
             }
             if let Some(vote_total) = &official_count.vote_total {
                 println!("Checking tally count {}",i+1);
-                assert_close(vote_total.exhausted,my_count.status.tallies.exhausted.clone(),"exhausted tallies");
-                assert_close_signed(vote_total.rounding.clone().into(),my_count.status.tallies.rounding.clone(),"rounding tallies");
+                if self.all_exhausted_go_to_rounding {
+                    assert_close(vote_total.rounding.assume_positive(),my_count.status.tallies.exhausted.clone()+my_count.status.tallies.rounding.assume_positive(),"votes lost to exhaustion or rounding");
+                } else {
+                    assert_close(vote_total.exhausted,my_count.status.tallies.exhausted.clone(),"exhausted tallies");
+                    assert_close_signed(vote_total.rounding.clone().into(),my_count.status.tallies.rounding.clone(),"rounding tallies");
+                }
                 for candidate in 0..vote_total.candidate.len() {
                     assert_close_candidate(vote_total.candidate[candidate],my_count.status.tallies.candidate[candidate].clone(),"tally",CandidateIndex(candidate));
                 }
@@ -156,7 +191,8 @@ impl OfficialDistributionOfPreferencesTranscript {
                 }
             }
         }
-        assert_eq!(self.counts.len(),transcript.counts.len())
+        assert_eq!(self.counts.len(),transcript.counts.len());
+        None
     }
 }
 

@@ -4,7 +4,7 @@
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
-use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational};
+use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational, SurplusTransferMethod};
 use stv::tie_resolution::MethodOfTieResolution;
 use stv::transfer_value::{TransferValue, convert_usize_to_rational, round_rational_down_to_usize};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber, SplitByWhenTransferValueWasCreated};
@@ -65,8 +65,10 @@ impl PreferenceDistributionRules for ACTPre2020 {
     fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
         transfer_value.mul_rounding_down(ballots)
     }
-    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
-    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
+    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
+    fn sort_exclusions_by_transfer_value() -> bool { true }
 
     /// Not applicable.
     fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
@@ -145,6 +147,7 @@ impl PreferenceDistributionRules for ACTPre2020 {
     fn count_set_aside_due_to_transfer_value_limit_as_rounding() -> bool { true }
 
     fn name() -> String { "ACTPre2020".to_string() }
+
 }
 
 
@@ -180,8 +183,10 @@ impl PreferenceDistributionRules for ACT2021 {
     fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> Self::Tally {
         Self::Tally::from_scaled_value(transfer_value.mul_rounding_down(BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize))) as u64)
     }
-    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
-    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
+    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
+    fn sort_exclusions_by_transfer_value() -> bool { true }
 
     // all below same as ACTpre2020.
     fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
@@ -229,8 +234,10 @@ impl PreferenceDistributionRules for ACT2020 {
     fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> Self::Tally {
         Self::Tally::from_scaled_value(transfer_value.mul_rounding_nearest(BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize))) as u64)
     }
-    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
-    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
+    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
+    fn sort_exclusions_by_transfer_value() -> bool { true }
 
     fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }

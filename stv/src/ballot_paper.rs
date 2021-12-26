@@ -8,9 +8,11 @@
 //! Information about a raw vote. That is, something written on a ballot paper.
 //! This may or may not be formal.
 
-use crate::ballot_metadata::{CandidateIndex, PartyIndex};
+use crate::ballot_metadata::{CandidateIndex, ElectionMetadata, PartyIndex};
 use serde::{Deserialize,Serialize};
 use std::collections::HashMap;
+use anyhow::anyhow;
+use crate::election_data::ElectionData;
 
 /// A marking on a particular square in a ballot. This may or may not be a number.
 #[derive(Copy,Clone,Debug,Eq, PartialEq)]
@@ -149,5 +151,117 @@ impl UniqueBTLBuilder {
     /// Convert to a list of BTL votes.
     pub fn to_btls(self) -> Vec<BTL> {
         self.btls.into_iter().map(|(candidates,n)|BTL{ candidates , n }).collect()
+    }
+}
+
+
+/// A utility for building up an ATL list and simplifying duplicate votes.
+#[derive(Default)]
+pub struct UniqueATLBuilder {
+    atls : HashMap<Vec<PartyIndex>,usize>,
+}
+
+impl UniqueATLBuilder {
+    /// Add a vote with a given preference list
+    pub fn add(&mut self,prefs:Vec<PartyIndex>) {
+        *self.atls.entry(prefs).or_insert(0)+=1;
+    }
+    /// Convert to a list of BTL votes.
+    pub fn to_atls(self) -> Vec<ATL> {
+        self.atls.into_iter().map(|(parties,n)|ATL{ parties , n }).collect()
+    }
+}
+
+/// A utility for dealing with A/BTL votes coming in in a random order.
+pub struct PreferencesComingOutOfOrder<T:Copy> {
+    /// received[i] = Some(x) iff preference i+1 was for entity x.
+    received : Vec<Option<T>>,
+}
+
+impl <T:Copy> Default for PreferencesComingOutOfOrder<T> {
+    fn default() -> Self {
+        PreferencesComingOutOfOrder{ received: vec![] }
+    }
+}
+
+impl <T:Copy> PreferencesComingOutOfOrder<T> {
+    // add a marking for `who_for` with preference `preference` starting from 1.
+    pub fn add(&mut self,preference:usize,who_for:T) -> anyhow::Result<()> {
+        if preference==0 { return Err(anyhow!("Can't have a preference of 0"))}
+        if self.received.len()<preference { self.received.resize(preference,None) }
+        if self.received[preference-1].is_some() { return Err(anyhow!("Already got preference {}",preference))}
+        self.received[preference-1] = Some(who_for);
+        Ok(())
+    }
+
+    /// Get the first contiguous list of votes.
+    pub fn drain_pref_list(&mut self) -> Vec<T> {
+        self.received.drain(..).take_while(Option::is_some).flatten().collect()
+    }
+
+    pub fn is_empty(&self) -> bool { self.received.is_empty() || self.received[0].is_none() }
+
+    pub fn clear(&mut self) { self.received.clear(); }
+}
+
+/// A helper structure for getting votes coming of the form "paper X had a preference of Y for Z"
+pub struct PreferencesComingOutOfOrderHelper {
+    atls : UniqueATLBuilder,
+    btls : UniqueBTLBuilder,
+    informal : usize,
+    current_paper_id : Option<String>,
+    current_atls : PreferencesComingOutOfOrder<PartyIndex>,
+    current_btls : PreferencesComingOutOfOrder<CandidateIndex>,
+}
+
+impl Default for PreferencesComingOutOfOrderHelper {
+    fn default() -> Self {
+        PreferencesComingOutOfOrderHelper{
+            atls: Default::default(),
+            btls: Default::default(),
+            informal: 0,
+            current_paper_id: None,
+            current_atls: PreferencesComingOutOfOrder::default(),
+            current_btls: PreferencesComingOutOfOrder::default(),
+        }
+    }
+}
+
+impl PreferencesComingOutOfOrderHelper {
+    pub fn done_current_paper(&mut self) {
+        if !self.current_btls.is_empty() { // is ATL
+            self.btls.add(self.current_btls.drain_pref_list());
+        } else if !self.current_atls.is_empty() { // is BTL
+            self.atls.add(self.current_atls.drain_pref_list());
+        } else { self.informal+=1; }
+        self.current_paper_id=None;
+        self.current_atls.clear();
+        self.current_btls.clear();
+    }
+    pub fn set_current_paper(&mut self,paper_id:&str) {
+        if self.current_paper_id.is_some() && self.current_paper_id.as_ref().unwrap()!=paper_id {
+            self.done_current_paper();
+        }
+        if self.current_paper_id.is_none() {
+            self.current_paper_id = Some(paper_id.to_string());
+        }
+    }
+    pub fn add_atl_pref(&mut self, preference:usize, party:PartyIndex) -> anyhow::Result<()> {
+        self.current_atls.add(preference,party)
+    }
+    pub fn add_btl_pref(&mut self, preference:usize, candidate:CandidateIndex) -> anyhow::Result<()> {
+        self.current_btls.add(preference,candidate)
+    }
+
+    pub fn done(mut self,metadata:ElectionMetadata) -> ElectionData {
+        if self.current_paper_id.is_some() {
+            self.done_current_paper();
+        }
+        ElectionData{
+            metadata,
+            atl: self.atls.to_atls(),
+            btl: self.btls.to_btls(),
+            informal: self.informal,
+        }
     }
 }

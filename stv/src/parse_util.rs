@@ -8,16 +8,19 @@
 //! Some utility routines that make parsing files easier.
 
 
+use std::env::temp_dir;
 use crate::ballot_metadata::{Candidate, Party, CandidateIndex, PartyIndex, ElectionName, NumberOfCandidates};
 use std::path::{Path, PathBuf};
 use std::fs::File;
-use std::io::{BufReader, Seek, BufRead, SeekFrom};
+use std::io::{BufReader, Seek, BufRead, SeekFrom, Read};
 use crate::election_data::ElectionData;
 use crate::tie_resolution::TieResolutionsMadeByEC;
 use anyhow::anyhow;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::process::Command;
 use std::str::FromStr;
+use reqwest::Url;
 
 /// A utility for helping to read a list of candidates and parties.
 #[derive(Default)]
@@ -165,6 +168,16 @@ impl FileFinder {
         Err(MissingFile{ file_name: filename.to_string(), where_to_get: source_url.to_string() })
     }
 
+    pub fn find_raw_data_file_with_extra_url_info(&self,filename:&str,archive_location:&str,source_url_base:&str,source_url_relative:&str) -> Result<PathBuf,MissingFile> {
+        let expect = self.path.join(filename);
+        if expect.exists() { return Ok(expect) }
+        let expect = self.path.join(archive_location).join(filename);
+        if expect.exists() { return Ok(expect) }
+        let url = Url::parse(source_url_base).unwrap().join(source_url_relative).unwrap();
+        Err(MissingFile{ file_name: filename.to_string(), where_to_get: url.as_str().to_string() })
+    }
+
+
     /// find an expected path in the current dir. If not there, check the parent, and continue recursively. Return the full path if found.
     fn look_in_ancestral_paths(expected_path:&str) -> Option<PathBuf> {
         let mut search = Path::new(".").canonicalize().ok();
@@ -187,4 +200,39 @@ impl FileFinder {
         }
     }
 
+}
+
+/// Read a file to a string. Like file.read_to_string but doesn't need a provided buffer.
+pub fn file_to_string(file:&mut File) -> anyhow::Result<String> {
+    let mut res = String::new();
+    file.read_to_string(&mut res)?;
+    Ok(res)
+}
+
+/// Parse an xslx file by the horrible convoluted method of running libreoffice to convert it
+/// into a csv file in the temporary directory, reading that into an array of strings, and
+/// then deleting the csv file. Requires openoffice to be installed!
+///
+/// It is generally better to use a library like calamine, but if that doesn't work for some reason,
+/// this is a fall back.
+pub fn parse_xlsx_by_converting_to_csv_using_openoffice(path:&PathBuf) -> anyhow::Result<Vec<Vec<String>>> {
+    // run open office
+//    println!("Converting {:?}",path);
+    let temp_path = temp_dir();
+    Command::new("libreoffice").arg("--headless").arg("--convert-to").arg("csv").arg(path).arg("--outdir").arg(&temp_path).output()?;
+    let filename = path.file_name().ok_or_else(||anyhow!("Provided path {:?} doesn't seem to have a file name",&path))?;
+    let mut output_path = temp_path.join(filename);
+    output_path.set_extension("csv");
+//    println!("Created at {:?}",output_path);
+    let mut res = vec![];
+    {
+        let reader = csv::ReaderBuilder::new().has_headers(false).from_path(&output_path)?;
+        for record in reader.into_records() {
+            let record=record?;
+            let cols = record.iter().map(|s|s.to_string()).collect::<Vec<_>>();
+            res.push(cols);
+        }
+    }
+    std::fs::remove_file(output_path)?;
+    Ok(res)
 }

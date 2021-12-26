@@ -127,7 +127,7 @@ function Render() {
             if (deltarow) { const res = add(deltarow,"td",classname); res.rowSpan=2; return res; }
             else { return add(row,"td",classname); }
         }
-        let count_desc = count_number.toString();
+        let count_desc = count.count_name || count_number.toString();
         fullSpanTD("count_no").innerText=count_desc;
         count_name_by_id.push(count_desc);
         for (const e of count.elected) {

@@ -173,6 +173,7 @@ impl FederalDataLoader {
             }],
             results: None,
             vacancies: Some(vacancies),
+            enrolment: None,
             secondary_vacancies: if vacancies==NumberOfCandidates(12) { Some(NumberOfCandidates(6)) } else {None},
             excluded: self.excluded_candidates(state),
             tie_resolutions : self.ec_decisions(state),

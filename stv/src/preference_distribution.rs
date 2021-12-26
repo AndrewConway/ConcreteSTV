@@ -23,7 +23,7 @@ use crate::util::{DetectUnique, CollectAll};
 use crate::tie_resolution::{MethodOfTieResolution, TieResolutionsMadeByEC, TieResolutionGranularityNeeded};
 use std::hash::Hash;
 use std::iter::Sum;
-use std::cmp::min;
+use std::cmp::{min, Ordering};
 use serde::{Serialize,Deserialize};
 use std::str::FromStr;
 use crate::signed_version::SignedVersion;
@@ -74,6 +74,24 @@ impl TransferValueMethod {
     }
 }
 
+#[derive(Copy,Clone,Serialize,Deserialize)]
+/// How to name counts.
+pub enum CountNamingMethod {
+    SimpleNumber, // 1,2,3,4,... the most common method.
+    MajorMinor, // 1.1,2.1,3.1,3.2,... a major number which deals with a whole exclusion/surplus transfer, and then sequential minor.
+    BasedOnSourceName, // x.Y where x is the major number as in MajorMinor, and Y is the name for the counts this came from. If the major count is not one separated by source count, then do MajorMinor.
+}
+
+
+/// What general algorithm to use to do surplus transfers.
+#[derive(Copy,Clone,Serialize,Deserialize,Eq, PartialEq)]
+pub enum SurplusTransferMethod {
+    JustOneTransferValue, // Bunch votes together and do a single transfer. E.g. Federal.
+    ScaleTransferValues, // Do separate transfers based on provenance, with transfer values scaled.
+    MergeSameTransferValuesAndScale, // Like ScaleTransferValues except merge transfer values and do highest first.
+}
+
+
 pub trait PreferenceDistributionRules {
     /// The type for the number of votes. Usually an integer.
     type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>;
@@ -88,7 +106,9 @@ pub trait PreferenceDistributionRules {
     fn make_transfer_value(surplus:Self::Tally,ballots:BallotPaperCount) -> TransferValue; // could be implemented using Self::convert_tally_to_rational { TransferValue::new(BigInt::from(surplus),BigInt::from(ballots.0)) }
     fn use_transfer_value(transfer_value:&TransferValue,ballots:BallotPaperCount) -> Self::Tally;
     /// if true, then distribute all votes with a single transfer value. If false, separate by incoming transfer value
-    fn distribute_surplus_all_with_same_transfer_value() -> bool;
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod;
+    /// if true, sort votes during an exclusion by transfer value, highest first.
+    fn sort_exclusions_by_transfer_value() -> bool;
 
     // ***  Tie resolution issues ***
 
@@ -100,8 +120,10 @@ pub trait PreferenceDistributionRules {
 
     // *** When the actual counting stops ***
 
-    /// If true, then don't check quota or for election when part way through a surplus distribution.
-    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool;
+    /// If false, then don't check quota or for election when part way through a surplus distribution.
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool;
+    /// If false, then don't check quota or for election when part way through an exclusion.
+    fn check_elected_if_in_middle_of_exclusion() -> bool;
     /// An elimination may involve multiple steps. If all vacancies are filled but not all steps are finished, do you finish all the counts, even though it cannot change the result of the election?
     fn finish_all_counts_in_elimination_when_all_elected() -> bool;
     /// If all vacancies are filled but not all surplus distributions are done, do you finish the surplus distributions, even though it cannot change the result of the election?
@@ -123,12 +145,20 @@ pub trait PreferenceDistributionRules {
     /// A name describing these rules.
     fn name() -> String;
 
+    /// how counts should be named.
+    fn how_to_name_counts() -> CountNamingMethod { CountNamingMethod::SimpleNumber }
+
+    //
     // Things just to support weird bugs. Defaults are given as who would otherwise do these?
+    //
 
     /// Change the votes otherwise being classified as exhausted. Changes will go into the lost due to rounding tally.
     fn munge_exhausted_votes(exhausted:Self::Tally,_is_exclusion:bool) -> Self::Tally { exhausted }
     /// Change the transfer value when it is being used as a limit (e.g. in ACT rule 1C(4))
     fn munge_transfer_value_when_used_as_limit(original:TransferValue) -> TransferValue { original }
+    /// In exclusions, sort the sub-counts by this function. Used to support wierd bug in NSWEC2021.
+    /// Also used in surplus distributions when the surplus transfer method is ScaleTransferValues.
+    fn sort_subcounts_by_count() -> Option<Box<dyn FnMut(&Transcript<Self::Tally>,<<Self as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,<<Self as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide) -> Ordering>> { None }
 }
 
 struct PendingTranscript<Tally> {
@@ -159,6 +189,8 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     tally_exhausted : Rules::Tally,
     tally_set_aside : Option<Rules::Tally>,
     current_count : CountIndex,
+    current_major_count : CountIndex,
+    current_minor_count : CountIndex,
     pending_surplus_distribution : VecDeque<CandidateIndex>,
     elected_candidates : Vec<CandidateIndex>,
 
@@ -199,6 +231,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             tally_exhausted: Rules::Tally::zero(),
             tally_set_aside: None,
             current_count : CountIndex(0),
+            current_major_count: CountIndex(1),
+            current_minor_count : CountIndex(1),
             pending_surplus_distribution : VecDeque::default(),
             elected_candidates : vec![],
             in_this_count : PendingTranscript {
@@ -400,11 +434,30 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
     pub fn end_of_count_step(&mut self,reason : ReasonForCount,portion : PortionOfReasonBeingDoneThisCount,reason_completed : bool) {
         self.resort_candidates();
-        if !(Rules::dont_check_elected_if_in_middle_of_surplus_distribution()&&reason.is_surplus()&&!reason_completed) {
+        let should_check_elected = reason_completed || match reason {
+            ReasonForCount::FirstPreferenceCount => true,
+            ReasonForCount::ExcessDistribution(_) => Rules::check_elected_if_in_middle_of_surplus_distribution(),
+            ReasonForCount::Elimination(_) => Rules::check_elected_if_in_middle_of_exclusion(),
+        };
+        if should_check_elected {
             self.check_elected(&reason,reason_completed);
         }
         self.print_tallys();
         self.current_count=CountIndex(self.current_count.0+1);
+        let count_name : Option<String> = match Rules::how_to_name_counts() {
+            CountNamingMethod::SimpleNumber => None,
+            CountNamingMethod::MajorMinor => Some(format!("{}.{}",self.current_major_count.0,self.current_minor_count.0)),
+            CountNamingMethod::BasedOnSourceName => Some({
+                match reason {
+                    ReasonForCount::FirstPreferenceCount => "1".to_string(),
+                    ReasonForCount::ExcessDistribution(_) if Rules::surplus_distribution_subdivisions()!=SurplusTransferMethod::ScaleTransferValues => format!("{}_{}",self.current_major_count.0,self.current_minor_count.0),
+                    _ => {
+                        let from_count_name = portion.papers_came_from_counts.iter().map(|c|self.transcript.counts[c.0].count_name.as_ref().unwrap().clone()).collect::<Vec<_>>().join(",");
+                        format!("{}.{}",self.current_major_count.0,from_count_name)
+                    }
+                }
+            }),
+        };
         self.transcript.counts.push(SingleCount{
             reason,
             portion,
@@ -432,8 +485,11 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                     rounding:  Zero::zero(),
                     set_aside: None
                 }),
-            }
+            },
+            count_name,
         });
+        if reason_completed { self.current_major_count=CountIndex(self.current_major_count.0+1); self.current_minor_count=CountIndex(1); }
+        else { self.current_minor_count=CountIndex(self.current_minor_count.0+1); }
         self.in_this_count.not_continuing=self.in_this_count.elected.drain(..).map(|e|e.who).collect();
         self.in_this_count.decisions.clear();
     }
@@ -513,11 +569,30 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
     /// Distribute a surplus as multiple parcels, with a general ratio with denominator based on votes rather than ballots (typically surplus/votes, possibly taking exhausted votes into account somehow)
     /// Then multiply this ratio by the transfer value that everything came with.
-    pub fn distribute_surplus_by_scaling_incoming_transfer_values(&mut self,candidate_to_distribute:CandidateIndex)  {
+    pub fn distribute_surplus_by_scaling_incoming_transfer_values(&mut self,candidate_to_distribute:CandidateIndex,merge_same_tv:bool)  {
         let votes : Rules::Tally = self.tally(candidate_to_distribute);
         let surplus: Rules::Tally  = votes.clone()-self.quota.clone();
-        let mut votes_to_distribute : Vec<(TransferValue,(Rules::Tally,VotesWithSameTransferValue,PortionOfReasonBeingDoneThisCount))> = self.papers[candidate_to_distribute.0].extract_all_ballots_separated_by_transfer_value();
-        votes_to_distribute.sort_unstable_by(|(a,_), (b,_)| b.cmp(a)); // sort highest to lowest.
+        let votes_to_distribute : Vec<(TransferValue,(Rules::Tally,VotesWithSameTransferValue,PortionOfReasonBeingDoneThisCount))> =
+            if merge_same_tv { self.papers[candidate_to_distribute.0].extract_all_ballots_separated_by_transfer_value() } // sorted highest TV to lowest
+            else {
+                if let Some(custom_sorter) = Rules::sort_subcounts_by_count() {
+                    /*let transcript = Transcript::<Rules::Tally>{
+                        rules: "".to_string(),
+                        quota: QuotaInfo {
+                            papers: BallotPaperCount(0),
+                            vacancies: NumberOfCandidates(0),
+                            quota: Rules::Tally::zero(),
+                        },
+                        counts: vec![],
+                        elected: vec![]
+                    };*/
+                    self.papers[candidate_to_distribute.0].extract_all_ballots_separated_by_key(Some(custom_sorter),&self.transcript)
+                } else {
+                    self.papers[candidate_to_distribute.0].extract_all_ballots_separated_by_key(None,&self.transcript)
+                }
+                //let custom_sort_function : Option<Box<(dyn FnMut(<<Rules as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide, <<Rules as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide) -> std::cmp::Ordering + 'static)>> = Rules::sort_subcounts_by_count().map(|f|Box::new(|a1:<<Rules as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,a2:<<Rules as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide|f(&self.transcript,a1,a2)));
+                //self.papers[candidate_to_distribute.0].extract_all_ballots_separated_by_key(&custom_sort_function)
+            }; // sorted by key
         let mut partially_distributed = vec![];
         let mut total_value_of_exhausted_votes = BigRational::zero();
         let continuing_candidates_when_distribution_done = self.continuing_candidates_sorted_by_tally.len();
@@ -535,10 +610,11 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         //println!("TV based on surplus {} = {}-{} divided by {} = {}-{}",surplus_rational,votes,self.quota,general_tv_denom,votes,total_value_of_exhausted_votes);
         let general_tv = if general_tv_denom<=surplus_rational { TransferValue::one() } else { TransferValue(surplus_rational/general_tv_denom) };
         //println!("quota {} exhausted {} special factor excluded {:?} TV {}",self.quota,total_value_of_exhausted_votes,special_factor_excluded,general_tv);
-        let max_tv = partially_distributed.last().unwrap().0.clone();
         let mut current_remaining_tally_for_candidate_being_distributed : BigRational = Rules::convert_tally_to_rational(votes.clone());
+        let mut togo = partially_distributed.len();
         for (tv,step_tally,ballots,provenance,distributed,_exhausted_value) in partially_distributed {
-            let is_final_step = tv==max_tv;
+            togo-=1;
+            let is_final_step = togo==0;
             // println!("Parcelling out {} votes with TV {} over {} ballots",original_worth,transfer_value,tv_denom);
             let original_worth = Rules::convert_tally_to_rational(step_tally)*original_worth_ratio.clone();
             current_remaining_tally_for_candidate_being_distributed-=original_worth;
@@ -595,11 +671,13 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
     pub fn distribute_surplus(&mut self,candidate_to_distribute:CandidateIndex) {
         println!("Distributing surplus for {}",self.data.metadata.candidate(candidate_to_distribute).name);
-        if Rules::distribute_surplus_all_with_same_transfer_value() {
-            let provenance = self.distribute_surplus_all_with_same_transfer_value(candidate_to_distribute);
-            self.end_of_count_step(ReasonForCount::ExcessDistribution(candidate_to_distribute), provenance, true);
-        } else {
-            self.distribute_surplus_by_scaling_incoming_transfer_values(candidate_to_distribute);
+        match Rules::surplus_distribution_subdivisions() {
+            SurplusTransferMethod::JustOneTransferValue => {
+                let provenance = self.distribute_surplus_all_with_same_transfer_value(candidate_to_distribute);
+                self.end_of_count_step(ReasonForCount::ExcessDistribution(candidate_to_distribute), provenance, true);
+            }
+            SurplusTransferMethod::ScaleTransferValues => self.distribute_surplus_by_scaling_incoming_transfer_values(candidate_to_distribute,false),
+            SurplusTransferMethod::MergeSameTransferValuesAndScale => self.distribute_surplus_by_scaling_incoming_transfer_values(candidate_to_distribute,true),
         }
     }
 
@@ -810,9 +888,14 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
         let mut provenances : Vec<(<Rules::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,TransferValue)> = provenances.into_iter().collect();
         // First sort by S::KeyToDivide
-        provenances.sort_by_key(|f|f.0.clone()); // stable sort, will preserve ordering of other key stull
+        provenances.sort_by_key(|f|f.0.clone()); // stable sort, will preserve ordering of other key stuff
         // Then stable sort by TransferValue
-        provenances.sort_by_key(|f|f.1.0.clone().neg()); // stable sort, will preserve ordering of other key stull
+        if Rules::sort_exclusions_by_transfer_value() { provenances.sort_by_key(|f|f.1.0.clone().neg()); } // stable sort, will preserve ordering of other key stuff
+        if let Some(mut sorting_rule) = Rules::sort_subcounts_by_count() {
+            provenances.sort_by(|(a,_),(b,_)|{
+                sorting_rule(&self.transcript,a.clone(),b.clone())
+            });
+        }
         let mut togo = provenances.len();
         for key in provenances {
             // doing the transfer for this key.

@@ -129,6 +129,10 @@ pub struct DecisionMadeByEC {
     pub affected : Vec<CandidateIndex>
 }
 
+
+
+
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
     /// The action that is being done in said count
@@ -146,7 +150,10 @@ pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
     /// whether the EC needs to make any decisions
     pub decisions : Vec<DecisionMadeByEC>,
     /// status at end of count.
-    pub status : EndCountStatus<Tally>
+    pub status : EndCountStatus<Tally>,
+    /// A special name for the count, if not 1,2,3,... Mainly used so that each exclusion or surplus distribution is a single "major" count with possibly minor counts included.
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub count_name : Option<String>,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -163,6 +170,12 @@ pub struct Transcript<Tally:PartialEq+Clone+Display+FromStr> {
     pub quota : QuotaInfo<Tally>,
     pub counts : Vec<SingleCount<Tally>>,
     pub elected : Vec<CandidateIndex>,
+}
+
+impl <Tally:PartialEq+Clone+Display+FromStr> Transcript<Tally> {
+    pub fn count(&self,index:CountIndex) -> &SingleCount<Tally> {
+        &self.counts[index.0]
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize)]

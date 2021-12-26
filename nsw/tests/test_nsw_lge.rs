@@ -15,7 +15,7 @@ mod tests {
     use stv::election_data::ElectionData;
     use stv::ballot_metadata::{ElectionMetadata, ElectionName, Candidate, NumberOfCandidates, CandidateIndex};
     use stv::ballot_paper::BTL;
-    use crate::NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation;
+    use nsw::NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation;
     use stv::ballot_pile::BallotPaperCount;
 
     fn candidate(name: &str) -> Candidate {
@@ -55,6 +55,7 @@ mod tests {
                 source: vec![],
                 results: None,
                 vacancies: Some(NumberOfCandidates(3)),
+                enrolment: None,
                 secondary_vacancies: None,
                 excluded: vec![],
                 tie_resolutions: Default::default()

@@ -13,7 +13,8 @@ use std::path::PathBuf;
 use crate::election_data::ElectionData;
 use std::fs::File;
 use std::collections::HashMap;
-use std::ops::Sub;
+use std::iter::Map;
+use std::ops::{Range, Sub};
 use crate::tie_resolution::TieResolutionsMadeByEC;
 
 /// a candidate, referred to by position on the ballot paper, 0 being first
@@ -78,6 +79,9 @@ pub struct ElectionMetadata {
     /// the number of positions to be filled, default.
     #[serde(skip_serializing_if = "Option::is_none",default)]
     pub vacancies : Option<NumberOfCandidates>,
+    /// the number of eligible voters.
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub enrolment : Option<NumberOfCandidates>,
     /// Another number of positions to be filled. Useful for a double dissolution, where two counts are held, some candidates to get longer terms.
     #[serde(skip_serializing_if = "Option::is_none",default)]
     pub secondary_vacancies : Option<NumberOfCandidates>,
@@ -107,6 +111,37 @@ impl ElectionMetadata {
         }
         res
     }
+    /// Get a hashmap going from candidate name to index, converting SMITH Fred to Fred SMITH
+    pub fn get_candidate_name_lookup_with_capital_letters_afterwards(&self) -> HashMap<String,CandidateIndex> {
+        let mut res = HashMap::default();
+        fn is_surname(s:&str) -> bool {
+            s.len()>1 && s.trim_start_matches("Mac").trim_start_matches("Mc").chars().all(|c|!c.is_lowercase()) // one letter is probably an initial.
+        }
+        for i in 0..self.candidates.len() {
+            let name_components = self.candidates[i].name.split_ascii_whitespace().collect::<Vec<_>>();
+            let capital_components = name_components.iter().take_while(|&&s|is_surname(s)).collect::<Vec<_>>();
+            let lower_case_components = name_components.iter().skip(capital_components.len()).map(|&s|s);
+            let reordered_name = lower_case_components.chain(capital_components.iter().map(|&&s|s)).collect::<Vec<_>>().join(" ");
+            res.insert(reordered_name,CandidateIndex(i));
+        }
+        res
+    }
+    /// Get a hashmap going from party name to index
+    pub fn get_party_name_lookup(&self) -> HashMap<String,PartyIndex> {
+        let mut res = HashMap::default();
+        for i in 0..self.parties.len() {
+            res.insert(self.parties[i].name.clone(),PartyIndex(i));
+        }
+        res
+    }
+    /// Get a hashmap going from party column id to index
+    pub fn get_party_id_lookup(&self) -> HashMap<String,PartyIndex> {
+        let mut res = HashMap::default();
+        for i in 0..self.parties.len() {
+            res.insert(self.parties[i].column_id.clone(),PartyIndex(i));
+        }
+        res
+    }
     /// Get a hashmap going from candidate name to index. Include both candidate name and no_comma_name
     pub fn get_candidate_name_lookup_multiple_ways(&self) -> HashMap<String,CandidateIndex> {
         let mut res = HashMap::default();
@@ -125,6 +160,8 @@ impl ElectionMetadata {
         }
         res
     }
+    /// An iterator over all the candidate indices starting at 0.
+    pub fn candidate_indices(&self) -> Map<Range<usize>, fn(usize) -> CandidateIndex> { (0..self.candidates.len()).map(|i|CandidateIndex(i)) }
 }
 
 /// Which election it was.

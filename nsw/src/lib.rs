@@ -13,11 +13,9 @@
 //! # My thoughts.
 #![doc = include_str!("../NSWLocalCouncilLegislation2021Commentary.md")]
 
-mod test_nsw_lge;
-
-use stv::preference_distribution::{PreferenceDistributionRules, TransferValueMethod, WhenToDoElectCandidateClauseChecking, BigRational};
-use stv::ballot_pile::{FullySplitByCountNumber, BallotPaperCount};
-use stv::transfer_value::{TransferValue, convert_usize_to_rational, round_rational_down_to_usize};
+use stv::preference_distribution::{BigRational, CountNamingMethod, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
+use stv::ballot_pile::{BallotPaperCount, FullySplitByCountNumber};
+use stv::transfer_value::{convert_usize_to_rational, round_rational_down_to_usize, TransferValue};
 use stv::tie_resolution::MethodOfTieResolution;
 
 /// My guess at what the legislation means. See my comments below
@@ -45,7 +43,8 @@ impl PreferenceDistributionRules for NSWLocalCouncilLegislation2021MyGuessAtHigh
         transfer_value.mul_rounding_down(ballots)
     }
 
-    fn distribute_surplus_all_with_same_transfer_value() -> bool { false }
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::MergeSameTransferValuesAndScale }
+    fn sort_exclusions_by_transfer_value() -> bool { false }
 
     /// In general, Highly ambiguous, although OK for 2 person case.
     fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
@@ -57,7 +56,9 @@ impl PreferenceDistributionRules for NSWLocalCouncilLegislation2021MyGuessAtHigh
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
 
     /// see discussion
-    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { true }
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { false }
+    /// see discussion
+    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
 
     /// 9(7) says
     /// ```text
@@ -92,4 +93,6 @@ impl PreferenceDistributionRules for NSWLocalCouncilLegislation2021MyGuessAtHigh
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
 
     fn name() -> String { "NSWLocalGov2021".to_string() }
+    fn how_to_name_counts() -> CountNamingMethod { CountNamingMethod::BasedOnSourceName }
 }
+

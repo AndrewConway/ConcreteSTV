@@ -219,6 +219,7 @@ impl ACTDataLoader {
             }],
             results: None,
             vacancies: Some(vacancies),
+            enrolment: None,
             secondary_vacancies: None,
             excluded: self.excluded_candidates(electorate),
             tie_resolutions : self.ec_decisions(electorate),
@@ -385,10 +386,11 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
             vote_total,
             paper_total,
             vote_delta,
-            paper_delta
+            paper_delta,
+            count_name: None,
         });
         if sheet2.get_value((row_index,count_column)).is_none()&&sheet2.get_value((row_index+1,count_column)).is_none() {
-           return Ok(OfficialDistributionOfPreferencesTranscript{ quota, counts ,missing_negatives_in_papers_delta:true})
+           return Ok(OfficialDistributionOfPreferencesTranscript{ quota, counts ,missing_negatives_in_papers_delta:true, elected_candidates_are_in_order: true, all_exhausted_go_to_rounding: false })
         }
     }
 

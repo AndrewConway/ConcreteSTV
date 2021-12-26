@@ -37,6 +37,13 @@ pub enum MethodOfTieResolution {
     /// This is equivalent to always sorting by tally, and actually seems the most reasonable choice as far as I am concerned.
     /// Of course, that is not necessarily what is legislated.
     AnyDifferenceIsADiscriminator,
+    /// Like RequireHistoricalCountsToBeAllDifferent, but ignore sub-transfers in the middle
+    /// of a poly-transfer. E.g. in an exclusion where there are different transfer values
+    /// transferred in different sub-counts, ignore all the subcounts other than the one where
+    /// it is finished.
+    RequireHistoricalCountsToBeAllDifferentOnlyConsideringCountsWhereAnActionIsFinished,
+    /// Like AnyDifferenceIsADiscriminator but only consider major counts like RequireHistoricalCountsToBeAllDifferentOnlyConsideringCountsWhereAnActionIsFinished
+    AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished,
 }
 
 /// Sometimes you need tie resolution to distinguish all candidates (e.g. for order elected),
@@ -56,8 +63,10 @@ impl MethodOfTieResolution {
     pub fn resolve<Tally:Clone+Hash+Ord+Display+FromStr>(self,tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded) -> Option<DecisionMadeByEC> {
         let resolved = match self {
             MethodOfTieResolution::None => false,
-            MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent => resolve_ties_require_all_different(tied_candidates,transcript),
-            MethodOfTieResolution::AnyDifferenceIsADiscriminator => resolve_ties_any_different(tied_candidates,transcript,granularity),
+            MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent => resolve_ties_require_all_different(tied_candidates,transcript,false),
+            MethodOfTieResolution::AnyDifferenceIsADiscriminator => resolve_ties_any_different(tied_candidates,transcript,granularity,false),
+            MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferentOnlyConsideringCountsWhereAnActionIsFinished => resolve_ties_require_all_different(tied_candidates,transcript,true),
+            MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished => resolve_ties_any_different(tied_candidates,transcript,granularity,true),
         };
         if resolved { None } else { Some(DecisionMadeByEC{ affected: tied_candidates.to_vec() }) }
     }
@@ -124,15 +133,17 @@ impl TieResolutionsMadeByEC {
 
 /// Sort candidates low to high based on some prior period when they each had a different tally.
 /// Return true iff ties are resolved.
-fn resolve_ties_require_all_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>) -> bool {
+fn resolve_ties_require_all_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,just_consider_major_counts:bool) -> bool {
     for count in transcript.counts.iter().rev() {
-        let mut observed = HashSet::new();
-        for candidate in tied_candidates.iter() {
+        if count.reason_completed || !just_consider_major_counts {
+            let mut observed = HashSet::new();
+            for candidate in tied_candidates.iter() {
             observed.insert(count.status.tallies.candidate[candidate.0].clone());
-        }
-        if observed.len()==tied_candidates.len() { // All different!
+            }
+            if observed.len()==tied_candidates.len() { // All different!
             tied_candidates.sort_by_key(|candidate|count.status.tallies.candidate[candidate.0].clone());
             return true;
+            }
         }
     }
     false
@@ -141,9 +152,9 @@ fn resolve_ties_require_all_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr>(t
 
 /// Sort candidates low to high based on the tie resolution rules.
 /// Return true iff ties are resolved to the required granularity.
-fn resolve_ties_any_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded) -> bool {
+fn resolve_ties_any_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded,just_consider_major_counts:bool) -> bool {
     //println!("Resolve ties any different between {}",tied_candidates.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(","));
-    for count in transcript.counts.iter().rev() {
+    for count in transcript.counts.iter().rev() {if count.reason_completed || !just_consider_major_counts {
         let mut observed : HashMap<Tally,Vec<CandidateIndex>> = HashMap::new();
         for candidate in tied_candidates.iter() {
             observed.entry(count.status.tallies.candidate[candidate.0].clone()).or_insert_with(||vec![]).push(*candidate);
@@ -158,8 +169,8 @@ fn resolve_ties_any_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr>(tied_cand
                 let who = observed.get_mut(&tally).unwrap();
                 if who.len()>1 {
                     match granularity {
-                        TieResolutionGranularityNeeded::Total => {ok=ok&&resolve_ties_any_different(who,transcript,granularity)}  // could optimize to start at count currently up to.
-                        TieResolutionGranularityNeeded::LowestSeparated(loc) if loc>upto && loc<upto+who.len() => {ok=ok&&resolve_ties_any_different(who,transcript,TieResolutionGranularityNeeded::LowestSeparated(loc-upto))}
+                        TieResolutionGranularityNeeded::Total => {ok=ok&&resolve_ties_any_different(who,transcript,granularity,just_consider_major_counts)}  // could optimize to start at count currently up to.
+                        TieResolutionGranularityNeeded::LowestSeparated(loc) if loc>upto && loc<upto+who.len() => {ok=ok&&resolve_ties_any_different(who,transcript,TieResolutionGranularityNeeded::LowestSeparated(loc-upto),just_consider_major_counts)}
                         TieResolutionGranularityNeeded::LowestSeparated(_) => {} // granularity means we don't care.
                     }
                 }
@@ -169,6 +180,6 @@ fn resolve_ties_any_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr>(tied_cand
             //println!("Solution is : {}",tied_candidates.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(","));
             return ok;
         }
-    }
+    }}
     false
 }

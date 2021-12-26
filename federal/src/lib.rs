@@ -6,7 +6,7 @@
 
 //! Describe the rules used for Federal elections, as best I can tell.
 
-use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational};
+use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational, SurplusTransferMethod};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber};
 use stv::transfer_value::{TransferValue, round_rational_down_to_usize, convert_usize_to_rational};
 use stv::tie_resolution::MethodOfTieResolution;
@@ -36,8 +36,10 @@ impl PreferenceDistributionRules for FederalRules {
         transfer_value.mul_rounding_down(ballots)
     }
 
-    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
-    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
+    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
+    fn sort_exclusions_by_transfer_value() -> bool { true }
 
     /// Require that at some prior point *all* the counts were different
     /// ```text
@@ -237,8 +239,10 @@ impl PreferenceDistributionRules for FederalRulesUsed2019 {
     fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
     fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
 
-    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
-    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
+    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
+    fn sort_exclusions_by_transfer_value() -> bool { true }
 
     /// In 2019 QLD, in count 287, a surplus distribution, G. Rennick gets elected for achieving a quota.
     /// This leaves 2 candidates, and 1 vacancy. The 2 standing rules is not applied until
@@ -316,8 +320,10 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
     fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
     fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
 
-    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
-    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
+    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
+    fn sort_exclusions_by_transfer_value() -> bool { true }
 
     fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
@@ -392,8 +398,10 @@ impl PreferenceDistributionRules for FederalRulesUsed2013 {
     fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
     fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
 
-    fn distribute_surplus_all_with_same_transfer_value() -> bool { true }
-    fn dont_check_elected_if_in_middle_of_surplus_distribution() -> bool { false } // not applicable as distribute_surplus_all_with_same_transfer_value=true.
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
+    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
+    fn sort_exclusions_by_transfer_value() -> bool { true }
 
     /// In SA, count 228, B. Day is elected on quota, leaving 2 candidates 1 seat. S. Birmingham is not elected until the next count, 229.
     fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
