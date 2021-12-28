@@ -549,7 +549,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let distributed = DistributedVotes::distribute(&ballots.votes,&self.continuing_candidates,self.num_candidates);
         let continuing_ballots = ballots_considered-distributed.exhausted;
         let tv_denom = if Rules::transfer_value_method().denom_is_just_continuing() {continuing_ballots} else {ballots.num_ballots};
-        let mut transfer_value : TransferValue = Rules::make_transfer_value(surplus.clone(),tv_denom);
+        let mut transfer_value : TransferValue = if tv_denom.is_zero() { TransferValue::one() } else {Rules::make_transfer_value(surplus.clone(),tv_denom)};
         let mut original_worth : Rules::Tally = surplus.clone();
         if Rules::transfer_value_method().limit_to_incoming_transfer_value() {
             let old_tv = provenance.transfer_value.clone().expect("If you are going to limit to an incoming transfer value, there must be a unique one.");
