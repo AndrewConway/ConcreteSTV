@@ -148,6 +148,10 @@ pub trait PreferenceDistributionRules {
     /// how counts should be named.
     fn how_to_name_counts() -> CountNamingMethod { CountNamingMethod::SimpleNumber }
 
+    /// whether exhausted votes in count 1 (first preferences) count towards the quota calculation.
+    /// (this happens in the case of candidates ruled ineligible).
+    fn should_exhausted_votes_count_for_quota_computation() -> bool { false }
+
     //
     // Things just to support weird bugs. Defaults are given as who would otherwise do these?
     //
@@ -259,12 +263,18 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let mut total_first_preferences : BallotPaperCount = BallotPaperCount(0);
         for i in 0..self.num_candidates {
             let votes = &distributed.by_candidate[i];
-            let tally = Rules::Tally::from(votes.num_ballots.0);
-            total_first_preferences+=votes.num_ballots;
-            self.tallys[i]+=tally.clone();
-            self.papers[i].add(votes, TransferValue::one(), self.current_count, Some(self.current_count), tally);
+            if votes.num_ballots!=BallotPaperCount(0) {
+                let tally = Rules::Tally::from(votes.num_ballots.0);
+                total_first_preferences+=votes.num_ballots;
+                self.tallys[i]+=tally.clone();
+                self.papers[i].add(votes, TransferValue::one(), self.current_count, Some(self.current_count), tally);
+            }
         }
         self.exhausted+=distributed.exhausted;
+        self.tally_exhausted+=Rules::Tally::from(distributed.exhausted.0);
+        if Rules::should_exhausted_votes_count_for_quota_computation() {
+            total_first_preferences+=distributed.exhausted;
+        }
         self.exhausted_atl+=distributed.exhausted_atl;
         self.compute_quota(total_first_preferences);
         self.end_of_count_step(ReasonForCount::FirstPreferenceCount, PortionOfReasonBeingDoneThisCount {
@@ -323,7 +333,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 let tied = &mut to_check[i..differs];
                 if let Some(decision) = how.resolve(tied,&self.transcript,granularity) {
                     self.in_this_count.decisions.push(decision);
-                    self.ec_resolutions.resolve(tied);
+                    self.ec_resolutions.resolve(tied,granularity);
                 }
             }
             i=differs;
@@ -452,8 +462,12 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                     ReasonForCount::FirstPreferenceCount => "1".to_string(),
                     ReasonForCount::ExcessDistribution(_) if Rules::surplus_distribution_subdivisions()!=SurplusTransferMethod::ScaleTransferValues => format!("{}_{}",self.current_major_count.0,self.current_minor_count.0),
                     _ => {
-                        let from_count_name = portion.papers_came_from_counts.iter().map(|c|self.transcript.counts[c.0].count_name.as_ref().unwrap().clone()).collect::<Vec<_>>().join(",");
-                        format!("{}.{}",self.current_major_count.0,from_count_name)
+                        if portion.papers_came_from_counts.is_empty() {
+                            format!("{}",self.current_major_count.0)
+                        } else {
+                            let from_count_name = portion.papers_came_from_counts.iter().map(|c|self.transcript.counts[c.0].count_name.as_ref().unwrap().clone()).collect::<Vec<_>>().join(",");
+                            format!("{}.{}",self.current_major_count.0,from_count_name)
+                        }
                     }
                 }
             }),
@@ -887,6 +901,14 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             }
         }
         let mut provenances : Vec<(<Rules::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,TransferValue)> = provenances.into_iter().collect();
+        if provenances.is_empty() { // Poor candidate got no votes! Make a vacuous count to indicate that an elimination happened.
+            self.end_of_count_step(ReasonForCount::Elimination(candidates_to_exclude.clone()), PortionOfReasonBeingDoneThisCount {
+                transfer_value: None,
+                when_tv_created: None,
+                papers_came_from_counts: vec![],
+            }, true);
+            return;
+        }
         // First sort by S::KeyToDivide
         provenances.sort_by_key(|f|f.0.clone()); // stable sort, will preserve ordering of other key stuff
         // Then stable sort by TransferValue

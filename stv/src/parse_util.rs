@@ -119,8 +119,8 @@ pub trait RawDataSource {
     }
 
     /// Like read_raw_data, but with a better error message for invalid electorates.
-    fn read_raw_data_checking_electorate_valid(&self,electorate:&String) -> anyhow::Result<ElectionData> {
-        if !self.all_electorates().contains(electorate) { Err(self.bad_electorate(electorate)) }
+    fn read_raw_data_checking_electorate_valid(&self,electorate:&str) -> anyhow::Result<ElectionData> {
+        if !self.all_electorates().iter().any(|s|s==electorate) { Err(self.bad_electorate(electorate)) }
         else { self.read_raw_data(electorate) }
     }
 

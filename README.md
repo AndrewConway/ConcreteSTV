@@ -221,6 +221,7 @@ This program is Copyright 2021 Andrew Conway.
 
 This file is part of ConcreteSTV.
 
+With the exception of specific files mentioned below,
 ConcreteSTV is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -234,8 +235,28 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
+### Other copyrights
+
+This repository contains some files derived from data sources with their
+own separate copyrights. These files are licensed as above to the extent that they are the work
+of contributors to ConcreteSTV, and maintain the original copyright to the appropriate
+extent.
+* nsw/NSWLocalCouncilLegislation2021.md. Based on content from the 
+  [New South Wales Legislation website](https://legislation.nsw.gov.au/view/whole/html/2020-10-27/sl-2005-0487#sch.5) at 3 Dec 2021. 
+  For the latest information on New South Wales Government legislation please go to https://www.legislation.nsw.gov.au.
+  It is licensed under a Creative Commons Attribution 4.0 International licence (CC BY 4.0).
+* nsw/src/NSWLGE2021_contest_list.json. This list is partially derived from data on the 
+  [NSW Electoral Commission website](https://www.elections.nsw.gov.au), which
+  is © State of New South Wales through the NSW Electoral Commission 
+  and licensed under the [Creative Commons Attribution 4.0 License](https://creativecommons.org/licenses/by/4.0/) (CCA License).
+
+Kudos to the State of New South Wales for the use of such a license. 
+
+This should not be taken as an endorsement of ConcreteSTV by any organisation listed here.
+
 Or course any files you download from electoral commissions (or elsewhere)
 are likely covered by their own licenses.
+
 
 ## Contact
 

@@ -49,7 +49,7 @@ pub enum MethodOfTieResolution {
 /// Sometimes you need tie resolution to distinguish all candidates (e.g. for order elected),
 /// sometimes only to single out a particular subset (e.g. elimination of 1 lowest candidate).
 /// This specifies how precise one needs to be.
-#[derive(Debug,Clone,Copy)]
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum TieResolutionGranularityNeeded {
     /// Require a unique collection of all people
     Total,
@@ -118,11 +118,18 @@ impl TieResolutionsMadeByEC {
         Ok(TieResolutionsMadeByEC{tie_resolutions})
     }
     /// Sort tied_candidates appropriately (low to high)
-    pub fn resolve(&self,tied_candidates: &mut [CandidateIndex]) {
+    pub fn resolve(&self, tied_candidates: &mut [CandidateIndex], granularity: TieResolutionGranularityNeeded) {
         for decision in &self.tie_resolutions {
             let deemed_order : Vec<CandidateIndex> = decision.iter().filter(|&c|tied_candidates.contains(c)).cloned().collect();
             if deemed_order.len()==tied_candidates.len() {
                 tied_candidates.copy_from_slice(&deemed_order);
+                return;
+            }
+            if granularity==TieResolutionGranularityNeeded::LowestSeparated(1) && decision.len()==2 && deemed_order.len()==2 {
+                // This is sufficient. One will be excluded and this should not re-arise.
+                let last = decision[0]; // this is least favoured candidate, so should go at the start of the list, which is in ascending order.
+                let order_with_last_first = [last].into_iter().chain(tied_candidates.iter().cloned().filter(|&c|c!=last)).collect::<Vec<_>>();
+                tied_candidates.copy_from_slice(&order_with_last_first);
                 return;
             }
         }
@@ -138,11 +145,11 @@ fn resolve_ties_require_all_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr>(t
         if count.reason_completed || !just_consider_major_counts {
             let mut observed = HashSet::new();
             for candidate in tied_candidates.iter() {
-            observed.insert(count.status.tallies.candidate[candidate.0].clone());
+                observed.insert(count.status.tallies.candidate[candidate.0].clone());
             }
             if observed.len()==tied_candidates.len() { // All different!
-            tied_candidates.sort_by_key(|candidate|count.status.tallies.candidate[candidate.0].clone());
-            return true;
+                tied_candidates.sort_by_key(|candidate|count.status.tallies.candidate[candidate.0].clone());
+                return true;
             }
         }
     }

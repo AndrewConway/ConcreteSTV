@@ -66,9 +66,9 @@ impl OfficialDistributionOfPreferencesTranscript {
     /// like compare_with_transcript but don't panic if the first difference is caused by a difference in EC decision making. If so, return Some(candidate_favoured_by_ec,candidate_excluded_by_ec).
     pub fn compare_with_transcript_checking_for_ec_decisions<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F) -> Option<(CandidateIndex,CandidateIndex)> {
         if let Some(quota) = &self.quota {
-            assert_eq!(quota.vacancies,transcript.quota.vacancies);
-            assert_eq!(quota.papers,transcript.quota.papers);
-            assert_eq!(quota.quota,decode(transcript.quota.quota.clone()));
+            assert_eq!(quota.vacancies,transcript.quota.vacancies,"vacancies official vs me");
+            assert_eq!(quota.papers,transcript.quota.papers,"papers with first preferences official vs me");
+            assert_eq!(quota.quota,decode(transcript.quota.quota.clone()),"quota official vs me");
         }
         for i in 0..min(self.counts.len(),transcript.counts.len()) {
             let assert_papers = |official:usize,our:BallotPaperCount,what:&str|{

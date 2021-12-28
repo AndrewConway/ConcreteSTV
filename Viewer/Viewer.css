@@ -6,6 +6,10 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+td {
+    min-width: 2em;
+}
+
 td.CandidateNameHoriz {
     text-align: center;
     align-items: center;

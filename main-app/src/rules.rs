@@ -17,7 +17,7 @@ use std::fmt::{Display, Formatter};
 use act::{ACTPre2020, ACT2020, ACT2021};
 use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 use serde::{Serialize,Deserialize};
-use nsw::NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation;
+use nsw::{NSWECLocalGov2021, NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation};
 
 #[derive(Copy, Clone)]
 pub enum Rules {
@@ -29,6 +29,7 @@ pub enum Rules {
     ACT2020,
     ACT2021,
     NSWLocalGov2021,
+    NSWECLocalGov2021,
 }
 
 impl FromStr for Rules {
@@ -44,6 +45,7 @@ impl FromStr for Rules {
             "ACT2020" => Ok(Rules::ACT2020),
             "ACT2021" => Ok(Rules::ACT2021),
             "NSWLocalGov2021" => Ok(Rules::NSWLocalGov2021),
+            "NSWECLocalGov2021" => Ok(Rules::NSWECLocalGov2021),
             _ => Err("No such rule supported")
         }
     }
@@ -60,6 +62,7 @@ impl Display for Rules {
             Rules::ACT2020 => "ACT2020",
             Rules::ACT2021 => "ACT2021",
             Rules::NSWLocalGov2021 => "NSWLocalGov2021",
+            Rules::NSWECLocalGov2021 => "NSWECLocalGov2021",
         };
         f.write_str(s)
     }
@@ -75,6 +78,7 @@ impl Rules {
             Rules::Federal => distribute_preferences::<FederalRules>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
             Rules::ACTPre2020 => distribute_preferences::<ACTPre2020>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
             Rules::NSWLocalGov2021 => distribute_preferences::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
+            Rules::NSWECLocalGov2021 => distribute_preferences::<NSWECLocalGov2021>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),
             _ => { // handle 6 digit transcripts.
                 let transcript = match self {
                     Rules::ACT2020 => distribute_preferences::<ACT2020>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions),

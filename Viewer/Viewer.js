@@ -60,7 +60,7 @@ function Render() {
     const rounding_ever_used = transcript.counts.some(c=>c.status.papers.rounding || c.status.tallies.rounding);
     const exhausted_ever_used = transcript.counts.some(c=>c.status.papers.exhausted || c.status.tallies.exhausted);
     const above_table = add(render_div,"div","quota");
-    above_table.innerText="Quota : "+transcript.quota.quota+" Formal Votes : "+transcript.quota.papers+" Vacancies : "+transcript.quota.vacancies;
+    above_table.innerText="Quota : "+transcript.quota.quota+" Votes with first preference : "+transcript.quota.papers+" Vacancies : "+transcript.quota.vacancies;
     const table = add(render_div,"table");
     const elected_list = add(render_div,"div","WinningCandidatesList");
     add(elected_list,"h4").innerText="Winning Candidates";
