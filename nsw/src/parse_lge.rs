@@ -80,8 +80,13 @@ impl RawDataSource for NSWLGEDataLoader {
     fn all_electorates(&self) -> Vec<String> {
         self.contests.iter().map(|c|c.name.clone()).collect()
     }
+    fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> { self.read_raw_data_possibly_rejecting_some_types(electorate,None) }
 
-    fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> {
+}
+
+impl NSWLGEDataLoader {
+
+    pub fn read_raw_data_possibly_rejecting_some_types(&self, electorate: &str, reject_vote_type : Option<HashSet<String>>) -> anyhow::Result<ElectionData> {
         let contest = &self.find_contest(electorate)?.url;
         let mayoral = electorate.ends_with(" Mayoral");
         let metadata_data_file = self.find_raw_data_file_relative(contest,
@@ -90,8 +95,8 @@ impl RawDataSource for NSWLGEDataLoader {
                                                                   if mayoral {"mayoral/report/fp-by-grp-and-candidate-by-vote-type"} else {"councillor/report/fp-by-grp-and-candidate-by-vote-type"})?;
         let mut metadata = self.parse_candidate_list(File::open(metadata_data_file)?,mayoral,electorate)?;
         let winner_info_file = self.find_raw_data_file_relative(contest,"",
-                                                                  if mayoral {"mayoral.html"} else {"councillor.html"},
-                                                                  if mayoral {"mayoral"} else {"councillor"})?;
+                                                                if mayoral {"mayoral.html"} else {"councillor.html"},
+                                                                if mayoral {"mayoral"} else {"councillor"})?;
         let winner_info = NSWLGESingleContestMainPageInfo::extract_file(winner_info_file)?;
         if !winner_info.elected_candidates.is_empty() {
             let candidates = metadata.get_candidate_name_lookup_with_capital_letters_afterwards();
@@ -109,11 +114,8 @@ impl RawDataSource for NSWLGEDataLoader {
         }
         let zip_name = if mayoral {"mayoral-finalpreferencedatafile.zip"} else {"finalpreferencedatafile.zip"};
         let zip_preferences_list = self.find_raw_data_file_relative(contest,"download",zip_name,&("download/".to_string()+zip_name))?;
-        parse_zip_election_file(File::open(zip_preferences_list)?,metadata,None,mayoral)
+        parse_zip_election_file(File::open(zip_preferences_list)?,metadata,reject_vote_type,mayoral)
     }
-}
-
-impl NSWLGEDataLoader {
 
     pub fn new(finder:&FileFinder,year:&'static str,page_url:&'static str) -> anyhow::Result<Self> {
         let archive_location = "NSW/LGE".to_string()+year+"/vtr.elections.nsw.gov.au/LG2101"; // The 2101 should not be hardcoded.
