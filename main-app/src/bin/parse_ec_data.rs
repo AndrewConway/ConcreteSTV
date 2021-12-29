@@ -7,16 +7,15 @@
 
 //! Parse Election Commmission data and produce .stv files.
 
-use clap::{AppSettings, Clap};
+use clap::Parser;
 use main_app::ec_data_source::ECDataSource;
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::stdout;
 use stv::parse_util::FileFinder;
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = "0.1", author = "Andrew Conway", name="ConcreteSTV")]
-#[clap(setting = AppSettings::ColoredHelp)]
 /// Produce a .stv file with actual election data from a download from an Electoral Commission.
 struct Opts {
     /// The election to load data from.

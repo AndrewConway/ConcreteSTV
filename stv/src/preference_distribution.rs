@@ -201,11 +201,12 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     // information about what is going on in this count.
     in_this_count : PendingTranscript<Rules::Tally>,
     transcript : Transcript<Rules::Tally>,
+    print_progress_to_stdout : bool, // if true, then print tallys etc to stdout.
 }
 
 impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 {
-    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<PartiallyDistributedVote<'a>>,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC) -> Self {
+    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<PartiallyDistributedVote<'a>>,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC,print_progress_to_stdout : bool) -> Self {
         let num_candidates = data.metadata.candidates.len();
         let tallys = vec![Rules::Tally::zero();num_candidates];
         let mut papers = vec![];
@@ -254,7 +255,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 },
                 counts: vec![],
                 elected: vec![]
-            }
+            },
+            print_progress_to_stdout,
         }
     }
 
@@ -298,7 +300,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             vacancies: self.candidates_to_be_elected,
             quota: self.quota.clone(),
         };
-        println!("Quota = {}",self.quota);
+        if self.print_progress_to_stdout { println!("Quota = {}", self.quota); }
     }
 
     pub fn tally(&self,candidate:CandidateIndex) -> Rules::Tally { self.tallys[candidate.0].clone() }
@@ -311,7 +313,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
     fn declare_elected(&mut self,who:CandidateIndex,why:ElectionReason) {
         self.in_this_count.elected.push(CandidateElected{who,why});
-        println!("Elected {}",self.data.metadata.candidate(who).name);
+        if self.print_progress_to_stdout { println!("Elected {}", self.data.metadata.candidate(who).name); }
         self.elected_candidates.push(who);
         self.transcript.elected.push(who);
         self.no_longer_continuing(who,true);
@@ -408,7 +410,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             for &candidate in self.pending_surplus_distribution.iter() {
                 others+=self.tally(candidate)-self.quota.clone();
             }
-            println!("remaining seats {} corresponding candidate tally {} others {}",self.remaining_to_elect(),possibly_overwhelming_tally,others);
+            if self.print_progress_to_stdout { println!("remaining seats {} corresponding candidate tally {} others {}", self.remaining_to_elect(), possibly_overwhelming_tally, others); }
             if possibly_overwhelming_tally>others {
                 let candidates_to_elect : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().rev().take(self.remaining_to_elect().0).cloned().collect();
                 for c in candidates_to_elect {
@@ -452,7 +454,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         if should_check_elected {
             self.check_elected(&reason,reason_completed);
         }
-        self.print_tallys();
+        if self.print_progress_to_stdout { self.print_tallys(); }
         self.current_count=CountIndex(self.current_count.0+1);
         let count_name : Option<String> = match Rules::how_to_name_counts() {
             CountNamingMethod::SimpleNumber => None,
@@ -684,7 +686,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 
     pub fn distribute_surplus(&mut self,candidate_to_distribute:CandidateIndex) {
-        println!("Distributing surplus for {}",self.data.metadata.candidate(candidate_to_distribute).name);
+        // println!("Distributing surplus for {}",self.data.metadata.candidate(candidate_to_distribute).name);
         match Rules::surplus_distribution_subdivisions() {
             SurplusTransferMethod::JustOneTransferValue => {
                 let provenance = self.distribute_surplus_all_with_same_transfer_value(candidate_to_distribute);
@@ -882,7 +884,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// > continuing candidate.
     pub fn exclude(&mut self, candidates_to_exclude:Vec<CandidateIndex>) {
         for &candidate in &candidates_to_exclude {
-            println!("Excluding {}",self.data.metadata.candidate(candidate).name);
+            // println!("Excluding {}",self.data.metadata.candidate(candidate).name);
             self.no_longer_continuing(candidate,false);
         }
         if Rules::when_to_check_if_all_remaining_should_get_elected()==WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers && self.number_continuing_candidates()==self.remaining_to_elect()
@@ -956,7 +958,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         self.exclude(candidates_to_exclude);
     }
     pub fn go(&mut self) {
-        self.print_candidates_names();
+        if self.print_progress_to_stdout { self.print_candidates_names(); }
         self.distribute_first_preferences();
         while self.remaining_to_elect()>NumberOfCandidates(0) || (Rules::finish_all_surplus_distributions_when_all_elected() && (!self.continuing_candidates_sorted_by_tally.is_empty()) && !self.pending_surplus_distribution.is_empty()) {
             if let Some(candidate) = self.pending_surplus_distribution.pop_front() {
@@ -968,10 +970,10 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 }
 
-pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC) -> Transcript<Rules::Tally> {
+pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,print_progress_to_stdout:bool) -> Transcript<Rules::Tally> {
     let arena = typed_arena::Arena::<CandidateIndex>::new();
     let votes = data.resolve_atl(&arena);
-    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates,ec_resolutions);
+    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates,ec_resolutions,print_progress_to_stdout);
     work.go();
     work.transcript
 }

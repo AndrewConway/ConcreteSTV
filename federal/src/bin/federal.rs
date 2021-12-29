@@ -23,7 +23,7 @@ fn main()  -> anyhow::Result<()> {
 
     let data = loader.load_cached_data("ACT")?;
     data.print_summary();
-    let transcript = distribute_preferences::<FederalRules>(&data, NumberOfCandidates(2), &HashSet::default(), &TieResolutionsMadeByEC::default());
+    let transcript = distribute_preferences::<FederalRules>(&data, NumberOfCandidates(2), &HashSet::default(), &TieResolutionsMadeByEC::default(),true);
     let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
     let file = File::create("transcript.json")?;
     serde_json::to_writer_pretty(file,&transcript)?;

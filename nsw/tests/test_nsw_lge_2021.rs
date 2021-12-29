@@ -23,7 +23,7 @@ fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&s
     let mut tie_resolutions = TieResolutionsMadeByEC::default();
     let official_transcript = loader.read_official_dop_transcript(&data.metadata).unwrap();
     loop {
-        let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &data.metadata.excluded.iter().cloned().collect(), &tie_resolutions);
+        let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &data.metadata.excluded.iter().cloned().collect(), &tie_resolutions,false);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript };
         std::fs::create_dir_all("test_transcripts").unwrap();
         {

@@ -22,7 +22,7 @@ mod tests {
     fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&str,loader:ACTDataLoader,decode:F,sub_folder:Option<&str>) -> anyhow::Result<()> {
         let data = loader.load_cached_data(electorate)?;
         data.print_summary();
-        let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &HashSet::default(), &TieResolutionsMadeByEC::default());
+        let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &HashSet::default(), &TieResolutionsMadeByEC::default(),true);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}{}{}.json",electorate,transcript.metadata.name.year,sub_folder.unwrap_or("")))?;

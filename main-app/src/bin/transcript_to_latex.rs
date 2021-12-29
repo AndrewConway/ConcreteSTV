@@ -4,7 +4,7 @@
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
-use clap::{AppSettings, Clap};
+use clap::Parser;
 use std::path::PathBuf;
 use std::fs::File;
 use stv::election_data::ElectionData;
@@ -18,9 +18,8 @@ use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 use std::str::FromStr;
 use std::fmt::Display;
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = "0.1", author = "Andrew Conway", name="ConcreteSTV")]
-#[clap(setting = AppSettings::ColoredHelp)]
 /// Convert a .stv file or .transcript file to a LaTeX table.
 struct Opts {
     /// The name of the .stv or transcript file to convert to latex.

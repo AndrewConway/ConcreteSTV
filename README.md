@@ -104,7 +104,7 @@ two needed election files to parse, but it tells us where to get them (or at lea
 ```text
 Error: Missing file SenateFirstPrefsByStateByVoteTypeDownload-24310.csv look in https://results.aec.gov.au/24310/Website/SenateDownloadsMenu-24310-Csv.htm
 ```
-Go to said URL (or [use this direct link](https://results.aec.gov.au/24310/Website/External/SenateFirstPrefsByStateByVoteTypeDownload-24310.csv)), download 'First preferences by state by vote type (CSV)' into your current directory, then try again. 
+Go to said URL (or [use this direct link](https://results.aec.gov.au/24310/Website/Downloads/SenateFirstPrefsByStateByVoteTypeDownload-24310.csv)), download 'First preferences by state by vote type (CSV)' into your current directory, then try again. 
 ```text
 Error: Missing file aec-senate-formalpreferences-24310-TAS.zip look in https://results.aec.gov.au/24310/Website/SenateDownloadsMenu-24310-Csv.htm
 ```
@@ -114,7 +114,7 @@ Sorry, we need another file. Download 'Formal Preferences - Tasmania' from the w
 ```
 It will parse for a second or two, and produce the desired file. Check in your directory, 
 there should be a roughly 11MB file `TAS2019.stv`. You may look at it with a JSON viewer
-if you wish.
+if you wish. 
 
 ### Election data formats understood
 
@@ -130,12 +130,13 @@ use the AEC2019 rules for this. Use the bold names in the section "Currently Sup
 as the name for the appropriate rules.
 
 ```bash
-../target/release/concrete_stv AEC2019 TAS2019.stv
+../target/release/concrete_stv AEC2019 TAS2019.stv --verbose
 ```
 
 This will pause for a second as it reads the input, then print out a text version of the
-distribution of preferences, which is somewhat hard to read. 
-It will also have created a roughly hundred kilobyte JSON file `TAS2019_AEC2019.transcript`, which we
+distribution of preferences, which is somewhat hard to read (you can skip this by not
+including the --verbose option). 
+More importantly, it will also have created a roughly hundred kilobyte JSON file `TAS2019_AEC2019.transcript`, which we
 will use in the next section for a prettier view. 
 
 Note that you can pass --help as an option to either of these programs for details on options.

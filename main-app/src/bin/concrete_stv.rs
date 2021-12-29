@@ -5,7 +5,7 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-use clap::{AppSettings, Clap};
+use clap::{Parser};
 use std::path::PathBuf;
 use std::fs::File;
 use stv::election_data::ElectionData;
@@ -16,9 +16,8 @@ use anyhow::anyhow;
 use std::iter::FromIterator;
 use main_app::rules::Rules;
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = "0.1", author = "Andrew Conway", name="ConcreteSTV")]
-#[clap(setting = AppSettings::ColoredHelp)]
 /// Count STV elections using a variety of rules including good approximations to
 /// those used by various electoral commissions on various elections.
 struct Opts {
@@ -45,6 +44,10 @@ struct Opts {
     #[clap(short, long,use_delimiter=true,require_delimiter=true)]
     exclude : Option<Vec<usize>>,
 
+    /// Whether the status of the count should be printed out to stdout.
+    #[clap(long)]
+    verbose: bool,
+
 }
 
 
@@ -62,7 +65,7 @@ fn main() -> anyhow::Result<()> {
         None => Default::default(),
         Some(v) => HashSet::from_iter(v.iter().map(|c|CandidateIndex(*c))),
     };
-    let transcript = opt.rules.count(&votes,vacancies,&excluded,&TieResolutionsMadeByEC::default());
+    let transcript = opt.rules.count(&votes,vacancies,&excluded,&TieResolutionsMadeByEC::default(),opt.verbose);
 
     let transcript_file = match &opt.transcript {
         None => {

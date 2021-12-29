@@ -69,7 +69,7 @@ impl CompareRules {
     }
 
     fn compute<Rules:PreferenceDistributionRules>(&self,data:&ElectionData) -> anyhow::Result<Transcript<Rules::Tally>> {
-        let transcript = distribute_preferences::<Rules>(&data,data.metadata.vacancies.unwrap(), &HashSet::from_iter(data.metadata.excluded.iter().cloned()), &data.metadata.tie_resolutions);
+        let transcript = distribute_preferences::<Rules>(&data,data.metadata.vacancies.unwrap(), &HashSet::from_iter(data.metadata.excluded.iter().cloned()), &data.metadata.tie_resolutions,false);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript };
         let name = data.metadata.name.identifier()+"_"+&Rules::name()+".transcript";
         self.save(&transcript,&name)?;
