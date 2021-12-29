@@ -12,7 +12,6 @@ use stv::transfer_value::{TransferValue, round_rational_down_to_usize, convert_u
 use stv::tie_resolution::MethodOfTieResolution;
 
 pub mod parse;
-mod test_federal;
 pub mod parse2013;
 
 pub struct FederalRules {

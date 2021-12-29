@@ -8,7 +8,7 @@
 //! Code to compare two transcripts to see if they are the same
 
 
-use crate::ballot_metadata::CandidateIndex;
+use crate::ballot_metadata::{CandidateIndex, ElectionMetadata};
 use crate::distribution_of_preferences_transcript::{CountIndex, Transcript};
 use std::cmp::min;
 use serde::{Serialize,Deserialize};
@@ -48,6 +48,34 @@ pub struct DifferentCandidateLists {
 impl Display for DifferentCandidateLists {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f,"{} vs {}",self.list1.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(","),self.list2.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(","))
+    }
+}
+
+pub struct DeltasInCandidateLists {
+    pub common : Vec<CandidateIndex>,
+    pub list1only : Vec<CandidateIndex>,
+    pub list2only : Vec<CandidateIndex>,
+}
+
+impl From<DifferentCandidateLists> for DeltasInCandidateLists {
+    fn from(cl: DifferentCandidateLists) -> Self {
+        let common = cl.list1.iter().cloned().filter(|c|cl.list2.contains(c)).collect();
+        let list1only = cl.list1.iter().cloned().filter(|c|!cl.list2.contains(c)).collect();
+        let list2only = cl.list2.iter().cloned().filter(|c|!cl.list1.contains(c)).collect();
+        DeltasInCandidateLists{common,list1only,list2only}
+    }
+}
+
+pub fn pretty_print_candidate_list(candidates:&[CandidateIndex],metadata:&ElectionMetadata) -> String {
+    format!("[{:?}]",candidates.iter().map(|&c|&metadata.candidate(c).name).collect::<Vec<_>>())
+}
+
+impl DeltasInCandidateLists {
+    /// See if the two lists were actually the same - that is list1only
+    pub fn is_empty(&self) -> bool { self.list1only.is_empty() && self.list2only.is_empty() }
+
+    pub fn pretty_print(&self,metadata : &ElectionMetadata) -> String {
+        format!("Common {} Different {} vs {}",pretty_print_candidate_list(&self.common,metadata),pretty_print_candidate_list(&self.list1only,metadata),pretty_print_candidate_list(&self.list2only,metadata))
     }
 }
 

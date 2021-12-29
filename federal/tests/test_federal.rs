@@ -10,9 +10,9 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::parse::{get_federal_data_loader_2016, get_federal_data_loader_2019, get_federal_data_loader_2013};
+    use federal::parse::{get_federal_data_loader_2016, get_federal_data_loader_2019, get_federal_data_loader_2013};
     use stv::preference_distribution::distribute_preferences;
-    use crate::{FederalRulesUsed2019, FederalRulesUsed2016, FederalRulesUsed2013};
+    use federal::{FederalRulesUsed2019, FederalRulesUsed2016, FederalRulesUsed2013};
     use std::collections::HashSet;
     use stv::tie_resolution::TieResolutionsMadeByEC;
     use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;

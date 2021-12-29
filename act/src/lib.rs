@@ -11,7 +11,6 @@ use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber, SplitByWhenTra
 use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 
 pub mod parse;
-mod test_act;
 
 
 /// The rules used pre2020 for the ACT Legislative Assembly, when votes were integers

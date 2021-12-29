@@ -10,14 +10,14 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::parse::{get_act_data_loader_2020, get_act_data_loader_2016, ACTDataLoader, get_act_data_loader_2012, get_act_data_loader_2008};
+    use act::parse::{get_act_data_loader_2020, get_act_data_loader_2016, ACTDataLoader, get_act_data_loader_2012, get_act_data_loader_2008};
     use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
     use std::collections::HashSet;
     use stv::tie_resolution::TieResolutionsMadeByEC;
     use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
     use std::fs::File;
     use stv::parse_util::{RawDataSource, FileFinder};
-    use crate::{ACTPre2020, ACT2021, ACT2020};
+    use act::{ACTPre2020, ACT2021, ACT2020};
 
     fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&str,loader:ACTDataLoader,decode:F,sub_folder:Option<&str>) -> anyhow::Result<()> {
         let data = loader.load_cached_data(electorate)?;
