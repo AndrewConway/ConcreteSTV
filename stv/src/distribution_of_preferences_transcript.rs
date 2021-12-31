@@ -21,7 +21,7 @@ use std::str::FromStr;
 /// The index of a count. 0 means the first. This is different from the human readable
 /// count, which may be more complex and have sub-counts as well.
 #[derive(Copy,Clone,Debug,Ord, PartialOrd, Eq, PartialEq,Hash,Serialize,Deserialize)]
-pub struct CountIndex(pub(crate) usize);
+pub struct CountIndex(pub usize);
 
 /// A value that is primarily per candidate, but may also go to some other source.
 /// Generally, this is used for preserved properties such that the sum over all candidates and other destinations is always the same.

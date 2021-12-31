@@ -4,6 +4,7 @@
 
 members= [
     "stv",
+    "margin",
     "act",
     "federal",
     "nsw",

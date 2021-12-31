@@ -680,6 +680,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "margin"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "federal",
+ "num-traits",
+ "serde",
+ "serde_json",
+ "stv",
+]
+
+[[package]]
 name = "markup5ever"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
