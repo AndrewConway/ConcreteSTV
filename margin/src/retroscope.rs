@@ -206,7 +206,9 @@ impl Retroscope {
 
     fn add(&mut self,mut distributor:CandidateDistributor,count:CountIndex) {
         for (candidate,votes) in distributor.going_to.drain(..).enumerate() {
-            self.piles_by_candidate[candidate].by_count.insert(count, votes);
+            if !votes.is_empty() {
+                self.piles_by_candidate[candidate].by_count.insert(count, votes);
+            }
         }
     }
     fn num_candidates(&self) -> NumberOfCandidates { NumberOfCandidates(self.piles_by_candidate.len()) }
