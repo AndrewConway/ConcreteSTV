@@ -672,6 +672,7 @@ dependencies = [
  "anyhow",
  "clap",
  "federal",
+ "margin",
  "nsw",
  "num",
  "serde",

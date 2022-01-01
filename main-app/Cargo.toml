@@ -11,6 +11,7 @@ anyhow = "1.0"
 stv = { path = "../stv" }
 federal = { path = "../federal" }
 act = { path = "../act" }
+margin = {path = "../margin" }
 nsw = { path = "../nsw" }
 serde = {version="1.0", features = ["derive"]}
 serde_json = "1.0"
