@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -15,6 +15,7 @@ use stv::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use stv::distribution_of_preferences_transcript::{CountIndex, ReasonForCount, SingleCount};
 use stv::election_data::ElectionData;
 use stv::transfer_value::TransferValue;
+use crate::choose_votes::{ChooseVotes, ChooseVotesOptions};
 
 /// A tool to help rerun an election given a transcript.
 /// It lets you tell which candidate a particular person's votes were with, and with what transfer value.
@@ -210,6 +211,9 @@ impl Retroscope {
     }
     fn num_candidates(&self) -> NumberOfCandidates { NumberOfCandidates(self.piles_by_candidate.len()) }
 
+    pub fn get_chooser<'a>(&'a self, candidate:CandidateIndex, election_data:&'a ElectionData, options:ChooseVotesOptions) -> ChooseVotes<'a> {
+        ChooseVotes::new(self,candidate,election_data,options)
+    }
 }
 
 
