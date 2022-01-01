@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -6,7 +6,7 @@
 
 use serde::Serialize;
 use serde::Deserialize;
-use num::{One, BigRational, BigInt, ToPrimitive};
+use num::{One, BigRational, BigInt, ToPrimitive, Zero};
 use crate::ballot_pile::BallotPaperCount;
 use std::fmt::{Display, Formatter};
 use std::convert::TryFrom;
@@ -42,6 +42,15 @@ impl TransferValue {
         let rounded_down = rounded_down.to_usize().unwrap();
         let remainder = exact.numer().clone()%exact.denom().clone();
         if &(remainder*2) > exact.denom() { rounded_down+1 } else {rounded_down}
+    }
+
+    pub fn num_ballot_papers_to_get_this_tv(&self,tally:BigRational) -> BallotPaperCount {
+        if tally.is_zero() { BallotPaperCount(0) } else {
+            let needed = tally/self.0.clone();
+            // want to round needed up to nearest integer.
+            let rounded_up_to_int = (needed.numer().clone() + needed.denom().clone() - BigInt::one()) / needed.denom().clone();
+            BallotPaperCount(rounded_up_to_int.to_usize().unwrap())
+        }
     }
 }
 
