@@ -8,4 +8,5 @@
 //! This is often computationally infeasible, but heuristics can find some examples.
 
 pub mod retroscope;
-pub mod find_outcome_changes;
+pub mod choose_votes;
+pub mod vote_changes;

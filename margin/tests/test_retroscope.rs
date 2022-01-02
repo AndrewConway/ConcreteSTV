@@ -114,6 +114,7 @@ fn test_retroscope() {
     assert_pile(&retroscope.votes.btl[3],CandidateIndex(3),CountIndex(0));
     assert_pile(&retroscope.votes.btl[4],CandidateIndex(4),CountIndex(0));
     assert_eq!(retroscope.piles_by_candidate[3].by_count.get(&CountIndex(0)).unwrap(),&vec![RetroscopeVoteIndex(5)]);
+    assert_eq!(retroscope.piles_by_candidate[3].by_count.get(&CountIndex(1)),None);
     assert_eq!(retroscope.piles_by_candidate[3].by_count.get(&CountIndex(2)).unwrap(),&vec![RetroscopeVoteIndex(1)]);
     assert_eq!(retroscope.piles_by_candidate[4].by_count.get(&CountIndex(0)).unwrap(),&vec![RetroscopeVoteIndex(6)]);
     assert_eq!(retroscope.piles_by_candidate[4].by_count.get(&CountIndex(2)).unwrap(),&vec![RetroscopeVoteIndex(4)]);
