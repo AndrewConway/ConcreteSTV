@@ -9,6 +9,8 @@
 
 
 use stv::ballot_metadata::CandidateIndex;
+use serde::Serialize;
+use serde::Deserialize;
 
 /// A list of vote changes that may change the outcome of the election
 /// These are conceptual, measured in votes. There may be a larger number of ballot papers involved.
