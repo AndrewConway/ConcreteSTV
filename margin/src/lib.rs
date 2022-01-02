@@ -9,3 +9,4 @@
 
 pub mod retroscope;
 pub mod choose_votes;
+pub mod vote_changes;
