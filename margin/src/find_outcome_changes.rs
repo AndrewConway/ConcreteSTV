@@ -22,44 +22,76 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
     let mut min_manipulation = Manipulation { removed_winner: CandidateIndex(0), otherwise_eliminated: CandidateIndex(0), size:original_data.num_votes()}; // Initialise with total votes, guaranteed to be greater than any difference.
     let mut retroscope = Retroscope::new(&original_data, &original_data.metadata.excluded);
     let mut sorted_continuing_candidates:Vec<CandidateIndex> = retroscope.continuing.iter().cloned().collect();
-    for (countnumber, count) in transcript.counts.iter().enumerate() {
+    for countnumber in 0 .. transcript.counts.len() -1 {
+        let count = &transcript.counts[countnumber];
         retroscope.apply(CountIndex(countnumber),count );
-        match &count.reason {
-            ReasonForCount::Elimination(eliminated_candidates) if eliminated_candidates.len()==1 => {
+        // In NSW there are multiple counts for one 'action', so most counts do not have a decision
+        // We only need to try changing the decision on those counts for which some decision (e.g.
+        // eliminate or seat someone) can be made.
+        if !count.reason_completed {
+            continue;
+        }
+        sorted_continuing_candidates = retroscope.continuing.iter().cloned().collect();
+        sorted_continuing_candidates.sort_by_key(| c | count.status.tallies.candidate[c.0]);
+        let next_count =  &transcript.counts[countnumber+1];
+        match if countnumber < transcript.counts.len()-1 { Some(&transcript.counts[countnumber+1].reason) } else { None } {
+                // If this is a count that redistributes the votes of a candidate eliminated in the previous
+                // count, see if we can get someone else eliminated instead.
+                Some(ReasonForCount::Elimination(eliminated_candidates)) if eliminated_candidates.len()==1 => {
                 let eliminated_candidate = eliminated_candidates[0];
                 let tally_excluded_candidate = count.status.tallies.candidate[eliminated_candidate.0];
-                let continuing_elected_candidates = transcript.elected.iter().filter(|c|sorted_continuing_candidates.contains(*c)).cloned().collect::<Vec<_>>();
-                if continuing_elected_candidates.len() > 0 {
-                    let elected_candidate_tallies  = continuing_elected_candidates.iter().map(|c| count.status.tallies.candidate[c.0]).collect::<Vec<_>>();
-                    let lowest_winner_tally = elected_candidate_tallies.iter().cloned().min().unwrap();
-                    let lowest_winner_index = elected_candidate_tallies.iter().position(|&t| lowest_winner_tally == t ).unwrap();
-                    // let lowest_winner = continuing_elected_candidates[lowest_winner_index];
-                    //let vote_difference = lowest_winner_tally - tally_excluded_candidate;
-                    for &candidate in &sorted_continuing_candidates {
-                        let vote_difference = count.status.tallies.candidate[candidate.0] - tally_excluded_candidate;
-                        let votes_to_change = vote_difference / 2 + vote_difference % 2; // Round up to nearest int if odd
-                        //let possible_manipulation = try_swapping_two_candidates::<Rules>(eliminated_candidate, continuing_elected_candidates[lowest_winner_index], votes_to_change, &original_data, &transcript);
-                        let possible_manipulation = try_swapping_two_candidates::<Rules>(eliminated_candidate, candidate, votes_to_change, &original_data, &transcript);
-                        // TODO: think carefully about whether the size/value distinction is properly captured.
-                        match possible_manipulation {
-                            None => {}
-                            Some(m) => {
-                                if m.size < min_manipulation.size {
-                                    min_manipulation = m;
-                                }
+                // TODO: Add break when we've found at least one value for each kind of change (manipulation and addition)
+                for &candidate in &sorted_continuing_candidates {
+                    let vote_difference = count.status.tallies.candidate[candidate.0] - tally_excluded_candidate;
+                    let votes_to_change = vote_difference / 2 + vote_difference % 2; // Round up to nearest int if odd
+                    //let possible_manipulation = try_swapping_two_candidates::<Rules>(eliminated_candidate, continuing_elected_candidates[lowest_winner_index], votes_to_change, &original_data, &transcript);
+                    let possible_manipulation = try_swapping_two_candidates::<Rules>(eliminated_candidate, candidate, votes_to_change, &original_data, &transcript);
+                    // TODO: think carefully about whether the size/value distinction is properly captured.
+                    match possible_manipulation {
+                        None => {}
+                        Some(m) => {
+                            if m.size < min_manipulation.size {
+                                min_manipulation = m;
                             }
                         }
                     }
                 }
             }
-            _ => {}
+                // If someone got elected in this count, either because they got a quota or because the
+                // number of continuing candidates was just enough to fill the seats, see if we can get
+                // someone else elected instead.
+                // At the moment, this simply tries swapping with the highest continuing candidate who
+                // is not an official winner.
+            _ => {
+                let sorted_continuing_non_winners = sorted_continuing_candidates.iter().filter(| c | !transcript.elected.contains(c)).cloned().collect::<Vec<_>>();
+                let just_elected_candidates = &count.elected;
+                if just_elected_candidates.len() > 0  && sorted_continuing_non_winners.len() > 0 {
+                    let highest_non_winner= sorted_continuing_non_winners[sorted_continuing_non_winners.len()-1];
+                    let elected_candidate_tallies = just_elected_candidates.iter().map(|c| count.status.tallies.candidate[c.who.0]).collect::<Vec<_>>();
+                    let lowest_winner_tally = elected_candidate_tallies.iter().cloned().min().unwrap();
+                    let lowest_winner_index = elected_candidate_tallies.iter().position(|&t| lowest_winner_tally == t).unwrap();
+                    let lowest_winner = just_elected_candidates[lowest_winner_index].who;
+
+                    let vote_difference = count.status.tallies.candidate[lowest_winner.0] - count.status.tallies.candidate[highest_non_winner.0];
+
+                    let votes_to_change = vote_difference / 2 + vote_difference % 2; // Round up to nearest int if odd
+                    let possible_manipulation = try_swapping_two_candidates::<Rules>(highest_non_winner, lowest_winner, votes_to_change, &original_data, &transcript);
+                    // TODO: think carefully about whether the size/value distinction is properly captured.
+                    match possible_manipulation {
+                        None => {}
+                        Some(m) => {
+                            if m.size < min_manipulation.size {
+                                min_manipulation = m;
+                            }
+                        }
+                    }
+                }
+            }
         }
         for c in &count.not_continuing { not_continuing.insert(*c); }
 
-        sorted_continuing_candidates = retroscope.continuing.iter().cloned().collect();
-        sorted_continuing_candidates.sort_by_key(| c | count.status.tallies.candidate[c.0]);
     }
-    println!("Electorate: {}. Min manipulation: size {}", original_data.metadata.name.electorate, min_manipulation.size)
+    println!("Electorate: {}. {} total votes. Min manipulation: size {}", original_data.metadata.name.electorate, original_data.num_votes(),  min_manipulation.size)
 }
 
 // TODO: when this is updated to do proper calculations about current vote weight, it will need to
@@ -87,12 +119,10 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
     let altered_transcript = distribute_preferences::<Rules>(&data, data.metadata.vacancies.unwrap(), &data.metadata.excluded.iter().cloned().collect(), &data.metadata.tie_resolutions, false);
 
     let transcript_comparison = compare_transcripts(original_transcript, &altered_transcript);
-//     if num_to_go == 0 {
-//        println!("Electorate {}: min manipulation {}. Result: {:?}", data.metadata.name.electorate, votes_to_change, transcript_comparison);
-//    }
 
     match &transcript_comparison {
         DifferenceBetweenTranscripts::DifferentCandidatesElected(_) => {
+            println!("Electorate {}: min manipulation {}. Result: {:?}", data.metadata.name.electorate, votes_to_change, transcript_comparison);
             return Some(Manipulation{ size: votes_to_change, otherwise_eliminated: eliminated_candidate, removed_winner: to_be_reduced }); }
         _ => {}
     }
