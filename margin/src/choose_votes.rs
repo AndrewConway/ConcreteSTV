@@ -24,15 +24,22 @@ pub struct TakeVotes {
 }
 /// Allow extraction of votes for a particular candidate.
 pub struct ChooseVotes<'a> {
-    options : ChooseVotesOptions,
-    retroscope : &'a Retroscope,
+    // options : ChooseVotesOptions,
+    //retroscope : &'a Retroscope,
     election_data : &'a ElectionData,
-    /// sources that have not been considered yet, sorted by transfer value. Take from top first.
-    remaining_sources : Vec<(CountIndex,&'a Vec<RetroscopeVoteIndex>)>,
-    upto : Option<ChooseVotesUpTo<'a>>
+    // sources sorted by transfer value. Take from the top first.
+    sources : Vec<ChooseVotesUpTo<'a>>,
+    // sources that have not been considered yet, sorted by transfer value. Take from top first.
+    //remaining_sources : Vec<(CountIndex,&'a Vec<RetroscopeVoteIndex>)>,
+    //upto : Option<ChooseVotesUpTo<'a>>
 }
 struct ChooseVotesUpTo<'a> {
     current_transfer_value : &'a TransferValue,
+    atl : ChooseVotesIndistinguishableSet,
+    btl : ChooseVotesIndistinguishableSet,
+}
+/// A set of votes all with the same TV, all arrived on same count, either all ATL or all BTL.
+struct ChooseVotesIndistinguishableSet {
     current_votes : Vec<RetroscopeVoteIndex>,
     used_from_last_of_current_votes: usize,
     ballots_remaining : BallotPaperCount,
@@ -46,18 +53,28 @@ pub struct ChooseVotesOptions {
     /// Allow votes that are sitting on the first preference to be taken
     pub allow_first_pref : bool,
 }
-impl <'a> ChooseVotesUpTo<'a> {
+/*
+pub struct VotesAvailable<Tally> {
+    atl : Tally,
+    btl : Tally,
+    total : Tally,
+}*/
+impl ChooseVotesIndistinguishableSet {
+    /*
+    fn votes_available<R:PreferenceDistributionRules>(&self,tv:&TransferValue) -> R::Tally {
+        R::use_transfer_value(tv,self.ballots_remaining)
+    }*/
     /// Get a specific number of ballots.
-    fn take_votes(&mut self,election_data:&'_ ElectionData,to_take:BallotPaperCount) -> Vec<TakeVotes> {
+    fn take_votes(&mut self,election_data:&'_ ElectionData,to_take:BallotPaperCount,where_to_go:&mut Vec<TakeVotes>) {
         let mut togo = to_take.0;
-        let mut res = vec![];
+        assert!(togo <= self.ballots_remaining.0);
         let num_atl = election_data.atl.len();
         while togo>0 {
             let source = self.current_votes.pop().unwrap();
             let is_atl = source.0 < num_atl;
             let n = (if is_atl { election_data.atl[source.0].n } else { election_data.btl[source.0-num_atl].n})-self.used_from_last_of_current_votes;
             let n_to_use = n.min(togo);
-            res.push(TakeVotes{ from: source, n:n_to_use });
+            where_to_go.push(TakeVotes{ from: source, n:n_to_use });
             togo-=n_to_use;
             self.ballots_remaining-=BallotPaperCount(n_to_use);
             if n>n_to_use {
@@ -67,10 +84,64 @@ impl <'a> ChooseVotesUpTo<'a> {
                 self.used_from_last_of_current_votes =0;
             }
         }
+    }
+
+}
+impl <'a> ChooseVotesUpTo<'a> {
+    fn votes_available_total<R:PreferenceDistributionRules>(&self) -> R::Tally { R::use_transfer_value(self.current_transfer_value,self.atl.ballots_remaining+self.btl.ballots_remaining) }
+    fn votes_available_btl<R:PreferenceDistributionRules>(&self) -> R::Tally { R::use_transfer_value(self.current_transfer_value,self.btl.ballots_remaining) }
+    /*
+    fn votes_available<R:PreferenceDistributionRules>(&self) -> VotesAvailable<R::Tally> {
+        VotesAvailable{
+            atl: self.atl.votes_available(self.current_transfer_value),
+            btl: self.atl.votes_available(self.current_transfer_value),
+            total: self.votes_available_total(),
+        }
+    }*/
+    fn new(count:CountIndex,ballots_to_consider:&'_ [RetroscopeVoteIndex],retroscope:&'a Retroscope,election_data:&ElectionData,options:&ChooseVotesOptions) -> Self {
+        let mut res = ChooseVotesUpTo{
+            current_transfer_value: retroscope.transfer_value(count),
+            atl: ChooseVotesIndistinguishableSet {
+                current_votes: vec![],
+                used_from_last_of_current_votes: 0,
+                ballots_remaining: BallotPaperCount(0),
+            },
+            btl: ChooseVotesIndistinguishableSet {
+                current_votes: vec![],
+                used_from_last_of_current_votes: 0,
+                ballots_remaining: BallotPaperCount(0),
+            }
+        };
+        let num_atl = election_data.atl.len();
+        for &v in ballots_to_consider {
+            let is_atl = v.0 < num_atl;
+            if is_atl {
+                if options.allow_atl {
+                    if options.allow_first_pref || retroscope.votes.btl[v.0-num_atl].upto>=election_data.metadata.party(election_data.atl[v.0].parties[0]).candidates.len() {
+                        res.atl.current_votes.push(v);
+                        res.atl.ballots_remaining+=BallotPaperCount(election_data.atl[v.0].n);
+                    }
+                }
+            } else {
+                if options.allow_first_pref || retroscope.votes.btl[v.0-num_atl].upto>0 {
+                    res.btl.current_votes.push(v);
+                    res.btl.ballots_remaining+=BallotPaperCount(election_data.btl[v.0-num_atl].n);
+                }
+            }
+        }
         res
     }
-    fn get_votes<R:PreferenceDistributionRules>(&mut self,election_data:&'_ ElectionData,wanted:R::Tally) -> FoundVotes<R::Tally> {
-        let max_available = R::use_transfer_value(self.current_transfer_value,self.ballots_remaining);
+    /// Get a specific number of ballots, taking BTL ones first.
+    fn take_votes(&mut self,election_data:&'_ ElectionData,to_take:BallotPaperCount) -> Vec<TakeVotes> {
+        let mut res = vec![];
+        let take_btl = to_take.min(self.btl.ballots_remaining);
+        let take_atl = to_take-take_btl;
+        if !take_btl.is_zero() { self.btl.take_votes(election_data,take_btl,&mut res); }
+        if !take_atl.is_zero() { self.atl.take_votes(election_data,take_atl,&mut res); }
+        res
+    }
+    fn get_votes<R:PreferenceDistributionRules>(&mut self,election_data:&'_ ElectionData,wanted:R::Tally,allow_atl:bool) -> FoundVotes<R::Tally> {
+        let max_available = if allow_atl { self.votes_available_total::<R>() } else { self.votes_available_btl::<R>() };
         let to_take = wanted.min(max_available);
         let ballots_needed = self.current_transfer_value.num_ballot_papers_to_get_this_tv(R::convert_tally_to_rational(to_take.clone()));
         FoundVotes{
@@ -85,68 +156,46 @@ impl <'a> ChooseVotes<'a> {
         let by_count = &retroscope.piles_by_candidate[candidate.0].by_count;
         let mut remaining_sources = by_count.iter().map(|(&count,votes)|(count,votes)).collect::<Vec<_>>();
         remaining_sources.sort_by_key(|(count,_)|retroscope.transfer_value(*count));
+        let sources = remaining_sources.iter().map(|(count,ballots_to_consider)|ChooseVotesUpTo::new(*count,ballots_to_consider,retroscope,election_data,&options)).collect();
         ChooseVotes{
-            options,
-            retroscope,
+            //options,
+            //retroscope,
             election_data,
-            remaining_sources,
-            upto: None,
+            sources,
+            // remaining_sources,
+            // upto: None,
         }
     }
-    /// make sure self.upto contains something, if possible, by taking it, if needed, from remaining_sources unless that is empty.
-    fn make_sure_upto_has_something_if_possible(&mut self) {
-        if self.upto.is_none() {
-            if let Some((count,votes_at_this_count)) = self.remaining_sources.pop() {
-                let mut current_votes = vec![];
-                let mut ballots_remaining = BallotPaperCount(0);
-                let num_atl = self.election_data.atl.len();
-                for &v in votes_at_this_count {
-                    let is_atl = v.0 < num_atl;
-                    let ok = (self.options.allow_atl || !is_atl) &&
-                        (self.options.allow_first_pref || (if is_atl { &self.retroscope.votes.atl[v.0] } else { &self.retroscope.votes.btl[v.0-num_atl] }).upto>0);
-                    if ok {
-                        current_votes.push(v);
-                        ballots_remaining+=BallotPaperCount(if is_atl { self.election_data.atl[v.0].n} else { self.election_data.btl[v.0-num_atl].n });
-                    }
-                }
-                self.upto = Some(ChooseVotesUpTo{
-                    current_transfer_value: self.retroscope.transfer_value(count),
-                    current_votes,
-                    used_from_last_of_current_votes: 0,
-                    ballots_remaining,
-                });
-            }
-        }
-    }
-    /// Get up to wanted votes from a single tally. This is done so that rounding can be done sensible. None if nothing left.
-    fn get_parcel_of_votes_from_a_single_count<R:PreferenceDistributionRules>(&mut self,wanted:R::Tally) -> Option<FoundVotes<R::Tally>> {
-        loop {
-            self.make_sure_upto_has_something_if_possible();
-            if let Some(upto) = self.upto.as_mut() {
-                let from_here = upto.get_votes::<R>(self.election_data,wanted.clone());
-                if from_here.papers.is_zero() { self.upto=None }
-                else { return Some(from_here) }
-            } else { return None }
-        }
-    }
+    pub fn votes_available_total<R:PreferenceDistributionRules>(&self) -> R::Tally { self.sources.iter().map(|s|s.votes_available_total::<R>()).sum() }
+    pub fn votes_available_btl<R:PreferenceDistributionRules>(&self) -> R::Tally { self.sources.iter().map(|s|s.votes_available_btl::<R>()).sum() }
+
     /// If possible, get a set of ballots that will provide the wanted number of votes.
-    /// This will preferentially use a large number of votes.
-    pub fn get_votes<R:PreferenceDistributionRules>(&mut self,wanted:R::Tally) -> Option<FoundVotes<R::Tally>> {
+    /// This will preferentially use votes with a large transfer value.
+    /// BTL votes will be used preferentially, but atl votes will be used if allow_atl is true.
+    pub fn get_votes<R:PreferenceDistributionRules>(&mut self,wanted:R::Tally,allow_atl:bool) -> Option<FoundVotes<R::Tally>> {
         let mut which_votes = vec![];
         let mut papers = BallotPaperCount::zero();
         let mut togo = wanted.clone();
-        while !togo.is_zero() {
-            if let Some(parcel) = self.get_parcel_of_votes_from_a_single_count::<R>(togo.clone()) {
+        for i in (0..self.sources.len()).rev() {
+            let parcel = self.sources[i].get_votes::<R>(self.election_data,togo.clone(),allow_atl);
+            if parcel.papers.is_zero() {
+                if i+1==self.sources.len() && (allow_atl||self.sources[i].atl.ballots_remaining.is_zero()) {
+                    self.sources.pop(); // remove empty source from future considerations.
+                }
+            } else {
                 togo-=parcel.tally;
                 papers+=parcel.papers;
                 which_votes.extend(parcel.which_votes.into_iter());
-            } else { return None }
+            }
+            if togo.is_zero() {
+                return Some(FoundVotes{
+                    which_votes,
+                    papers,
+                    tally: wanted,
+                })
+            }
         }
-        Some(FoundVotes{
-            which_votes,
-            papers,
-            tally: wanted,
-        })
+        None
     }
 
 }

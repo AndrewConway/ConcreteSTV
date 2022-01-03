@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -14,6 +14,7 @@ use std::fmt::{Display, Formatter};
 use std::iter::Sum;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use std::str::FromStr;
+use crate::preference_distribution::RoundUpToUsize;
 
 /// Stores a fixed precision decimal number as an integer scaled by 10^DIGITS
 #[derive(Copy, Clone,Eq, PartialEq,Ord, PartialOrd,Hash)]
@@ -144,6 +145,11 @@ impl <'de,const DIGITS:usize> Deserialize<'de> for FixedPrecisionDecimal<DIGITS>
     }
 }
 
+impl <const DIGITS:usize> RoundUpToUsize for FixedPrecisionDecimal<DIGITS> {
+    fn ceil(&self) -> usize {
+        ((self.scaled_value+FixedPrecisionDecimal::<DIGITS>::SCALE-1)/FixedPrecisionDecimal::<DIGITS>::SCALE) as usize
+    }
+}
 
 #[cfg(test)]
 mod tests {

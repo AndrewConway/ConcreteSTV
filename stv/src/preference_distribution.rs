@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -91,10 +91,18 @@ pub enum SurplusTransferMethod {
     MergeSameTransferValuesAndScale, // Like ScaleTransferValues except merge transfer values and do highest first.
 }
 
+pub trait RoundUpToUsize {
+    /// round up to the next integer.
+    fn ceil(&self) -> usize;
+}
+
+impl RoundUpToUsize for usize {
+    fn ceil(&self) -> usize { *self }
+}
 
 pub trait PreferenceDistributionRules {
     /// The type for the number of votes. Usually an integer.
-    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>;
+    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>+RoundUpToUsize;
     type SplitByNumber : HowSplitByCountNumber;
 
     /// Whether to transfer all the votes or just the last parcel.

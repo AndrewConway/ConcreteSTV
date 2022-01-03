@@ -122,28 +122,30 @@ fn test_retroscope() {
 
     // Test ChooseVotes
     let mut chooser1 = retroscope.get_chooser(CandidateIndex(1),&vote_data,ChooseVotesOptions{ allow_atl: true, allow_first_pref: true });
-    assert!(chooser1.get_votes::<FederalRules>(1000).is_none());
+    assert!(chooser1.get_votes::<FederalRules>(1000,true).is_none());
     let mut chooser1 = retroscope.get_chooser(CandidateIndex(1),&vote_data,ChooseVotesOptions{ allow_atl: false, allow_first_pref: false });
-    assert!(chooser1.get_votes::<FederalRules>(1).is_none());
+    assert!(chooser1.get_votes::<FederalRules>(1,true).is_none());
     let mut chooser1 = retroscope.get_chooser(CandidateIndex(1),&vote_data,ChooseVotesOptions{ allow_atl: true, allow_first_pref: true });
-    let found1 = chooser1.get_votes::<FederalRules>(4).unwrap(); // there are 10 BTL TV 1, and 100 ATL TV 79/180
+    assert_eq!(10,chooser1.votes_available_btl::<FederalRules>());
+    assert_eq!(53,chooser1.votes_available_total::<FederalRules>());
+    let found1 = chooser1.get_votes::<FederalRules>(4,true).unwrap(); // there are 10 BTL TV 1, and 100 ATL TV 79/180
     assert_eq!(found1.papers,BallotPaperCount(4));
     assert_eq!(found1.which_votes.len(),1);
     assert_eq!(found1.which_votes[0].n,4);
     assert_eq!(found1.which_votes[0].from,RetroscopeVoteIndex(3));
-    let found1 = chooser1.get_votes::<FederalRules>(1).unwrap(); // there are 6 BTL TV 1, and 100 ATL TV 79/180 left
+    let found1 = chooser1.get_votes::<FederalRules>(1,true).unwrap(); // there are 6 BTL TV 1, and 100 ATL TV 79/180 left
     assert_eq!(found1.papers,BallotPaperCount(1));
     assert_eq!(found1.which_votes.len(),1);
     assert_eq!(found1.which_votes[0].n,1);
     assert_eq!(found1.which_votes[0].from,RetroscopeVoteIndex(3));
-    let found1 = chooser1.get_votes::<FederalRules>(25).unwrap(); // there are 5 BTL TV 1, and 100 ATL TV 79/180 left
+    let found1 = chooser1.get_votes::<FederalRules>(25,true).unwrap(); // there are 5 BTL TV 1, and 100 ATL TV 79/180 left
     assert_eq!(found1.papers,BallotPaperCount(51));
     assert_eq!(found1.which_votes.len(),2);
     assert_eq!(found1.which_votes[0].n,5);
     assert_eq!(found1.which_votes[0].from,RetroscopeVoteIndex(3));
     assert_eq!(found1.which_votes[1].n,46); // 46*79/180 = 20.xxx
     assert_eq!(found1.which_votes[1].from,RetroscopeVoteIndex(0));
-    assert!(chooser1.get_votes::<FederalRules>(30).is_none());
+    assert!(chooser1.get_votes::<FederalRules>(30,true).is_none());
 
 
     retroscope.apply(CountIndex(3),transcript.count(CountIndex(3)));
