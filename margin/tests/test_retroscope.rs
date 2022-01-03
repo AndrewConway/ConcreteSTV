@@ -17,6 +17,7 @@ use stv::election_data::ElectionData;
 use stv::preference_distribution::distribute_preferences;
 use stv::tie_resolution::TieResolutionsMadeByEC;
 use margin::retroscope::{PileStatus, Retroscope, RetroscopeVoteIndex, RetroscopeVoteStatus};
+use margin::vote_changes::{VoteChange, VoteChanges};
 use stv::ballot_pile::BallotPaperCount;
 use stv::transfer_value::TransferValue;
 
@@ -67,6 +68,9 @@ fn test_retroscope() {
     let transcript = distribute_preferences::<FederalRules>(&vote_data,NumberOfCandidates(3),&HashSet::new(),&TieResolutionsMadeByEC::default(),false);
     println!("{}",serde_json::to_string_pretty(&transcript).unwrap());
     let mut retroscope = Retroscope::new(&vote_data,&[]);
+    assert_eq!(false,retroscope.is_highest_continuing_member_party_ticket(CandidateIndex(1),&vote_data.metadata)); // 0 is above
+    assert_eq!(false,retroscope.is_highest_continuing_member_party_ticket(CandidateIndex(3),&vote_data.metadata)); // 2 is above
+    assert_eq!(false,retroscope.is_highest_continuing_member_party_ticket(CandidateIndex(4),&vote_data.metadata)); // not on a ticket
 
     retroscope.apply(CountIndex(0),transcript.count(CountIndex(0)));
     // First preferences - should get candidates 0 and 2 elected.
@@ -120,6 +124,9 @@ fn test_retroscope() {
     assert_eq!(retroscope.piles_by_candidate[4].by_count.get(&CountIndex(2)).unwrap(),&vec![RetroscopeVoteIndex(4)]);
     assert_eq!(retroscope.transfer_value(CountIndex(2)),&TransferValue::from_str("59/160").unwrap());
 
+    assert_eq!(true,retroscope.is_highest_continuing_member_party_ticket(CandidateIndex(1),&vote_data.metadata)); // top of ticket
+    assert_eq!(true,retroscope.is_highest_continuing_member_party_ticket(CandidateIndex(3),&vote_data.metadata)); // top of ticket
+    assert_eq!(false,retroscope.is_highest_continuing_member_party_ticket(CandidateIndex(4),&vote_data.metadata)); // not on a ticket
     // Test ChooseVotes
     let mut chooser1 = retroscope.get_chooser(CandidateIndex(1),&vote_data,ChooseVotesOptions{ allow_atl: true, allow_first_pref: true });
     assert!(chooser1.get_votes::<FederalRules>(1000,true).is_none());
@@ -129,24 +136,59 @@ fn test_retroscope() {
     assert_eq!(10,chooser1.votes_available_btl::<FederalRules>());
     assert_eq!(53,chooser1.votes_available_total::<FederalRules>());
     let found1 = chooser1.get_votes::<FederalRules>(4,true).unwrap(); // there are 10 BTL TV 1, and 100 ATL TV 79/180
-    assert_eq!(found1.papers,BallotPaperCount(4));
-    assert_eq!(found1.which_votes.len(),1);
-    assert_eq!(found1.which_votes[0].n,4);
-    assert_eq!(found1.which_votes[0].from,RetroscopeVoteIndex(3));
+    assert_eq!(found1.len(),1);
+    assert_eq!(found1[0].n,BallotPaperCount(4));
+    assert_eq!(found1[0].tally,4);
+    assert_eq!(found1[0].tv,TransferValue::one());
+    assert_eq!(found1[0].ballots.len(),1);
+    assert_eq!(found1[0].ballots[0].n,4);
+    assert_eq!(found1[0].ballots[0].from,RetroscopeVoteIndex(3));
     let found1 = chooser1.get_votes::<FederalRules>(1,true).unwrap(); // there are 6 BTL TV 1, and 100 ATL TV 79/180 left
-    assert_eq!(found1.papers,BallotPaperCount(1));
-    assert_eq!(found1.which_votes.len(),1);
-    assert_eq!(found1.which_votes[0].n,1);
-    assert_eq!(found1.which_votes[0].from,RetroscopeVoteIndex(3));
+    assert_eq!(found1.len(),1);
+    assert_eq!(found1[0].n,BallotPaperCount(1));
+    assert_eq!(found1[0].tally,1);
+    assert_eq!(found1[0].tv,TransferValue::one());
+    assert_eq!(found1[0].ballots.len(),1);
+    assert_eq!(found1[0].ballots[0].n,1);
+    assert_eq!(found1[0].ballots[0].from,RetroscopeVoteIndex(3));
     let found1 = chooser1.get_votes::<FederalRules>(25,true).unwrap(); // there are 5 BTL TV 1, and 100 ATL TV 79/180 left
-    assert_eq!(found1.papers,BallotPaperCount(51));
-    assert_eq!(found1.which_votes.len(),2);
-    assert_eq!(found1.which_votes[0].n,5);
-    assert_eq!(found1.which_votes[0].from,RetroscopeVoteIndex(3));
-    assert_eq!(found1.which_votes[1].n,46); // 46*79/180 = 20.xxx
-    assert_eq!(found1.which_votes[1].from,RetroscopeVoteIndex(0));
+    assert_eq!(found1.len(),2);
+    assert_eq!(found1[0].n,BallotPaperCount(5));
+    assert_eq!(found1[1].n,BallotPaperCount(46));
+    assert_eq!(found1[0].tally,5);
+    assert_eq!(found1[1].tally,20);
+    assert_eq!(found1[0].tv,TransferValue::one());
+    assert_eq!(found1[1].tv,TransferValue::from_str("79/180").unwrap());
+    assert_eq!(found1[0].ballots.len(),1);
+    assert_eq!(found1[0].ballots[0].n,5);
+    assert_eq!(found1[0].ballots[0].from,RetroscopeVoteIndex(3));
+    assert_eq!(found1[1].ballots.len(),1);
+    assert_eq!(found1[1].ballots[0].n,46);
+    assert_eq!(found1[1].ballots[0].from,RetroscopeVoteIndex(0));
     assert!(chooser1.get_votes::<FederalRules>(30,true).is_none());
 
+    let attempted_changes = VoteChanges{ changes: vec![VoteChange{ n: 30, from: Some(CandidateIndex(1)), to: Some(CandidateIndex(4)) }] };
+    let concrete = attempted_changes.make_concrete::<FederalRules>(&retroscope,&vote_data,ChooseVotesOptions{ allow_atl: true, allow_first_pref: true });
+    assert!(concrete.is_none());
+    let attempted_changes = VoteChanges{ changes: vec![VoteChange{ n: 30, from: Some(CandidateIndex(1)), to: Some(CandidateIndex(3)) }] };
+    let concrete = attempted_changes.make_concrete::<FederalRules>(&retroscope,&vote_data,ChooseVotesOptions{ allow_atl: true, allow_first_pref: true }).unwrap();
+    assert_eq!(2,concrete.changes.len());
+    assert_eq!(BallotPaperCount(10),concrete.changes[0].n);
+    assert_eq!(10,concrete.changes[0].tally);
+    assert_eq!(Some(CandidateIndex(3)),concrete.changes[0].candidate_to);
+    assert_eq!(CandidateIndex(1),concrete.changes[0].from.as_ref().unwrap().candidate);
+    assert_eq!(1,concrete.changes[0].from.as_ref().unwrap().ballots.len());
+    assert_eq!(10,concrete.changes[0].from.as_ref().unwrap().ballots[0].n);
+    assert_eq!(RetroscopeVoteIndex(3),concrete.changes[0].from.as_ref().unwrap().ballots[0].from);
+    assert_eq!(TransferValue::one(),concrete.changes[0].from.as_ref().unwrap().tv);
+    assert_eq!(BallotPaperCount(46),concrete.changes[1].n);
+    assert_eq!(20,concrete.changes[1].tally);
+    assert_eq!(Some(CandidateIndex(3)),concrete.changes[1].candidate_to);
+    assert_eq!(CandidateIndex(1),concrete.changes[1].from.as_ref().unwrap().candidate);
+    assert_eq!(1,concrete.changes[1].from.as_ref().unwrap().ballots.len());
+    assert_eq!(46,concrete.changes[1].from.as_ref().unwrap().ballots[0].n);
+    assert_eq!(RetroscopeVoteIndex(0),concrete.changes[1].from.as_ref().unwrap().ballots[0].from);
+    assert_eq!(TransferValue::from_str("79/180").unwrap(),concrete.changes[1].from.as_ref().unwrap().tv);
 
     retroscope.apply(CountIndex(3),transcript.count(CountIndex(3)));
     // Fourth count - eliminate candidate 4, TV 1 btl[4] goes to 1.

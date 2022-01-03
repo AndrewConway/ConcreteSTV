@@ -6,6 +6,7 @@
 
 //! Choose specific votes that were attached to a candidate at a particular count.
 
+use std::ops::{AddAssign};
 use num_traits::Zero;
 use stv::ballot_metadata::CandidateIndex;
 use stv::ballot_pile::BallotPaperCount;
@@ -14,8 +15,10 @@ use stv::election_data::ElectionData;
 use stv::preference_distribution::PreferenceDistributionRules;
 use stv::transfer_value::TransferValue;
 use crate::retroscope::{Retroscope, RetroscopeVoteIndex};
+use serde::Serialize;
+use serde::Deserialize;
 
-#[derive(Clone,Copy,Debug)]
+#[derive(Clone,Copy,Debug,Serialize,Deserialize)]
 pub struct TakeVotes {
     /// Which vote to take
     pub from : RetroscopeVoteIndex,
@@ -140,14 +143,15 @@ impl <'a> ChooseVotesUpTo<'a> {
         if !take_atl.is_zero() { self.atl.take_votes(election_data,take_atl,&mut res); }
         res
     }
-    fn get_votes<R:PreferenceDistributionRules>(&mut self,election_data:&'_ ElectionData,wanted:R::Tally,allow_atl:bool) -> FoundVotes<R::Tally> {
+    fn get_votes<R:PreferenceDistributionRules>(&mut self,election_data:&'_ ElectionData,wanted:R::Tally,allow_atl:bool) -> BallotsWithGivenTransferValue<R::Tally> {
         let max_available = if allow_atl { self.votes_available_total::<R>() } else { self.votes_available_btl::<R>() };
         let to_take = wanted.min(max_available);
         let ballots_needed = self.current_transfer_value.num_ballot_papers_to_get_this_tv(R::convert_tally_to_rational(to_take.clone()));
-        FoundVotes{
-            which_votes: self.take_votes(election_data,ballots_needed),
-            papers: ballots_needed,
+        BallotsWithGivenTransferValue{
+            n: ballots_needed,
             tally: to_take,
+            tv: self.current_transfer_value.clone(),
+            ballots: self.take_votes(election_data,ballots_needed),
         }
     }
 }
@@ -166,33 +170,27 @@ impl <'a> ChooseVotes<'a> {
             // upto: None,
         }
     }
+    /// Total available votes, both below and above the line, taking rounding into account.
     pub fn votes_available_total<R:PreferenceDistributionRules>(&self) -> R::Tally { self.sources.iter().map(|s|s.votes_available_total::<R>()).sum() }
+    /// available votes below the line, taking rounding into account.
     pub fn votes_available_btl<R:PreferenceDistributionRules>(&self) -> R::Tally { self.sources.iter().map(|s|s.votes_available_btl::<R>()).sum() }
 
     /// If possible, get a set of ballots that will provide the wanted number of votes.
     /// This will preferentially use votes with a large transfer value.
     /// BTL votes will be used preferentially, but atl votes will be used if allow_atl is true.
-    pub fn get_votes<R:PreferenceDistributionRules>(&mut self,wanted:R::Tally,allow_atl:bool) -> Option<FoundVotes<R::Tally>> {
-        let mut which_votes = vec![];
-        let mut papers = BallotPaperCount::zero();
-        let mut togo = wanted.clone();
+    pub fn get_votes<R:PreferenceDistributionRules>(&mut self,wanted:R::Tally,allow_atl:bool) -> Option<Vec<BallotsWithGivenTransferValue<R::Tally>>> {
+        let mut res = vec![];
+        let mut sofar = R::Tally::zero();
         for i in (0..self.sources.len()).rev() {
-            let parcel = self.sources[i].get_votes::<R>(self.election_data,togo.clone(),allow_atl);
-            if parcel.papers.is_zero() {
+            let parcel = self.sources[i].get_votes::<R>(self.election_data,wanted.clone()-sofar.clone(),allow_atl);
+            if parcel.n.is_zero() {
                 if i+1==self.sources.len() && (allow_atl||self.sources[i].atl.ballots_remaining.is_zero()) {
                     self.sources.pop(); // remove empty source from future considerations.
                 }
             } else {
-                togo-=parcel.tally;
-                papers+=parcel.papers;
-                which_votes.extend(parcel.which_votes.into_iter());
-            }
-            if togo.is_zero() {
-                return Some(FoundVotes{
-                    which_votes,
-                    papers,
-                    tally: wanted,
-                })
+                sofar+=parcel.tally.clone();
+                res.push(parcel);
+                if sofar>=wanted { return Some(res) }
             }
         }
         None
@@ -200,9 +198,40 @@ impl <'a> ChooseVotes<'a> {
 
 }
 
+/*
 #[derive(Clone,Debug)]
 pub struct FoundVotes<Tally> {
     pub which_votes : Vec<TakeVotes>,
     pub papers : BallotPaperCount,
     pub tally : Tally,
 }
+
+impl <Tally:AddAssign> FoundVotes<Tally> {
+    pub(crate) fn add(&mut self,other:FoundVotes<Tally>) {
+        self.which_votes.extend(other.which_votes);
+        self.papers+=other.papers;
+        self.tally+=other.tally;
+    }
+}
+
+ */
+
+
+/// A concrete set of ballot level changes that are all similar - same TV, same source candidate, same destination candidate.
+#[derive(Clone,Debug,Serialize,Deserialize)]
+pub struct BallotsWithGivenTransferValue<Tally> {
+    pub n : BallotPaperCount,
+    pub tally : Tally,
+    pub tv : TransferValue,
+    pub ballots : Vec<TakeVotes>
+}
+
+impl <Tally:AddAssign> BallotsWithGivenTransferValue<Tally> {
+    pub(crate) fn add(&mut self,other:BallotsWithGivenTransferValue<Tally>) {
+        self.ballots.extend(other.ballots);
+        self.n+=other.n;
+        self.tally+=other.tally;
+        assert_eq!(self.tv,other.tv);
+    }
+}
+

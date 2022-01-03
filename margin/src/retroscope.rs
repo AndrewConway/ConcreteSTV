@@ -11,11 +11,13 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fmt::Display;
 use std::str::FromStr;
-use stv::ballot_metadata::{CandidateIndex, NumberOfCandidates};
+use stv::ballot_metadata::{CandidateIndex, ElectionMetadata, NumberOfCandidates};
 use stv::distribution_of_preferences_transcript::{CountIndex, ReasonForCount, SingleCount};
 use stv::election_data::ElectionData;
 use stv::transfer_value::TransferValue;
 use crate::choose_votes::{ChooseVotes, ChooseVotesOptions};
+use serde::Serialize;
+use serde::Deserialize;
 
 /// A tool to help rerun an election given a transcript.
 /// It lets you tell which candidate a particular person's votes were with, and with what transfer value.
@@ -72,7 +74,7 @@ pub enum PileStatus {
 }
 
 /// if [0..atl.len()) then an index into atl, otherwise subtract atl.len() and an index into btl.
-#[derive(Copy,Clone,Eq,PartialEq)]
+#[derive(Copy,Clone,Eq,PartialEq,Serialize,Deserialize)]
 pub struct RetroscopeVoteIndex(pub usize);
 
 // type alias really, don't want long display
@@ -215,6 +217,18 @@ impl Retroscope {
 
     pub fn get_chooser<'a>(&'a self, candidate:CandidateIndex, election_data:&'a ElectionData, options:ChooseVotesOptions) -> ChooseVotes<'a> {
         ChooseVotes::new(self,candidate,election_data,options)
+    }
+
+    /// Return true if an ATL vote for the candidate's party (if any) would be sitting on the candidate.
+    pub fn is_highest_continuing_member_party_ticket(&self,candidate:CandidateIndex,metadata:&ElectionMetadata) -> bool {
+        if let Some(party) = metadata.candidate(candidate).party {
+            if !metadata.party(party).atl_allowed { return false; }
+            for c in &metadata.party(party).candidates {
+                if *c==candidate { return true }
+                else if self.continuing.contains(c) { return false }
+            }
+            panic!("Candidate {} is not in their own party!",metadata.candidate(candidate).name);
+        } else { false } // not in a party
     }
 }
 
