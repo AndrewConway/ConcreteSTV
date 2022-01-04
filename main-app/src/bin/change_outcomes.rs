@@ -5,6 +5,7 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::fs::{create_dir_all, File};
+use std::io::Write;
 use margin::choose_votes::ChooseVotesOptions;
 use margin::find_outcome_changes::find_outcome_changes;
 use nsw::NSWECLocalGov2021;
@@ -18,14 +19,21 @@ fn main() -> anyhow::Result <()> {
     let loader = get_nsw_lge_data_loader_2021(&finder)?;
     println!("Made loader");
     let electorates = loader.all_electorates();
+
+    create_dir_all("changes")?;
+    let mut summary = File::create("changes/summary.csv")?;
     for electorate in &electorates {
         println!("Electorate: {}", electorate);
         let data = loader.load_cached_data(electorate)?;
         let results = find_outcome_changes::<NSWECLocalGov2021>(&data, ChooseVotesOptions{ allow_atl: true, allow_first_pref: true });
 
-        create_dir_all("changes")?;
         let out = File::create(format!("changes/{}.vchange", electorate))?;
         serde_json::to_writer(out,&results)?;
+
+        let min_add = results.changes.iter().filter( |vc | !vc.requires.changed_ballots).map(|vc| vc.ballots.n).min();
+        let min_manipulation = results.changes.iter().filter( |vc | vc.requires.changed_ballots).map(|vc| vc.ballots.n).min();
+        write!(summary, "{},{},{},{}", electorate, data.num_votes(), min_add.map(|vc| vc.to_string()).unwrap_or("".to_string()), min_manipulation.map(|vc| vc.to_string()).unwrap_or("".to_string()))?;
+        summary.flush()?;
     }
 
     Ok(())
