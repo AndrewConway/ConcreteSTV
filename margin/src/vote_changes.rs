@@ -90,6 +90,13 @@ impl <Tally:Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+Fr
         }
         Some(builder.to_ballot_changes())
     }
+
+    /// utility used in optimization that changes one of the values to some new value.
+    pub(crate) fn change_single_value<TallyLike:Into<Tally>>(&self,which_subelem:usize,new_vote_value:TallyLike) -> Self {
+        let mut res = self.clone();
+        res.changes[which_subelem].vote_value=new_vote_value.into();
+        res
+    }
 }
 
 #[derive(Clone,Debug,Eq,PartialEq,Hash)]

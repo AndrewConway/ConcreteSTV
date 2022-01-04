@@ -10,6 +10,7 @@ use std::collections::HashSet;
 use std::str::FromStr;
 use federal::FederalRules;
 use margin::choose_votes::ChooseVotesOptions;
+use margin::evaluate_and_optimize_vote_changes::{ChangeResult, optimise, simple_test};
 use stv::ballot_metadata::{Candidate, CandidateIndex, ElectionMetadata, ElectionName, NumberOfCandidates, Party, PartyIndex};
 use stv::ballot_paper::{ATL, BTL};
 use stv::distribution_of_preferences_transcript::CountIndex;
@@ -45,7 +46,7 @@ fn test_retroscope() {
                 Party{ column_id: "B".to_string(), name: "The group of people who like B".to_string(),  abbreviation: None, atl_allowed: true, candidates: vec![CandidateIndex(2),CandidateIndex(3)], tickets: vec![] },
             ],
             source: vec![],
-            results: None,
+            results: Some(vec![CandidateIndex(0),CandidateIndex(2),CandidateIndex(3)]),
             vacancies: Some(NumberOfCandidates(3)),
             enrolment: None,
             secondary_vacancies: None,
@@ -189,6 +190,23 @@ fn test_retroscope() {
     assert_eq!(46,concrete.changes[1].from.as_ref().unwrap().ballots[0].n);
     assert_eq!(RetroscopeVoteIndex(0),concrete.changes[1].from.as_ref().unwrap().ballots[0].from);
     assert_eq!(TransferValue::from_str("79/180").unwrap(),concrete.changes[1].from.as_ref().unwrap().tv);
+
+    // consider changing the outcome of the election at this point. Candidate 1 has 53 votes, 3 has 86, 4 has 23. Normally 4 would be excluded, giving 1 vote to candidate 1, and then candidate 3 gets elected 86 to 54. This could be changed by moving 17 votes from candidate 3 to candidate 1.
+    let vote_changes = VoteChanges{ changes: vec![VoteChange{ vote_value: 20, from: Some(CandidateIndex(3)), to: Some(CandidateIndex(1)) }] };
+    match simple_test::<FederalRules>(&vote_changes,&vote_data,&retroscope,ChooseVotesOptions{ allow_atl: true, allow_first_pref: true }) {
+        ChangeResult::NoChange => panic!("No change!"),
+        ChangeResult::NotEnoughVotesAvailable => panic!("Not enough votes available!"),
+        ChangeResult::Change(deltas,ballot_changes) => {
+            assert_eq!(deltas.list2only,vec![CandidateIndex(3)]);
+            assert_eq!(deltas.list1only,vec![CandidateIndex(1)]);
+            assert_eq!(ballot_changes.n,BallotPaperCount(20)); // first prefs.
+        }
+    }
+
+    let optimize_result = optimise::<FederalRules>(&vote_changes,&vote_data,&retroscope,ChooseVotesOptions{ allow_atl: true, allow_first_pref: true }).unwrap();
+    assert_eq!(optimize_result.deltas.list2only,vec![CandidateIndex(3)]);
+    assert_eq!(optimize_result.deltas.list1only,vec![CandidateIndex(1)]);
+    assert_eq!(optimize_result.changes.n,BallotPaperCount(17)); // optimized it down to 17.
 
     retroscope.apply(CountIndex(3),transcript.count(CountIndex(3)));
     // Fourth count - eliminate candidate 4, TV 1 btl[4] goes to 1.
