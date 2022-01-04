@@ -51,6 +51,8 @@ impl Display for DifferentCandidateLists {
     }
 }
 
+/// Describe the difference between two lists of candidate indices. Order is not considered (and indeed is supressed to make equality comparison easier).
+#[derive(Clone,Debug,Serialize,Deserialize,Eq,PartialEq)]
 pub struct DeltasInCandidateLists {
     pub common : Vec<CandidateIndex>,
     pub list1only : Vec<CandidateIndex>,
@@ -59,9 +61,12 @@ pub struct DeltasInCandidateLists {
 
 impl From<DifferentCandidateLists> for DeltasInCandidateLists {
     fn from(cl: DifferentCandidateLists) -> Self {
-        let common = cl.list1.iter().cloned().filter(|c|cl.list2.contains(c)).collect();
-        let list1only = cl.list1.iter().cloned().filter(|c|!cl.list2.contains(c)).collect();
-        let list2only = cl.list2.iter().cloned().filter(|c|!cl.list1.contains(c)).collect();
+        let mut common : Vec<CandidateIndex> = cl.list1.iter().cloned().filter(|c|cl.list2.contains(c)).collect();
+        common.sort_by_key(|c|c.0);
+        let mut list1only : Vec<CandidateIndex> = cl.list1.iter().cloned().filter(|c|!cl.list2.contains(c)).collect();
+        list1only.sort_by_key(|c|c.0);
+        let mut list2only : Vec<CandidateIndex> = cl.list2.iter().cloned().filter(|c|!cl.list1.contains(c)).collect();
+        list2only.sort_by_key(|c|c.0);
         DeltasInCandidateLists{common,list1only,list2only}
     }
 }

@@ -12,3 +12,4 @@ pub mod find_outcome_changes;
 pub mod vote_changes;
 pub mod choose_votes;
 pub mod evaluate_and_optimize_vote_changes;
+pub mod record_changes;
