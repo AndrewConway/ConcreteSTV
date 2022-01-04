@@ -22,6 +22,7 @@ fn main() -> anyhow::Result <()> {
 
     create_dir_all("changes")?;
     let mut summary = File::create("changes/summary.csv")?;
+    writeln!(summary,"Electorate,Votes,Min Addition,Min Manipulation")?;
     for electorate in &electorates {
         println!("Electorate: {}", electorate);
         let data = loader.load_cached_data(electorate)?;
@@ -32,7 +33,7 @@ fn main() -> anyhow::Result <()> {
 
         let min_add = results.changes.iter().filter( |vc | !vc.requires.changed_ballots).map(|vc| vc.ballots.n).min();
         let min_manipulation = results.changes.iter().filter( |vc | vc.requires.changed_ballots).map(|vc| vc.ballots.n).min();
-        write!(summary, "{},{},{},{}", electorate, data.num_votes(), min_add.map(|vc| vc.to_string()).unwrap_or("".to_string()), min_manipulation.map(|vc| vc.to_string()).unwrap_or("".to_string()))?;
+        writeln!(summary, "{},{},{},{}", electorate, data.num_votes(), min_add.map(|vc| vc.to_string()).unwrap_or("".to_string()), min_manipulation.map(|vc| vc.to_string()).unwrap_or("".to_string()))?;
         summary.flush()?;
     }
 
