@@ -40,7 +40,7 @@ impl <Tally:Clone+RoundUpToUsize> VoteChanges<Tally> {
     /// Add a command to transfer n votes from candidate `from` to candidate `to`.
     pub fn transfer(&mut self, n: Tally, from: CandidateIndex, to: CandidateIndex) {
         self.changes.push(VoteChange {
-            n: n.clone(),
+            vote_value: n.clone(),
             from: Some(from),
             to: Some(to),
         })
@@ -48,7 +48,7 @@ impl <Tally:Clone+RoundUpToUsize> VoteChanges<Tally> {
     /// Add a command to add n votes to candidate `to`.
     pub fn add(&mut self, n: Tally, to: CandidateIndex) {
         self.changes.push(VoteChange {
-            n: n.clone(),
+            vote_value: n.clone(),
             from: None,
             to: Some(to),
         })
@@ -56,7 +56,7 @@ impl <Tally:Clone+RoundUpToUsize> VoteChanges<Tally> {
     /// Add a command to remove n votes from candidate `from`.
     pub fn remove(&mut self, n: Tally, from: CandidateIndex) {
         self.changes.push(VoteChange {
-            n: n.clone(),
+            vote_value: n.clone(),
             from: Some(from),
             to: None,
         })
@@ -71,7 +71,7 @@ impl <Tally:Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+Fr
         for (change,allow_atl) in btl_only_changes.iter().map(|&x|(x,false)).chain(atl_ok_changes.iter().map(|&x|(x,true))) {
             if let Some(from) = change.from {
                 let chooser = choosers.entry(from).or_insert_with(||retroscope.get_chooser(from,election_data,options));
-                if let Some(ballots) = chooser.get_votes::<R>(change.n.clone(),allow_atl) {
+                if let Some(ballots) = chooser.get_votes::<R>(change.vote_value.clone(),allow_atl) {
                     for b in ballots {
                         builder.add(change.from,change.to,b);
                     }
@@ -79,8 +79,8 @@ impl <Tally:Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+Fr
             } else {
                 if let Some(_to) = change.to { // insert votes
                     builder.add(change.from,change.to,BallotsWithGivenTransferValue{
-                        n: BallotPaperCount(change.n.ceil()),
-                        tally: change.n.clone(),
+                        n: BallotPaperCount(change.vote_value.ceil()),
+                        tally: change.vote_value.clone(),
                         tv: TransferValue::one(),
                         ballots: vec![],
                     });
@@ -133,7 +133,7 @@ impl <Tally:AddAssign> BallotChangesBuilder<Tally> {
 /// A "vote level" change - take a number of votes from one candidate and give to another.
 pub struct VoteChange<Tally> {
     /// The number of votes to move
-    pub n : Tally,
+    pub vote_value : Tally,
     /// The candidate to move from (or None, if the votes are just to be added)
     pub from : Option<CandidateIndex>,
     /// The candidate to move to (or None, if the votes are just to be added).

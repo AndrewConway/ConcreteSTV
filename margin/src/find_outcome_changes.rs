@@ -8,10 +8,11 @@ use std::collections::HashSet;
 use stv::ballot_metadata::{CandidateIndex, ElectionMetadata};
 use stv::ballot_paper::{ATL, BTL};
 use stv::compare_transcripts::{compare_transcripts, DifferenceBetweenTranscripts};
-use stv::distribution_of_preferences_transcript::{CountIndex, ReasonForCount, Transcript};
+use stv::distribution_of_preferences_transcript::{CountIndex, ReasonForCount, SingleCount, Transcript};
 use stv::election_data::ElectionData;
 use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
 use crate::retroscope::Retroscope;
+use crate::vote_changes::VoteChange;
 
 pub fn find_outcome_changes <Rules>(original_data:&ElectionData)
 where Rules : PreferenceDistributionRules<Tally=usize> {
@@ -19,7 +20,7 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
     let transcript = distribute_preferences::<Rules>(&original_data, original_data.metadata.vacancies.unwrap(), &original_data.metadata.excluded.iter().cloned().collect(), &original_data.metadata.tie_resolutions, false);
     let mut not_continuing = HashSet::new();
 
-    let mut min_manipulation = Manipulation { removed_winner: CandidateIndex(0), otherwise_eliminated: CandidateIndex(0), size:original_data.num_votes()}; // Initialise with total votes, guaranteed to be greater than any difference.
+    let mut min_manipulation = VoteChange { from: None, to: None, vote_value:original_data.num_votes()}; // Initialise with total votes, guaranteed to be greater than any difference.
     let mut retroscope = Retroscope::new(&original_data, &original_data.metadata.excluded);
     let mut sorted_continuing_candidates:Vec<CandidateIndex> = retroscope.continuing.iter().cloned().collect();
     for countnumber in 0 .. transcript.counts.len() -1 {
@@ -39,18 +40,21 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
                 // count, see if we can get someone else eliminated instead.
                 Some(ReasonForCount::Elimination(eliminated_candidates)) if eliminated_candidates.len()==1 => {
                 let eliminated_candidate = eliminated_candidates[0];
-                let tally_excluded_candidate = count.status.tallies.candidate[eliminated_candidate.0];
+                //let tally_eliminated_candidate = count.status.tallies.candidate[eliminated_candidate.0];
                 // TODO: Add break when we've found at least one value for each kind of change (manipulation and addition)
                 for &candidate in &sorted_continuing_candidates {
-                    let vote_difference = count.status.tallies.candidate[candidate.0] - tally_excluded_candidate;
-                    let votes_to_change = vote_difference / 2 + vote_difference % 2; // Round up to nearest int if odd
+                    let vote_change = compute_vote_change::<Rules>(eliminated_candidate, candidate, count);
+                    //let vote_difference = count.status.tallies.candidate[candidate.0] - tally_eliminated_candidate;
+                    //
+                    // let votes_to_change = vote_difference / 2 + vote_difference % 2; // Round up to nearest int if odd
                     //let possible_manipulation = try_swapping_two_candidates::<Rules>(eliminated_candidate, continuing_elected_candidates[lowest_winner_index], votes_to_change, &original_data, &transcript);
-                    let possible_manipulation = try_swapping_two_candidates::<Rules>(eliminated_candidate, candidate, votes_to_change, &original_data, &transcript);
+                    //let possible_manipulation = try_swapping_two_candidates::<Rules>(eliminated_candidate, candidate, votes_to_change, &original_data, &transcript);
+                    let possible_manipulation = try_swapping_two_candidates::<Rules>(&vote_change, original_data, &transcript);
                     // TODO: think carefully about whether the size/value distinction is properly captured.
                     match possible_manipulation {
                         None => {}
                         Some(m) => {
-                            if m.size < min_manipulation.size {
+                            if m.vote_value < min_manipulation.vote_value {
                                 min_manipulation = m;
                             }
                         }
@@ -71,16 +75,17 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
                     let lowest_winner_tally = elected_candidate_tallies.iter().cloned().min().unwrap();
                     let lowest_winner_index = elected_candidate_tallies.iter().position(|&t| lowest_winner_tally == t).unwrap();
                     let lowest_winner = just_elected_candidates[lowest_winner_index].who;
+                    let vote_change = compute_vote_change::<Rules>(highest_non_winner, lowest_winner, &count);
 
-                    let vote_difference = count.status.tallies.candidate[lowest_winner.0] - count.status.tallies.candidate[highest_non_winner.0];
+                    // let vote_difference = count.status.tallies.candidate[lowest_winner.0] - count.status.tallies.candidate[highest_non_winner.0];
 
-                    let votes_to_change = vote_difference / 2 + vote_difference % 2; // Round up to nearest int if odd
-                    let possible_manipulation = try_swapping_two_candidates::<Rules>(highest_non_winner, lowest_winner, votes_to_change, &original_data, &transcript);
+                    // let votes_to_change = vote_difference / 2 + vote_difference % 2; // Round up to nearest int if odd
+                    let possible_manipulation = try_swapping_two_candidates::<Rules>(&vote_change, original_data, &transcript);
                     // TODO: think carefully about whether the size/value distinction is properly captured.
                     match possible_manipulation {
                         None => {}
                         Some(m) => {
-                            if m.size < min_manipulation.size {
+                            if m.vote_value < min_manipulation.vote_value {
                                 min_manipulation = m;
                             }
                         }
@@ -91,30 +96,62 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
         for c in &count.not_continuing { not_continuing.insert(*c); }
 
     }
-    println!("Electorate: {}. {} total votes. Min manipulation: size {}", original_data.metadata.name.electorate, original_data.num_votes(),  min_manipulation.size)
+    println!("Electorate: {}. {} total votes. Min manipulation: size {}", original_data.metadata.name.electorate, original_data.num_votes(),  min_manipulation.vote_value);
+}
+
+fn compute_vote_change<Rules:PreferenceDistributionRules<Tally=usize>>(to_candidate: CandidateIndex, from_candidate: CandidateIndex, count: &SingleCount<usize>) -> VoteChange<Rules::Tally> {
+    let tally_to_candidate = count.status.tallies.candidate[to_candidate.0];
+    let tally_from_candidate = count.status.tallies.candidate[from_candidate.0];
+
+    let vote_difference = tally_from_candidate  - tally_to_candidate;
+    let votes_to_change = vote_difference / 2 + vote_difference % 2; // Round up to nearest int if odd
+    return VoteChange {
+        vote_value: votes_to_change,
+        from: Some(from_candidate),
+        to: Some(to_candidate)
+    }
 }
 
 // TODO: when this is updated to do proper calculations about current vote weight, it will need to
 // return the number of ballots actually changed to produce a certain value. Probably best to
 // simply add that to the Manipulation data structure.
-fn try_swapping_two_candidates<Rules>(eliminated_candidate:CandidateIndex, to_be_reduced: CandidateIndex, votes_to_change: usize, original_data: &ElectionData, original_transcript: &Transcript<usize>) -> Option<Manipulation>
+fn try_swapping_two_candidates<Rules:PreferenceDistributionRules<Tally=usize>>(vote_change: &VoteChange<Rules::Tally>, original_data: &ElectionData, original_transcript: &Transcript<usize>) -> Option<VoteChange<Rules::Tally>>
 where Rules : PreferenceDistributionRules<Tally=usize> {
     let mut data = original_data.clone();
-    // println!("Electorate {} lowest winner {:?}. Votes to change {}", data.metadata.name.electorate, min_manipulation.removed_winner, min_manipulation.size );
-    // Add enough votes to bump up the would-be eliminated candidate
-    data.btl.push(BTL {
-        candidates: vec![eliminated_candidate],
-        n: votes_to_change
-    });
+    // Add enough single first-preference votes to bump up the to_candidate, if there is one
+    match &vote_change.to {
+        Some(c) => {
+            data.btl.push(BTL {
+                candidates: vec![*c],
+                n: vote_change.vote_value
+            });
+        }
+        // If we're being asked to move votes to a candidate, but there is no to_candidate, nothing works
+        None => {
+            if vote_change.vote_value != 0 {
+                return None
+            }
+        }
+    }
 
-    // Remove votes for the lowest winner
-    let (new_btls, num_to_go) = remove_btls(to_be_reduced, votes_to_change, data.btl);
-    data.btl = new_btls;
+    // Remove btl votes from the from_candidate, if possible
+    match &vote_change.from {
+        Some(c) => {
+            let (new_btls, num_to_go) = remove_btls(*c, vote_change.vote_value, data.btl);
+            data.btl = new_btls;
 
-    // If the lowest (would-be) winner is first on their party's ticket, we can remove ATL
-    // votes for that party/group
-    let (new_atls, num_to_go) = if_top_remove_atls(to_be_reduced, num_to_go, data.atl, &data.metadata);
-    data.atl = new_atls;
+            // If the lowest (would-be) winner is first on their party's ticket, we can remove ATL
+            // votes for that party/group
+            let (new_atls, num_to_go) = if_top_remove_atls(*c, num_to_go, data.atl, &data.metadata);
+            data.atl = new_atls;
+        }
+        // If we're being asked to move votes from a candidate, but there is no from_candidate, nothing works
+        None => {
+            if vote_change.vote_value != 0 {
+                return None
+            }
+        }
+    }
 
     let altered_transcript = distribute_preferences::<Rules>(&data, data.metadata.vacancies.unwrap(), &data.metadata.excluded.iter().cloned().collect(), &data.metadata.tie_resolutions, false);
 
@@ -122,8 +159,9 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
 
     match &transcript_comparison {
         DifferenceBetweenTranscripts::DifferentCandidatesElected(_) => {
-            println!("Electorate {}: min manipulation {}. Result: {:?}", data.metadata.name.electorate, votes_to_change, transcript_comparison);
-            return Some(Manipulation{ size: votes_to_change, otherwise_eliminated: eliminated_candidate, removed_winner: to_be_reduced }); }
+            println!("Electorate {}: min manipulation {}. Result: {:?}", data.metadata.name.electorate, vote_change.vote_value, transcript_comparison);
+            return Some(vote_change.clone());
+            }
         _ => {}
     }
     None
@@ -181,7 +219,7 @@ fn remove_btls(candidate_to_reduce: CandidateIndex, votes_to_change: usize, old_
     (new_btls, num_to_go)
 }
 
-/// A minimum Manipuation, including both the removed would-be winner and the otherwise-eliminated candidate who has to be raised to remove them
+/*
 #[derive(Clone,Debug)]
 pub struct Manipulation {
 // Candidate who would have won, without this Manipulation
@@ -191,3 +229,4 @@ pub struct Manipulation {
     // number of votes to shift
     pub size: usize
 }
+*/
