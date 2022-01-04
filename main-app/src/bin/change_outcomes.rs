@@ -4,16 +4,12 @@
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
+use std::fs::{create_dir_all, File};
+use margin::choose_votes::ChooseVotesOptions;
 use margin::find_outcome_changes::find_outcome_changes;
 use nsw::NSWECLocalGov2021;
 use nsw::parse_lge::get_nsw_lge_data_loader_2021;
-use stv::ballot_metadata::CandidateIndex;
-use stv::ballot_paper::{ATL, BTL};
-use stv::compare_transcripts::compare_transcripts;
-use stv::distribution_of_preferences_transcript::ReasonForCount;
 use stv::parse_util::{FileFinder, RawDataSource};
-use stv::preference_distribution::distribute_preferences;
 
 fn main() -> anyhow::Result <()> {
 
@@ -25,7 +21,11 @@ fn main() -> anyhow::Result <()> {
     for electorate in &electorates {
         println!("Electorate: {}", electorate);
         let data = loader.load_cached_data(electorate)?;
-        find_outcome_changes::<NSWECLocalGov2021>(&data);
+        let results = find_outcome_changes::<NSWECLocalGov2021>(&data, ChooseVotesOptions{ allow_atl: true, allow_first_pref: true });
+
+        create_dir_all("changes")?;
+        let out = File::create(format!("changes/{}.vchange", electorate))?;
+        serde_json::to_writer(out,&results)?;
     }
 
     Ok(())
