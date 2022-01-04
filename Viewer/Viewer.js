@@ -1,12 +1,12 @@
 "use strict";
 
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
-let full_transcript = null;
+let document_to_show = null;
 
 function zero_is_blank(n) { return (n===0 || n===null ||n===undefined)?"":n.toString(); }
 function delta(newV,oldV) {
@@ -39,15 +39,19 @@ function format_transfer_value(tv,from) {
     if (from) { res+=" created "+from;}
     return res;
 }
+
+function effect_to_string(metadata,list) {
+    return list.map(c=>metadata.candidates[c].name).join(" & ");
+}
+
 function Render() {
-    let heading_orientation = document.getElementById("heading-orientation").value;
-    let show_papers = document.getElementById("ShowPapers").checked;
+    // general purpose clearing up.
     const render_div = document.getElementById("render");
     removeAllChildElements(render_div);
     const heading = document.getElementById("MainHeading");
     heading.innerHTML="";
-    if (!full_transcript) return;
-    const metadata = full_transcript.metadata;
+    if (!document_to_show) return;
+    const metadata = document_to_show.metadata || document_to_show.original.metadata;
     if (metadata&&metadata.name) { // compute the name
         const name = metadata.name;
         const heading_text = name.year.toString()+" "+name.name+" : "+name.electorate+(name.modifications?(" "+name.modifications.join(" ; ")):"");
@@ -56,6 +60,74 @@ function Render() {
     if (metadata&&metadata.name&&metadata.name.comment) {
         add(render_div,"div","comment").innerText=metadata.name.comment;
     }
+    // work out what to show.
+    if (document_to_show.transcript) {
+        RenderTranscript(document_to_show,render_div);
+    } else if (document_to_show.original && document_to_show.changes) {
+        RenderChanges(document_to_show,render_div);
+    }
+}
+
+/** Display a list of changes */
+function RenderChanges(vote_changes_document,render_div) {
+    const vote_data = vote_changes_document.original;
+    const metadata = vote_data.metadata;
+    const changes_div = add(render_div,"div");
+    const changes_table = add(changes_div,"table","changes");
+    const table_head = add(add(changes_table,"thead"),"tr");
+    const table_body = add(changes_table,"tbody");
+    add(table_head,"th").innerText="Ballots";
+    add(table_head,"th").innerText="Effect";
+    add(table_head,"th").innerText="How";
+    add(table_head,"th").innerText="Details";
+    const num_atl=vote_data.atl.length;
+    // vote_changes_document.changes.sort((a,b)=>a.ballots.n-b.ballots.n);
+    for (const change of vote_changes_document.changes) {
+        const tr = add(table_body,"tr");
+        add(tr,"td").innerText=change.ballots.n;
+        const effect_td = add(tr,"td");
+        add(effect_td,"div").innerText="+ "+effect_to_string(metadata,change.outcome.list1only);
+        add(effect_td,"div").innerText="- "+effect_to_string(metadata,change.outcome.list2only);
+        let how = [];
+        if (change.requires.changed_first_preference) how.push("First Preferences");
+        if (change.requires.changed_atl) how.push("ATL");
+        if (change.requires.added_ballots) how.push("Added");
+        if (change.requires.removed_ballots) how.push("Removed");
+        if (change.requires.changed_ballots) how.push("Changed");
+        if (change.requires.changed_physical_ballots) how.push("Physical");
+        add(tr,"td").innerText=how.join(", ")
+        let details = add(tr,"td");
+        for (const sc of change.ballots.changes) {
+            let text = sc.n+" ("+sc.tally+" votes)";
+            if (sc.from) {
+                text+=" TV "+sc.from.tv;
+                text+=" "+metadata.candidates[sc.from.candidate].name;
+            }
+            if (sc.candidate_to) {
+                text+=" → "+metadata.candidates[sc.candidate_to].name;
+            }
+            let detailsdiv = add(details,"div","hoverable");
+            detailsdiv.innerText=text;
+            if (sc.from) {
+                const tooltip = add(detailsdiv,"div","tooltip");
+                for (const b of sc.from.ballots) {
+                    let vote = "";
+                    if (b.from<num_atl) {
+                        vote="ATL "+vote_data.atl[b.from].parties.join(",");
+                    } else {
+                        vote="BTL "+vote_data.btl[b.from-num_atl].candidates.join(",");
+                    }
+                    add(tooltip,"div").innerText=b.n+"× "+vote;
+                }
+            }
+        }
+    }
+}
+/** Display a distribution of preferences transcript */
+function RenderTranscript(full_transcript,render_div) {
+    let heading_orientation = document.getElementById("heading-orientation").value;
+    let show_papers = document.getElementById("ShowPapers").checked;
+    const metadata = full_transcript.metadata;
     const transcript = full_transcript.transcript;
     const rounding_ever_used = transcript.counts.some(c=>c.status.papers.rounding || c.status.tallies.rounding);
     const exhausted_ever_used = transcript.counts.some(c=>c.status.papers.exhausted || c.status.tallies.exhausted);
@@ -201,13 +273,13 @@ function Render() {
 
 function ChooseTranscript() {
     const files = document.getElementById("ChooseTranscript").files;
-    if (files.length>0) files[0].text().then(text=>{full_transcript=JSON.parse(text); Render(); });
+    if (files.length>0) files[0].text().then(text=>{document_to_show=JSON.parse(text); Render(); });
 }
 
 window.onload = function () {
     document.getElementById("ChooseTranscript").onchange = ChooseTranscript;
     document.getElementById("ShowPapers").onchange = Render;
     document.getElementById("heading-orientation").onchange = Render;
-    function got_std(data) { full_transcript=data; Render(); }
+    function got_std(data) { document_to_show=data; Render(); }
     // getWebJSON("../transcript.json",data=>{full_transcript=data; Render();},null);
 }

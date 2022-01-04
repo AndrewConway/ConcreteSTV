@@ -107,3 +107,36 @@ div.comment {
 div.quota {
     font-weight: bold;
 }
+
+.hoverable {
+    position: relative;
+}
+
+table.changes tr {
+    border-bottom: 1px solid #aaa;
+}
+table.changes td {
+    padding-left: 1em;
+    padding-right: 1em;
+    margin-left: 1em;
+    margin-right: 1em;
+}
+.hoverable .tooltip {
+    visibility: hidden;
+    background-color: #555;
+    color: #fff;
+    padding: 5px 0;
+    border-radius: 6px;
+    position: absolute;
+    z-index: 1;
+    top: 125%;
+/*    bottom: 125%;
+    left: 50%;
+    margin-left: -60px; */
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.hoverable:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
