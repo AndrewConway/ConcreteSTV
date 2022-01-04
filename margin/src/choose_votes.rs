@@ -190,10 +190,10 @@ impl <'a> ChooseVotes<'a> {
             } else {
                 sofar+=parcel.tally.clone();
                 res.push(parcel);
-                if sofar>=wanted { return Some(res) }
+                break;
             }
         }
-        None
+        if sofar>=wanted { Some(res) } else { None }
     }
 
 }
