@@ -125,5 +125,9 @@ impl <Tally:Clone> ElectionChanges<Tally> {
     pub fn smallest_manipulation_found(&self) -> Option<BallotPaperCount> {
         self.changes.iter().map(|c|c.ballots.n).min()
     }
+
+    pub fn sort(&mut self) {
+        self.changes.sort_by_key(|c|c.ballots.n);
+    }
 }
 

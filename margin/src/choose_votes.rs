@@ -158,9 +158,11 @@ impl <'a> ChooseVotesUpTo<'a> {
 impl <'a> ChooseVotes<'a> {
     pub (crate) fn new(retroscope:&'a Retroscope,candidate:CandidateIndex,election_data:&'a ElectionData,options : ChooseVotesOptions) -> Self {
         let by_count = &retroscope.piles_by_candidate[candidate.0].by_count;
+        //println!("Creating ChooseVotes for candidate {}, tally={}",candidate,by_count.values().map(|v|v.iter().map(|e|if e.0<election_data.atl.len() {election_data.atl[e.0].n} else { election_data.btl[e.0-election_data.atl.len()].n }).sum::<usize>()).sum::<usize>());
         let mut remaining_sources = by_count.iter().map(|(&count,votes)|(count,votes)).collect::<Vec<_>>();
         remaining_sources.sort_by_key(|(count,_)|retroscope.transfer_value(*count));
-        let sources = remaining_sources.iter().map(|(count,ballots_to_consider)|ChooseVotesUpTo::new(*count,ballots_to_consider,retroscope,election_data,&options)).collect();
+        let sources:Vec<ChooseVotesUpTo> = remaining_sources.iter().map(|(count,ballots_to_consider)|ChooseVotesUpTo::new(*count,ballots_to_consider,retroscope,election_data,&options)).collect();
+        //println!("  Sources, tally={}",sources.iter().map(|s|s.atl.ballots_remaining+s.btl.ballots_remaining).sum::<BallotPaperCount>());
         ChooseVotes{
             //options,
             //retroscope,
@@ -190,7 +192,7 @@ impl <'a> ChooseVotes<'a> {
             } else {
                 sofar+=parcel.tally.clone();
                 res.push(parcel);
-                break;
+                if sofar>=wanted { break; }
             }
         }
         if sofar>=wanted { Some(res) } else { None }

@@ -43,12 +43,24 @@ pub struct FoundChange<Tally> {
     pub changes : BallotChanges<Tally>
 }
 pub fn optimise<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:ChooseVotesOptions) -> Option<FoundChange<R::Tally>> {
+    optimise_work::<R>(vote_changes,election_data,retroscope,options,0)
+}
+pub fn optimise_work<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:ChooseVotesOptions,tried_already:usize) -> Option<FoundChange<R::Tally>> {
     match simple_test::<R>(vote_changes,election_data,retroscope,options) {
         ChangeResult::NotEnoughVotesAvailable => { // could try reducing.
+            println!("Not enough votes available - looking for {} from {}",vote_changes.changes.iter().map(|c|c.vote_value.clone()).sum::<R::Tally>(),vote_changes.changes.first().and_then(|c|c.from).map(|c|election_data.metadata.candidate(c).name.as_str()).unwrap_or(""));
             None // TODO try reducing
         }
         ChangeResult::NoChange => { // could try increasing
-            None // TODO try increasing
+            if tried_already==0 {
+                println!("No change - trying doubling everything");
+                let mut new_changes = vote_changes.clone();
+                for c in &mut new_changes.changes { c.vote_value+=c.vote_value.clone(); }
+                optimise_work::<R>(&new_changes,election_data,retroscope,options,tried_already+1)
+            } else {
+                println!("No change - giving up");
+                None
+            }
         }
         ChangeResult::Change(deltas,changes) => {
             // guaranteed something, try to improve!

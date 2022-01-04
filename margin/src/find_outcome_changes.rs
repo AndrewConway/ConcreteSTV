@@ -25,7 +25,7 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
     // let mut min_addition = VoteChange { from: None, to: None, vote_value:original_data.num_votes()} ; // Initialise with total votes, guaranteed to be greater than any difference.
     let mut retroscope = Retroscope::new(&original_data, &original_data.metadata.excluded);
     let mut change_recorder = ElectionChanges::new(&original_data);
-    for countnumber in 0 .. transcript.counts.len() -1 {
+    for countnumber in 0 .. transcript.counts.len() {
         let count = &transcript.counts[countnumber];
         retroscope.apply(CountIndex(countnumber),count );
         // In NSW there are multiple counts for one 'action', so most counts do not have a decision
@@ -47,10 +47,12 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
                 let eliminated_candidate = eliminated_candidates[0];
                 // TODO: Add break when we've found at least one value for each kind of change (manipulation and addition)
                 for &candidate in &sorted_continuing_candidates {
-                    let vote_change = compute_vote_change::<Rules>(eliminated_candidate, candidate, count);
-                    let vote_changes = VoteChanges{ changes: vec![vote_change] };
-                    if let Some(possible_manipulation) = optimise::<Rules>(&vote_changes, &original_data, &retroscope, vote_choice_options) {
-                        change_recorder.add(possible_manipulation);
+                    if candidate!=eliminated_candidate {
+                        let vote_change = compute_vote_change::<Rules>(eliminated_candidate, candidate, count);
+                        let vote_changes = VoteChanges{ changes: vec![vote_change] };
+                        if let Some(possible_manipulation) = optimise::<Rules>(&vote_changes, &original_data, &retroscope, vote_choice_options) {
+                            change_recorder.add(possible_manipulation);
+                        }
                     }
                 }
                 // Addition-only option.
@@ -90,6 +92,7 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
         for c in &count.not_continuing { not_continuing.insert(*c); }
 
     }
+    change_recorder.sort();
     println!("Electorate: {}. {} total votes. Min manipulations: size {:?}", original_data.metadata.name.electorate, original_data.num_votes(),  change_recorder.changes.iter().map(| c | c.ballots.n).collect::<Vec<_>>());
     change_recorder
 }
@@ -108,8 +111,9 @@ fn compute_vote_change<Rules:PreferenceDistributionRules<Tally=usize>>(to_candid
     let tally_to_candidate = count.status.tallies.candidate[to_candidate.0];
     let tally_from_candidate = count.status.tallies.candidate[from_candidate.0];
 
+    println!("Tally for from candidate {} is {}, for to candidate {} is {}",from_candidate,tally_from_candidate,to_candidate,tally_to_candidate);
     let vote_difference = tally_from_candidate  - tally_to_candidate;
-    let votes_to_change = vote_difference / 2 + vote_difference % 2; // Round up to nearest int if odd
+    let votes_to_change = vote_difference / 2 + 1; // Want diff of 11 to produce 6, a diff of 12 to produce 7.
     return VoteChange {
         vote_value: votes_to_change,
         from: Some(from_candidate),
