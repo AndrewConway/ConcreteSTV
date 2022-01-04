@@ -23,6 +23,7 @@ use crate::distribution_of_preferences_transcript::{PortionOfReasonBeingDoneThis
 use crate::util::{DetectUnique, CollectAll};
 use std::fmt;
 use std::fmt::{Debug, Display};
+use std::iter::Sum;
 use std::str::FromStr;
 
 /// A number representing a count of pieces of paper.
@@ -65,7 +66,11 @@ impl FromStr for BallotPaperCount {
         Ok(BallotPaperCount(s.parse()?))
     }
 }
-
+impl Sum for BallotPaperCount {
+    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
+        BallotPaperCount(usize::sum(iter.map(|b|b.0)))
+    }
+}
 
 /// A vote, resolved into BTL, that is somewhere through being distributed.
 /// Ignore preferences with index less than upto.
