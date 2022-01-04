@@ -167,10 +167,10 @@ fn test_retroscope() {
     assert_eq!(found1[1].ballots[0].from,RetroscopeVoteIndex(0));
     assert!(chooser1.get_votes::<FederalRules>(30,true).is_none());
 
-    let attempted_changes = VoteChanges{ changes: vec![VoteChange{ n: 30, from: Some(CandidateIndex(1)), to: Some(CandidateIndex(4)) }] };
+    let attempted_changes = VoteChanges{ changes: vec![VoteChange{ vote_value: 30, from: Some(CandidateIndex(1)), to: Some(CandidateIndex(4)) }] };
     let concrete = attempted_changes.make_concrete::<FederalRules>(&retroscope,&vote_data,ChooseVotesOptions{ allow_atl: true, allow_first_pref: true });
     assert!(concrete.is_none());
-    let attempted_changes = VoteChanges{ changes: vec![VoteChange{ n: 30, from: Some(CandidateIndex(1)), to: Some(CandidateIndex(3)) }] };
+    let attempted_changes = VoteChanges{ changes: vec![VoteChange{ vote_value: 30, from: Some(CandidateIndex(1)), to: Some(CandidateIndex(3)) }] };
     let concrete = attempted_changes.make_concrete::<FederalRules>(&retroscope,&vote_data,ChooseVotesOptions{ allow_atl: true, allow_first_pref: true }).unwrap();
     assert_eq!(2,concrete.changes.len());
     assert_eq!(BallotPaperCount(10),concrete.changes[0].n);
