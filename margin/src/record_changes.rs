@@ -15,6 +15,7 @@ use crate::vote_changes::BallotChanges;
 use serde::Serialize;
 use serde::Deserialize;
 use stv::ballot_pile::BallotPaperCount;
+use crate::evaluate_and_optimize_vote_changes::FoundChange;
 
 /// Sufficient information to document one or more changes to an election completely.
 /// Keeps track of the best change, or changes if they are not comparable (e.g cause different candidates to be elected).
@@ -106,7 +107,7 @@ impl <Tally:Clone> ElectionChanges<Tally> {
 
     /// Add a change, if there is no strictly better one already known.
     pub fn add_change(&mut self,change:ElectionChange<Tally>) {
-        println!("Found a change of {} ballots",change.ballots.n);
+        println!("Recorder given a change of {} ballots",change.ballots.n);
         for existing in &self.changes {
             if change.is_dominated_by_or_equivalent_to(existing) { return; } // no point keeping it.
         }
@@ -117,8 +118,8 @@ impl <Tally:Clone> ElectionChanges<Tally> {
     }
 
     /// add an outcome once found.
-    pub fn add(&mut self,outcome:DeltasInCandidateLists,ballots:BallotChanges<Tally>) {
-        self.add_change(ElectionChange::new(outcome,ballots,&self.original));
+    pub fn add(&mut self,found:FoundChange<Tally>) {
+        self.add_change(ElectionChange::new(found.deltas,found.changes,&self.original));
     }
 
     pub fn smallest_manipulation_found(&self) -> Option<BallotPaperCount> {
