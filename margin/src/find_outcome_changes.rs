@@ -21,8 +21,6 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
     let transcript = distribute_preferences::<Rules>(&original_data, original_data.metadata.vacancies.unwrap(), &original_data.metadata.excluded.iter().cloned().collect(), &original_data.metadata.tie_resolutions, false);
     let mut not_continuing = HashSet::new();
 
-    // let mut min_manipulation = VoteChange { from: None, to: None, vote_value:original_data.num_votes()}; // Initialise with total votes, guaranteed to be greater than any difference.
-    // let mut min_addition = VoteChange { from: None, to: None, vote_value:original_data.num_votes()} ; // Initialise with total votes, guaranteed to be greater than any difference.
     let mut retroscope = Retroscope::new(&original_data, &original_data.metadata.excluded);
     let mut change_recorder = ElectionChanges::new(&original_data);
     for countnumber in 0 .. transcript.counts.len() {
@@ -30,7 +28,7 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
         retroscope.apply(CountIndex(countnumber),count );
         // In NSW there are multiple counts for one 'action', so most counts do not have a decision
         // We only need to try changing the decision on those counts for which some decision (e.g.
-        // eliminate or seat someone) can be made.
+        // eliminate or seat someone) can be made. This is superfluous for non-NSW elections.
         if !count.reason_completed {
             continue;
         }
@@ -63,12 +61,13 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
                 }
             }
 
-            // If someone got elected in this count, either because they got a quota or because the
-            // number of continuing candidates was just enough to fill the seats, see if we can get
+            // If this is not an elimination count, probably someone got elected in this count,
+            // either because they got a quota or because the
+            // number of continuing candidates was just enough to fill the seats. See if we can get
             // someone else elected instead.
             // At the moment, this simply tries swapping with the highest continuing candidate who
             // is not an official winner.
-            // Then try the addition-only option, in which we try adding votes to the highest
+            // It then tries the addition-only option, in which we try adding votes to the highest
             // non-winner until it exceeds the official winner.
 
             _ => {
@@ -82,9 +81,17 @@ where Rules : PreferenceDistributionRules<Tally=usize> {
                     let lowest_winner = just_elected_candidates[lowest_winner_index].who;
                     let vote_change = compute_vote_change::<Rules>(highest_non_winner, lowest_winner, &count);
 
+                    // Try shifting votes from the lowest winner to the highest non-winner
                     let vote_changes = VoteChanges{ changes: vec![vote_change] };
                     if let Some(possible_manipulation) = optimise::<Rules>(&vote_changes, &original_data, &retroscope, vote_choice_options) {
                         change_recorder.add(possible_manipulation);
+                    }
+
+                    // Addition-only
+                    let vote_addition = compute_vote_addition::<Rules>(highest_non_winner, lowest_winner, &count);
+                    let vote_additions = VoteChanges{ changes: vec![vote_addition] };
+                    if let Some(possible_addition) = optimise::<Rules>(&vote_additions, &original_data, &retroscope, vote_choice_options) {
+                        change_recorder.add(possible_addition);
                     }
                 }
             }
