@@ -1,9 +1,10 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
 use std::fs::{create_dir_all, File};
 use std::io::Write;
 use margin::choose_votes::ChooseVotesOptions;
@@ -23,10 +24,19 @@ fn main() -> anyhow::Result <()> {
     create_dir_all("changes")?;
     let mut summary = File::create("changes/summary.csv")?;
     writeln!(summary,"Electorate,Votes,Min Addition,Min Manipulation")?;
+    let ballot_types_considered_unverifiable = ["iVote"];
+    let ballot_types_considered_unverifiable : HashSet<String> = ballot_types_considered_unverifiable.iter().map(|s|s.to_string()).collect();
+    let options1 = ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: false, ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone() };
+    let options2 = ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone() };
     for electorate in &electorates {
         println!("Electorate: {}", electorate);
-        let data = loader.load_cached_data(electorate)?;
-        let results = find_outcome_changes::<NSWECLocalGov2021>(&data, ChooseVotesOptions{ allow_atl: true, allow_first_pref: true });
+        // let data = loader.load_cached_data(electorate)?;
+        let data = loader.read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021>(electorate)?;
+        data.print_summary();
+        let mut results = find_outcome_changes::<NSWECLocalGov2021>(&data,&options1);
+        let results2 = find_outcome_changes::<NSWECLocalGov2021>(&data,&options2);
+        results.merge(results2);
+        results.sort();
 
         let out = File::create(format!("changes/{}.vchange", electorate))?;
         serde_json::to_writer(out,&results)?;

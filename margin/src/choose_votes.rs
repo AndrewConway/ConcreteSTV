@@ -6,6 +6,7 @@
 
 //! Choose specific votes that were attached to a candidate at a particular count.
 
+use std::collections::HashSet;
 use std::ops::{AddAssign};
 use num_traits::Zero;
 use stv::ballot_metadata::CandidateIndex;
@@ -48,13 +49,16 @@ struct ChooseVotesIndistinguishableSet {
     ballots_remaining : BallotPaperCount,
 }
 
-#[derive(Clone,Copy,Debug)]
+#[derive(Clone,Debug)]
 /// What votes are allowed to be chosen
 pub struct ChooseVotesOptions {
     /// Allow above the line votes to be taken
     pub allow_atl : bool,
     /// Allow votes that are sitting on the first preference to be taken
     pub allow_first_pref : bool,
+    /// Allow votes of a type considered verifiable. Only meaningful if ballot_types_considered_unverifiable is non-empty.
+    pub allow_verifiable: bool,
+    pub ballot_types_considered_unverifiable:HashSet<String>,
 }
 /*
 pub struct VotesAvailable<Tally> {
@@ -121,14 +125,18 @@ impl <'a> ChooseVotesUpTo<'a> {
             if is_atl {
                 if options.allow_atl {
                     if options.allow_first_pref || retroscope.votes.btl[v.0-num_atl].upto>=election_data.metadata.party(election_data.atl[v.0].parties[0]).candidates.len() {
-                        res.atl.current_votes.push(v);
-                        res.atl.ballots_remaining+=BallotPaperCount(election_data.atl[v.0].n);
+                        if options.allow_verifiable || options.ballot_types_considered_unverifiable.is_empty() || !election_data.is_atl_verifiable(v.0, &options.ballot_types_considered_unverifiable) {
+                            res.atl.current_votes.push(v);
+                            res.atl.ballots_remaining+=BallotPaperCount(election_data.atl[v.0].n);
+                        }
                     }
                 }
             } else {
                 if options.allow_first_pref || retroscope.votes.btl[v.0-num_atl].upto>0 {
-                    res.btl.current_votes.push(v);
-                    res.btl.ballots_remaining+=BallotPaperCount(election_data.btl[v.0-num_atl].n);
+                    if options.allow_verifiable || options.ballot_types_considered_unverifiable.is_empty() || !election_data.is_btl_verifiable(v.0-num_atl, &options.ballot_types_considered_unverifiable) {
+                        res.btl.current_votes.push(v);
+                        res.btl.ballots_remaining+=BallotPaperCount(election_data.btl[v.0-num_atl].n);
+                    }
                 }
             }
         }
@@ -156,12 +164,12 @@ impl <'a> ChooseVotesUpTo<'a> {
     }
 }
 impl <'a> ChooseVotes<'a> {
-    pub (crate) fn new(retroscope:&'a Retroscope,candidate:CandidateIndex,election_data:&'a ElectionData,options : ChooseVotesOptions) -> Self {
+    pub (crate) fn new(retroscope:&'a Retroscope,candidate:CandidateIndex,election_data:&'a ElectionData,options : &ChooseVotesOptions) -> Self {
         let by_count = &retroscope.piles_by_candidate[candidate.0].by_count;
         //println!("Creating ChooseVotes for candidate {}, tally={}",candidate,by_count.values().map(|v|v.iter().map(|e|if e.0<election_data.atl.len() {election_data.atl[e.0].n} else { election_data.btl[e.0-election_data.atl.len()].n }).sum::<usize>()).sum::<usize>());
         let mut remaining_sources = by_count.iter().map(|(&count,votes)|(count,votes)).collect::<Vec<_>>();
         remaining_sources.sort_by_key(|(count,_)|retroscope.transfer_value(*count));
-        let sources:Vec<ChooseVotesUpTo> = remaining_sources.iter().map(|(count,ballots_to_consider)|ChooseVotesUpTo::new(*count,ballots_to_consider,retroscope,election_data,&options)).collect();
+        let sources:Vec<ChooseVotesUpTo> = remaining_sources.iter().map(|(count,ballots_to_consider)|ChooseVotesUpTo::new(*count,ballots_to_consider,retroscope,election_data,options)).collect();
         //println!("  Sources, tally={}",sources.iter().map(|s|s.atl.ballots_remaining+s.btl.ballots_remaining).sum::<BallotPaperCount>());
         ChooseVotes{
             //options,

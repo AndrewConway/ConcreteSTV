@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -12,7 +12,7 @@ use crate::ballot_metadata::{CandidateIndex, ElectionMetadata, PartyIndex};
 use serde::{Deserialize,Serialize};
 use std::collections::HashMap;
 use anyhow::anyhow;
-use crate::election_data::ElectionData;
+use crate::election_data::{ElectionData, VoteTypeSpecification};
 
 /// A marking on a particular square in a ballot. This may or may not be a number.
 #[derive(Copy,Clone,Debug,Eq, PartialEq)]
@@ -208,10 +208,13 @@ impl <T:Copy> PreferencesComingOutOfOrder<T> {
 pub struct PreferencesComingOutOfOrderHelper {
     atls : UniqueATLBuilder,
     btls : UniqueBTLBuilder,
+    atls_by_vote_type : HashMap<String,UniqueATLBuilder>,
+    btls_by_vote_type : HashMap<String,UniqueBTLBuilder>,
     informal : usize,
     current_paper_id : Option<String>,
     current_atls : PreferencesComingOutOfOrder<PartyIndex>,
     current_btls : PreferencesComingOutOfOrder<CandidateIndex>,
+    current_vote_type : Option<String>,
 }
 
 impl Default for PreferencesComingOutOfOrderHelper {
@@ -219,24 +222,40 @@ impl Default for PreferencesComingOutOfOrderHelper {
         PreferencesComingOutOfOrderHelper{
             atls: Default::default(),
             btls: Default::default(),
+            atls_by_vote_type: Default::default(),
+            btls_by_vote_type: Default::default(),
             informal: 0,
             current_paper_id: None,
             current_atls: PreferencesComingOutOfOrder::default(),
             current_btls: PreferencesComingOutOfOrder::default(),
+            current_vote_type: None
         }
     }
 }
 
 impl PreferencesComingOutOfOrderHelper {
     pub fn done_current_paper(&mut self) {
-        if !self.current_btls.is_empty() { // is ATL
-            self.btls.add(self.current_btls.drain_pref_list());
-        } else if !self.current_atls.is_empty() { // is BTL
-            self.atls.add(self.current_atls.drain_pref_list());
+        let vote_type = self.current_vote_type.take();
+        if !self.current_btls.is_empty() { // is BTL
+            let btls = match vote_type {
+                None => &mut self.btls,
+                Some(vote_type) => self.btls_by_vote_type.entry(vote_type).or_insert_with(||Default::default()),
+            };
+            btls.add(self.current_btls.drain_pref_list());
+        } else if !self.current_atls.is_empty() { // is ATL
+            let atls = match vote_type {
+                None => &mut self.atls,
+                Some(vote_type) => self.atls_by_vote_type.entry(vote_type).or_insert_with(||Default::default()),
+            };
+            atls.add(self.current_atls.drain_pref_list());
         } else { self.informal+=1; }
         self.current_paper_id=None;
         self.current_atls.clear();
         self.current_btls.clear();
+    }
+    /// Set the current vote's type. Call after set_current_paper.
+    pub fn set_vote_type(&mut self,vote_type:&str) {
+        self.current_vote_type=Some(vote_type.to_string());
     }
     pub fn set_current_paper(&mut self,paper_id:&str) {
         if self.current_paper_id.is_some() && self.current_paper_id.as_ref().unwrap()!=paper_id {
@@ -257,10 +276,34 @@ impl PreferencesComingOutOfOrderHelper {
         if self.current_paper_id.is_some() {
             self.done_current_paper();
         }
+        let mut atl = self.atls.to_atls();
+        let mut atl_types : Vec<VoteTypeSpecification> = vec![];
+        for (vote_type,builder) in self.atls_by_vote_type.drain() {
+            let extra_atls = builder.to_atls();
+            atl_types.push(VoteTypeSpecification{
+                vote_type,
+                first_index_inclusive: atl.len(),
+                last_index_exclusive: atl.len()+extra_atls.len(),
+            });
+            atl.extend(extra_atls.into_iter());
+        }
+        let mut btl = self.btls.to_btls();
+        let mut btl_types : Vec<VoteTypeSpecification> = vec![];
+        for (vote_type,builder) in self.btls_by_vote_type.drain() {
+            let extra_btls = builder.to_btls();
+            btl_types.push(VoteTypeSpecification{
+                vote_type,
+                first_index_inclusive: btl.len(),
+                last_index_exclusive: btl.len()+extra_btls.len(),
+            });
+            btl.extend(extra_btls.into_iter());
+        }
         ElectionData{
             metadata,
-            atl: self.atls.to_atls(),
-            btl: self.btls.to_btls(),
+            atl,
+            atl_types,
+            btl,
+            btl_types,
             informal: self.informal,
         }
     }

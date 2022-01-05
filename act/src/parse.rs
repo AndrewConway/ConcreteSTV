@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -117,7 +117,7 @@ impl RawDataSource for ACTDataLoader {
             }
         }
         if !prefs.is_empty() { btl.add(prefs.clone()); }
-        Ok(ElectionData{ metadata, atl:vec![], btl:btl.to_btls(), informal:0 })
+        Ok(ElectionData{ metadata, atl:vec![], atl_types: vec![], btl:btl.to_btls(), btl_types: vec![], informal:0 })
     }
 
     fn find_raw_data_file(&self,filename:&str) -> Result<PathBuf,MissingFile> {

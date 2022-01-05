@@ -215,7 +215,7 @@ impl Retroscope {
     }
     fn num_candidates(&self) -> NumberOfCandidates { NumberOfCandidates(self.piles_by_candidate.len()) }
 
-    pub fn get_chooser<'a>(&'a self, candidate:CandidateIndex, election_data:&'a ElectionData, options:ChooseVotesOptions) -> ChooseVotes<'a> {
+    pub fn get_chooser<'a>(&'a self, candidate:CandidateIndex, election_data:&'a ElectionData, options:&ChooseVotesOptions) -> ChooseVotes<'a> {
         ChooseVotes::new(self,candidate,election_data,options)
     }
 

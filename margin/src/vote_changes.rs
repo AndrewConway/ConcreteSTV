@@ -64,7 +64,7 @@ impl <Tally:Clone+RoundUpToUsize> VoteChanges<Tally> {
 }
 
 impl <Tally:Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Tally>+Zero+Hash+Sum<Tally>+RoundUpToUsize> VoteChanges<Tally> {
-    pub fn make_concrete<R:PreferenceDistributionRules<Tally=Tally>>(&self,retroscope:&Retroscope,election_data:&ElectionData,options:ChooseVotesOptions) -> Option<BallotChanges<Tally>> {
+    pub fn make_concrete<R:PreferenceDistributionRules<Tally=Tally>>(&self,retroscope:&Retroscope,election_data:&ElectionData,options:&ChooseVotesOptions) -> Option<BallotChanges<Tally>> {
         let mut builder = BallotChangesBuilder{ map: HashMap::new() };
         let mut choosers : HashMap<CandidateIndex,ChooseVotes> = HashMap::new();
         let (atl_ok_changes,btl_only_changes):(Vec<_>,Vec<_>) = self.changes.iter().partition(|vc|vc.to.map(|c|retroscope.is_highest_continuing_member_party_ticket(c,&election_data.metadata)).unwrap_or(true));

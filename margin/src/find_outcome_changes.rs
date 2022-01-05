@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -15,14 +15,14 @@ use crate::record_changes::ElectionChanges;
 use crate::retroscope::Retroscope;
 use crate::vote_changes::{VoteChange, VoteChanges};
 
-pub fn find_outcome_changes <Rules>(original_data:&ElectionData, vote_choice_options:ChooseVotesOptions) -> ElectionChanges<Rules::Tally>
+pub fn find_outcome_changes <Rules>(original_data:&ElectionData, vote_choice_options:&ChooseVotesOptions) -> ElectionChanges<Rules::Tally>
 where Rules : PreferenceDistributionRules<Tally=usize> {
 
     let transcript = distribute_preferences::<Rules>(&original_data, original_data.metadata.vacancies.unwrap(), &original_data.metadata.excluded.iter().cloned().collect(), &original_data.metadata.tie_resolutions, false);
     let mut not_continuing = HashSet::new();
 
     let mut retroscope = Retroscope::new(&original_data, &original_data.metadata.excluded);
-    let mut change_recorder = ElectionChanges::new(&original_data);
+    let mut change_recorder = ElectionChanges::new(original_data,&vote_choice_options.ballot_types_considered_unverifiable);
     for countnumber in 0 .. transcript.counts.len() {
         let count = &transcript.counts[countnumber];
         retroscope.apply(CountIndex(countnumber),count );

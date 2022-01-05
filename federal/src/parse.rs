@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -119,7 +119,7 @@ impl RawDataSource for FederalDataLoader {
         }
         let atl = atls.into_iter().map(|(parties,n)|ATL{ parties, n }).collect();
         let btl = btls.into_iter().map(|(candidates,n)|BTL{ candidates , n }).collect();
-        Ok(ElectionData{ metadata, atl, btl, informal })
+        Ok(ElectionData{ metadata, atl, atl_types: vec![], btl, btl_types: vec![], informal })
     }
 
     fn find_raw_data_file(&self,filename:&str) -> Result<PathBuf,MissingFile> {
@@ -194,7 +194,7 @@ impl FederalDataLoader {
         metadata.source[0].files.push(filename);
         let (mut btl,informal) = read_btl_votes2013(&metadata, &preferences_zip_file, 1)?; // The 2013 formality rules are quite complex. I am assuming the AEC has applied them already to all with a 1 vote. This is a dubious assumption as there are some without a 1 vote. However since we don't get all the informal votes, it is hard to check formality properly.
         btl.extend_from_slice(&ticket_votes);
-        Ok(ElectionData{ metadata, atl:vec![], btl, informal })
+        Ok(ElectionData{ metadata, atl:vec![], atl_types: vec![], btl, btl_types: vec![], informal })
     }
 
     pub fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {

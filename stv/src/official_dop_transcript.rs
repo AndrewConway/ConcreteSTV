@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -58,13 +58,13 @@ impl OfficialDistributionOfPreferencesTranscript {
     /// Compare the results from the official transcript to our transcript.
     /// panic if there are differences.
     pub fn compare_with_transcript<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F) {
-        let ec_decision = self.compare_with_transcript_checking_for_ec_decisions(transcript,decode);
+        let ec_decision = self.compare_with_transcript_checking_for_ec_decisions(transcript,decode,true);
         if let Some((favoured,unfavoured)) = ec_decision {
             panic!("An EC decision was not made the way we expected: {} was favoured over {}",favoured,unfavoured);
         }
     }
     /// like compare_with_transcript but don't panic if the first difference is caused by a difference in EC decision making. If so, return Some(candidate_favoured_by_ec,candidate_excluded_by_ec).
-    pub fn compare_with_transcript_checking_for_ec_decisions<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F) -> Option<(CandidateIndex,CandidateIndex)> {
+    pub fn compare_with_transcript_checking_for_ec_decisions<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F,verbose:bool) -> Option<(CandidateIndex,CandidateIndex)> {
         if let Some(quota) = &self.quota {
             assert_eq!(quota.vacancies,transcript.quota.vacancies,"vacancies official vs me");
             assert_eq!(quota.papers,transcript.quota.papers,"papers with first preferences official vs me");
@@ -131,7 +131,7 @@ impl OfficialDistributionOfPreferencesTranscript {
             };
             let my_count = &transcript.counts[i];
             let official_count = &self.counts[i];
-            println!("Checking count {} {}",i+1,my_count.count_name.clone().unwrap_or_default());
+            if verbose { println!("Checking count {} {}",i+1,my_count.count_name.clone().unwrap_or_default()); }
             assert_eq!(my_count.count_name,official_count.count_name);
             if self.elected_candidates_are_in_order {
                 assert_eq!(official_count.elected,my_count.elected.iter().map(|e|e.who).collect::<Vec<CandidateIndex>>());
@@ -155,7 +155,7 @@ impl OfficialDistributionOfPreferencesTranscript {
                 assert!(my_count.not_continuing.contains(who),"{} was not in the list of not continuing",who);
             }
             if let Some(vote_total) = &official_count.vote_total {
-                println!("Checking tally count {}",i+1);
+                if verbose { println!("Checking tally count {}",i+1); }
                 if self.all_exhausted_go_to_rounding {
                     assert_close(vote_total.rounding.assume_positive(),my_count.status.tallies.exhausted.clone()+my_count.status.tallies.rounding.assume_positive(),"votes lost to exhaustion or rounding");
                 } else {
@@ -167,7 +167,7 @@ impl OfficialDistributionOfPreferencesTranscript {
                 }
             }
             if let Some(vote_delta) = &official_count.vote_delta {
-                println!("Checking tally delta count {}",i+1);
+                if verbose { println!("Checking tally delta count {}",i+1); }
                 assert_close_delta(vote_delta.exhausted,my_count.status.tallies.exhausted.clone(),if i>0 { transcript.counts[i-1].status.tallies.exhausted.clone()} else {Tally::zero()},"exhausted delta tally");
                 assert_close_delta_signed(vote_delta.rounding.clone().into(),my_count.status.tallies.rounding.clone(),if i>0 { transcript.counts[i-1].status.tallies.rounding.clone()} else {Tally::zero().into()},"rounding delta tally");
                 for candidate in 0..vote_delta.candidate.len() {
@@ -175,7 +175,7 @@ impl OfficialDistributionOfPreferencesTranscript {
                 }
             }
             if let Some(paper_total) = &official_count.paper_total {
-                println!("Checking paper count {}",i+1);
+                if verbose { println!("Checking paper count {}",i+1); }
                 assert_papers(paper_total.exhausted,my_count.status.papers.exhausted.clone(),"exhausted papers");
                 assert_papers(paper_total.rounding.assume_positive(),my_count.status.papers.rounding.assume_positive(),"rounding papers");
                 for candidate in 0..paper_total.candidate.len() {
@@ -183,7 +183,7 @@ impl OfficialDistributionOfPreferencesTranscript {
                 }
             }
             if let Some(paper_delta) = &official_count.paper_delta {
-                println!("Checking paper delta {}",i+1);
+                if verbose { println!("Checking paper delta {}",i+1); }
                 assert_papers_delta(paper_delta.exhausted,my_count.status.papers.exhausted.clone(),if i>0 { transcript.counts[i-1].status.papers.exhausted.clone()} else {BallotPaperCount(0)},"exhausted papers delta");
                 assert_papers_delta(paper_delta.rounding.assume_positive(),my_count.status.papers.rounding.assume_positive(),if i>0 { transcript.counts[i-1].status.papers.rounding.assume_positive()} else {BallotPaperCount(0)},"rounding papers delta");
                 for candidate in 0..paper_delta.candidate.len() {

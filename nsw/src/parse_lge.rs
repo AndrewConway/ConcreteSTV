@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -21,6 +21,7 @@ use stv::ballot_pile::BallotPaperCount;
 use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use stv::parse_util::parse_xlsx_by_converting_to_csv_using_openoffice;
+use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
 
 
 pub fn get_nsw_lge_data_loader_2021(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
@@ -84,7 +85,30 @@ impl RawDataSource for NSWLGEDataLoader {
 
 }
 
+fn decode(tally:usize) -> f64 { tally as f64 }
 impl NSWLGEDataLoader {
+
+    /// Like read_raw_data, except also try to deduce the tie breaking decisions that were used by NSWEC.
+    /// This is a powerful function, but it will be slow and panic if anything goes even slightly wrong.
+    pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions<Rules:PreferenceDistributionRules<Tally=usize>>(&self, electorate: &str) -> anyhow::Result<ElectionData>  {
+        let mut data = self.read_raw_data(electorate)?;
+        if electorate.ends_with("Mayoral") { return Ok(data); } // don't have DOP file for mayoral elections. Besides, STV is not necessarily exactly a generalization of IRV... e.g. early termination conditions.
+        // let mut tie_resolutions = TieResolutionsMadeByEC::default();
+        let official_transcript = self.read_official_dop_transcript(&data.metadata)?;
+        loop {
+            let transcript = distribute_preferences::<Rules>(&data, data.metadata.vacancies.unwrap(), &data.metadata.excluded.iter().cloned().collect(), &data.metadata.tie_resolutions, false);
+            if let Some((favoured_candidate, unfavoured_candidate)) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript, decode,false) {
+                println!("Observed tie resolution favouring {} over {}", favoured_candidate, unfavoured_candidate);
+                assert!(favoured_candidate.0 < unfavoured_candidate.0, "favoured candidate should be lower as higher candidates are assumed favoured.");
+                if data.metadata.tie_resolutions.tie_resolutions.contains(&vec![unfavoured_candidate, favoured_candidate]) {
+                    panic!("That tie resolution is already in the list.")
+                }
+                data.metadata.tie_resolutions.tie_resolutions.push(vec![unfavoured_candidate, favoured_candidate]);
+            } else {
+                return Ok(data);
+            }
+        }
+    }
 
     pub fn read_raw_data_possibly_rejecting_some_types(&self, electorate: &str, reject_vote_type : Option<HashSet<String>>) -> anyhow::Result<ElectionData> {
         let contest = &self.find_contest(electorate)?.url;
@@ -338,8 +362,9 @@ fn parse_zip_election_file(zipfile : File, metadata:ElectionMetadata, reject_vot
         helper.set_current_paper(&record[paper_id_column]);
         let preference = &record[preference_number_column];
         if !preference.is_empty() { // part of a formal vote
+            let vote_type = &record[vote_type_column];
+            helper.set_vote_type(vote_type);
             if let Some(restrictions) = reject_vote_type.as_ref() {
-                let vote_type = &record[vote_type_column];
                 if restrictions.contains(vote_type) { continue }
             }
             let preference : usize = preference.parse()?;

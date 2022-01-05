@@ -28,7 +28,7 @@ pub enum ChangeResult<Tally> {
 
 /// Test the effect of the provided changes on the election.
 /// ElectionData must contain vacancy information and results (official winners).
-pub fn simple_test<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:ChooseVotesOptions) -> ChangeResult<R::Tally> {
+pub fn simple_test<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:&ChooseVotesOptions) -> ChangeResult<R::Tally> {
     if let Some(ballot_changes) = vote_changes.make_concrete::<R>(retroscope,election_data,options) {
         let changed_data = ballot_changes.apply_to_votes(election_data);
         let transcript = distribute_preferences::<R>(&changed_data,election_data.metadata.vacancies.unwrap(),&election_data.metadata.excluded.iter().cloned().collect(),&election_data.metadata.tie_resolutions,false);
@@ -42,10 +42,10 @@ pub struct FoundChange<Tally> {
     pub deltas : DeltasInCandidateLists,
     pub changes : BallotChanges<Tally>
 }
-pub fn optimise<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:ChooseVotesOptions) -> Option<FoundChange<R::Tally>> {
+pub fn optimise<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:&ChooseVotesOptions) -> Option<FoundChange<R::Tally>> {
     optimise_work::<R>(vote_changes,election_data,retroscope,options,0)
 }
-pub fn optimise_work<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:ChooseVotesOptions,tried_already:usize) -> Option<FoundChange<R::Tally>> {
+pub fn optimise_work<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:&ChooseVotesOptions,tried_already:usize) -> Option<FoundChange<R::Tally>> {
     match simple_test::<R>(vote_changes,election_data,retroscope,options) {
         ChangeResult::NotEnoughVotesAvailable => { // could try reducing.
             println!("Not enough votes available - looking for {} from {}",vote_changes.changes.iter().map(|c|c.vote_value.clone()).sum::<R::Tally>(),vote_changes.changes.first().and_then(|c|c.from).map(|c|election_data.metadata.candidate(c).name.as_str()).unwrap_or(""));

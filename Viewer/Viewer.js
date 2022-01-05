@@ -94,7 +94,7 @@ function RenderChanges(vote_changes_document,render_div) {
         if (change.requires.added_ballots) how.push("Added");
         if (change.requires.removed_ballots) how.push("Removed");
         if (change.requires.changed_ballots) how.push("Changed");
-        if (change.requires.changed_physical_ballots) how.push("Physical");
+        if (change.requires.affected_verifiable_ballots) how.push("Affected Verifiable");
         add(tr,"td").innerText=how.join(", ")
         let details = add(tr,"td");
         for (const sc of change.ballots.changes) {
@@ -112,11 +112,15 @@ function RenderChanges(vote_changes_document,render_div) {
                 const tooltip = add(detailsdiv,"div","tooltip");
                 for (const b of sc.from.ballots) {
                     let vote = "";
+                    let votetype = undefined;
                     if (b.from<num_atl) {
                         vote="ATL "+vote_data.atl[b.from].parties.join(",");
+                        votetype = vote_data.atl_types && vote_data.atl_types.find(t=>t.first_index_inclusive<=b.from && b.from<t.last_index_exclusive);
                     } else {
                         vote="BTL "+vote_data.btl[b.from-num_atl].candidates.join(",");
+                        votetype = vote_data.btl_types && vote_data.btl_types.find(t=>t.first_index_inclusive<=b.from-num_atl && b.from-num_atl<t.last_index_exclusive);
                     }
+                    if (votetype) vote=votetype.vote_type+" "+vote;
                     add(tooltip,"div").innerText=b.n+"× "+vote;
                 }
             }

@@ -8,6 +8,7 @@
 
 
 
+use std::collections::HashSet;
 use std::fmt::Debug;
 use stv::compare_transcripts::DeltasInCandidateLists;
 use stv::election_data::ElectionData;
@@ -23,6 +24,7 @@ use crate::evaluate_and_optimize_vote_changes::FoundChange;
 pub struct ElectionChanges<Tally:Clone> {
     pub original : ElectionData,
     pub changes : Vec<ElectionChange<Tally>>,
+    pub ballot_types_considered_unverifiable : HashSet<String>,
 }
 
 #[derive(Clone,Copy,Debug,Serialize,Deserialize)]
@@ -32,7 +34,7 @@ pub struct ChangeTypes {
     pub added_ballots : bool,
     pub removed_ballots : bool,
     pub changed_ballots : bool,
-    pub changed_physical_ballots : bool,
+    pub affected_verifiable_ballots: bool,
 }
 
 impl ChangeTypes {
@@ -43,17 +45,18 @@ impl ChangeTypes {
             (self.added_ballots || !other.added_ballots) &&
             (self.removed_ballots || !other.removed_ballots) &&
             (self.changed_ballots || !other.changed_ballots) &&
-            (self.changed_physical_ballots || !other.changed_physical_ballots)
+            (self.affected_verifiable_ballots || !other.affected_verifiable_ballots)
     }
-    // deduce what properties the ballots have.
-    pub fn deduce<Tally>(ballots:&BallotChanges<Tally>,data:&ElectionData) -> Self {
+    /// Deduce what properties the ballots have.
+    /// If not empty, ballot_types_considered_unverifiable contains the vote types deemed to be unverifiable.
+    pub fn deduce<Tally>(ballots:&BallotChanges<Tally>,data:&ElectionData,ballot_types_considered_unverifiable:&HashSet<String>) -> Self {
         let mut res = ChangeTypes{
             changed_first_preference: false,
             changed_atl: false,
             added_ballots: false,
             removed_ballots: false,
             changed_ballots: false,
-            changed_physical_ballots: false
+            affected_verifiable_ballots: false
         };
         let num_atl = data.atl.len();
         for bcs in &ballots.changes {
@@ -62,11 +65,17 @@ impl ChangeTypes {
             if bcs.from.is_some() && bcs.candidate_to.is_some() { res.changed_ballots=true; }
             if let Some(from) = bcs.from.as_ref() {
                 for b in &from.ballots {
-                    if b.from.0<num_atl {
+                    if b.from.0<num_atl { // it is an ATL vote
                         res.changed_atl=true;
                         if data.metadata.candidate(from.candidate).party.unwrap()==data.atl[b.from.0].parties[0] { res.changed_first_preference=true; }
-                    } else {
+                        if !ballot_types_considered_unverifiable.is_empty() {
+                            if data.is_atl_verifiable(b.from.0,ballot_types_considered_unverifiable) { res.affected_verifiable_ballots =true; }
+                        }
+                    } else { // it is a BTL vote
                         if from.candidate==data.btl[b.from.0-num_atl].candidates[0] { res.changed_first_preference=true; }
+                        if !ballot_types_considered_unverifiable.is_empty() {
+                            if data.is_btl_verifiable(b.from.0-num_atl,ballot_types_considered_unverifiable) { res.affected_verifiable_ballots =true; }
+                        }
                     }
                 }
             }
@@ -92,8 +101,8 @@ impl <Tally:Clone> ElectionChange<Tally> {
             self.ballots.n>=other.ballots.n
     }
 
-    pub fn new(outcome:DeltasInCandidateLists,ballots:BallotChanges<Tally>,data:&ElectionData) -> Self {
-        let requires = ChangeTypes::deduce(&ballots,data);
+    pub fn new(outcome:DeltasInCandidateLists,ballots:BallotChanges<Tally>,data:&ElectionData,ballot_types_considered_unverifiable:&HashSet<String>) -> Self {
+        let requires = ChangeTypes::deduce(&ballots,data,ballot_types_considered_unverifiable);
         ElectionChange{
             outcome,
             requires,
@@ -103,7 +112,7 @@ impl <Tally:Clone> ElectionChange<Tally> {
 }
 
 impl <Tally:Clone> ElectionChanges<Tally> {
-    pub fn new(data:&ElectionData) -> Self { ElectionChanges { original: data.clone(), changes: vec![] } }
+    pub fn new(data:&ElectionData,ballot_types_considered_unverifiable:&HashSet<String>) -> Self { ElectionChanges { original: data.clone(), changes: vec![] , ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone()} }
 
     /// Add a change, if there is no strictly better one already known.
     pub fn add_change(&mut self,change:ElectionChange<Tally>) {
@@ -117,9 +126,14 @@ impl <Tally:Clone> ElectionChanges<Tally> {
         self.changes.push(change);
     }
 
+    pub fn merge(&mut self,other:Self) {
+        for v in other.changes {
+            self.add_change(v);
+        }
+    }
     /// add an outcome once found.
     pub fn add(&mut self,found:FoundChange<Tally>) {
-        self.add_change(ElectionChange::new(found.deltas,found.changes,&self.original));
+        self.add_change(ElectionChange::new(found.deltas,found.changes,&self.original,&self.ballot_types_considered_unverifiable));
     }
 
     pub fn smallest_manipulation_found(&self) -> Option<BallotPaperCount> {
