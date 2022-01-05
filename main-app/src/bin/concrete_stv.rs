@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -15,17 +15,18 @@ use stv::ballot_metadata::{NumberOfCandidates, CandidateIndex};
 use anyhow::anyhow;
 use std::iter::FromIterator;
 use main_app::rules::Rules;
+use margin::record_changes::ElectionChanges;
 
 #[derive(Parser)]
-#[clap(version = "0.1", author = "Andrew Conway", name="ConcreteSTV")]
+#[clap(version = "0.2", author = "Andrew Conway", name="ConcreteSTV")]
 /// Count STV elections using a variety of rules including good approximations to
 /// those used by various electoral commissions on various elections.
 struct Opts {
     /// The counting rules to use.
-    /// Currently supported AEC2013, AEC2016, AEC2019, Federal
+    /// Currently supported AEC2013, AEC2016, AEC2019, Federal, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021
     rules : Rules,
 
-    /// The name of the .stv file to get votes from
+    /// The name of the .stv (or .vchange) file to get votes from
     #[clap(parse(from_os_str))]
     votes : PathBuf,
 
@@ -48,15 +49,29 @@ struct Opts {
     #[clap(long)]
     verbose: bool,
 
-}
+    /// If a .vchange file is used instead of a .stv file, one of the vote manipulations in it can be applied first, specified here. 1 means the first one in the file, 2 the second, etc.
+    /// This can be used to prove an upper bound on the margin.
+    #[clap(short, long)]
+    modification : Option<usize>,
 
+}
 
 fn main() -> anyhow::Result<()> {
     let opt : Opts = Opts::parse();
 
     let votes : ElectionData = {
         let file = File::open(&opt.votes)?;
-        serde_json::from_reader(file)?
+        if opt.votes.as_os_str().to_string_lossy().ends_with(".vchange") {
+            let vchange : ElectionChanges<f64> = serde_json::from_reader(file)?; // Everything so far will parse as f64, and the values are not used in way here so accuracy is irrelevant.
+            if let Some(modification_number_1_based) = opt.modification {
+                if modification_number_1_based>vchange.changes.len() || modification_number_1_based==0 {
+                    return Err(anyhow!("Modification number {} should be between 1 and {} (the number of modifications in that file)",modification_number_1_based,vchange.changes.len()));
+                }
+                vchange.changes[modification_number_1_based-1].ballots.apply_to_votes(&vchange.original,opt.verbose)
+            } else { vchange.original }
+        } else {
+            serde_json::from_reader(file)?
+        }
     };
 
     let vacancies=opt.vacancies.map(|n|NumberOfCandidates(n)).or(votes.metadata.vacancies).ok_or_else(||anyhow!("Need to specify number of vacancies"))?;
@@ -70,9 +85,10 @@ fn main() -> anyhow::Result<()> {
     let transcript_file = match &opt.transcript {
         None => {
             let votename = opt.votes.file_name().map(|o|o.to_string_lossy()).unwrap_or_default();
-            let votename = votename.trim_end_matches(".stv");
+            let votename = votename.trim_end_matches(".stv").trim_end_matches(".vchange");
+            let modname = if let Some(modification) = opt.modification { modification.to_string()+"_"} else {"".to_string()};
             let rulename = opt.rules.to_string();
-            let combined = votename.to_string()+"_"+&rulename+".transcript";
+            let combined = votename.to_string()+"_"+&modname+&rulename+".transcript";
             opt.votes.with_file_name(combined)
         }
         Some(tf) => tf.clone(),

@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -162,6 +162,13 @@ impl ElectionMetadata {
     }
     /// An iterator over all the candidate indices starting at 0.
     pub fn candidate_indices(&self) -> Map<Range<usize>, fn(usize) -> CandidateIndex> { (0..self.candidates.len()).map(|i|CandidateIndex(i)) }
+
+    pub fn candidate_list_to_string(&self,list : &[CandidateIndex]) -> String {
+        list.iter().map(|&c|self.candidate(c).name.as_str()).collect::<Vec<_>>().join(", ")
+    }
+    pub fn party_list_to_string(&self,list : &[PartyIndex]) -> String {
+        list.iter().map(|&c|self.party(c).best_name()).collect::<Vec<_>>().join(", ")
+    }
 }
 
 /// Which election it was.
@@ -222,6 +229,12 @@ pub struct Party {
     /// the group voting tickets for this party, if any.
     #[serde(skip_serializing_if = "Vec::is_empty",default)]
     pub tickets : Vec<Vec<CandidateIndex>>
+}
+
+impl Party {
+    pub fn best_name(&self) -> &str {
+        if self.name.is_empty() { self.column_id.as_str() } else {self.name.as_str()}
+    }
 }
 
 /// information about a candidate in the contest.

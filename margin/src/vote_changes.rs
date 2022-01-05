@@ -16,7 +16,7 @@ use std::iter::Sum;
 use std::ops::{AddAssign, Sub, SubAssign};
 use std::str::FromStr;
 use num_traits::Zero;
-use stv::ballot_metadata::CandidateIndex;
+use stv::ballot_metadata::{CandidateIndex, PartyIndex};
 use serde::Serialize;
 use serde::Deserialize;
 use stv::ballot_paper::{ATL, BTL};
@@ -174,7 +174,7 @@ pub struct BallotChanges<Tally> {
 }
 
 impl <Tally> BallotChanges<Tally> {
-    pub fn apply_to_votes(&self,election_data:&ElectionData) -> ElectionData {
+    pub fn apply_to_votes(&self,election_data:&ElectionData,verbose:bool) -> ElectionData {
         let mut data = election_data.clone();
         let num_atl = data.atl.len();
         for change in &self.changes {
@@ -185,17 +185,27 @@ impl <Tally> BallotChanges<Tally> {
                         if let Some(to) = change.candidate_to {
                             let from_party = election_data.metadata.candidate(from.candidate).party.unwrap(); // must have a party or couldn't be in an ATL vote.
                             if let Some(to_party) = election_data.metadata.candidate(to).party {
-                                let new_parties = data.atl[wv.from.0].parties.iter().filter(|&&c|c!=to_party).map(|&c|if c==from_party {to_party} else {c}).collect();
+                                let new_parties : Vec<PartyIndex> = data.atl[wv.from.0].parties.iter().filter(|&&c|c!=to_party).map(|&c|if c==from_party {to_party} else {c}).collect();
+                                if verbose {
+                                    println!("Changed {} ATL from [{}] to [{}]",wv.n,data.metadata.party_list_to_string(&data.atl[wv.from.0].parties),data.metadata.party_list_to_string(&new_parties));
+                                }
                                 data.atl.push(ATL{ parties: new_parties, n: wv.n })
                             } else {
                                 panic!("Candidate {} got ATL vote but doesn't have a party.",election_data.metadata.candidate(from.candidate).name);
                             }
+                        } else if verbose {
+                            println!("Removed {} ATL votes [{}]",wv.n,data.metadata.party_list_to_string(&data.atl[wv.from.0].parties));
                         }
                     } else { // It is a BTL vote.
                         data.btl[wv.from.0-num_atl].n-=wv.n;
                         if let Some(to) = change.candidate_to {
-                            let new_candidates = data.btl[wv.from.0-num_atl].candidates.iter().filter(|&&c|c!=to).map(|&c|if c==from.candidate {to} else {c}).collect();
+                            let new_candidates : Vec<CandidateIndex> = data.btl[wv.from.0-num_atl].candidates.iter().filter(|&&c|c!=to).map(|&c|if c==from.candidate {to} else {c}).collect();
+                            if verbose {
+                                println!("Changed {} BTL from [{}] to [{}]",wv.n,data.metadata.candidate_list_to_string(&data.btl[wv.from.0-num_atl].candidates),data.metadata.candidate_list_to_string(&new_candidates));
+                            }
                             data.btl.push(BTL{ candidates: new_candidates, n: wv.n })
+                        } else if verbose {
+                            println!("Removed {} BTL votes [{}]",wv.n,data.metadata.candidate_list_to_string(&data.btl[wv.from.0-num_atl].candidates));
                         }
                     }
 
@@ -203,6 +213,9 @@ impl <Tally> BallotChanges<Tally> {
             } else {
                 if let Some(to) = change.candidate_to { // insert votes
                     data.btl.push(BTL{ candidates:vec![to], n: change.n.0});
+                    if verbose {
+
+                    }
                 } else { eprintln!("Trying to do a vote change that does nothing."); } // don't actually do anything...
             }
         }
