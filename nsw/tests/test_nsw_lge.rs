@@ -61,6 +61,7 @@ mod tests {
                 tie_resolutions: Default::default()
             },
             atl: vec![],
+            atl_types: vec![],
             btl: vec![
                 BTL { candidates: vec![CandidateIndex(0)], n: 10000 },
                 BTL { candidates: vec![CandidateIndex(1)], n: 10000 },
@@ -69,6 +70,7 @@ mod tests {
                 BTL { candidates: vec![CandidateIndex(4)], n: 900 },
                 BTL { candidates: vec![CandidateIndex(5)], n: 100 },
             ],
+            btl_types: vec![],
             informal: 0
         };
         let transcript = distribute_preferences::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(&data, NumberOfCandidates(3), &Default::default(), &Default::default(),true);
