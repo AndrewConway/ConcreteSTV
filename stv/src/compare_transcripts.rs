@@ -52,7 +52,7 @@ impl Display for DifferentCandidateLists {
 }
 
 /// Describe the difference between two lists of candidate indices. Order is not considered (and indeed is supressed to make equality comparison easier).
-#[derive(Clone,Debug,Serialize,Deserialize,Eq,PartialEq)]
+#[derive(Clone,Debug,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct DeltasInCandidateLists {
     pub common : Vec<CandidateIndex>,
     pub list1only : Vec<CandidateIndex>,

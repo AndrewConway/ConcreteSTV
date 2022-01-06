@@ -240,7 +240,7 @@ impl NSWLGEDataLoader {
         if table.len() < 7 { return Err(anyhow!("DoP spreadsheet is too short"))}
         let expected_number_columns = 11+4*metadata.candidates.len()+14;
         if table[0].len() != expected_number_columns { return Err(anyhow!("DoP spreadsheet has {} columns expecting {}",table[0].len(),expected_number_columns)) }
-        println!("Read into a table with {} rows and {} columns",table.len(),table[0].len());
+        // println!("Read into a table with {} rows and {} columns",table.len(),table[0].len());
         let candidate_lookup = metadata.get_candidate_name_lookup();
         let col_candidate_papers = |c:CandidateIndex| 12+4*c.0;
         let col_count = 1;

@@ -11,6 +11,8 @@ use crate::ballot_paper::{ATL, BTL, VoteSource};
 use crate::ballot_pile::{PartiallyDistributedVote};
 use std::fs::File;
 use serde::{Deserialize,Serialize};
+use crate::distribution_of_preferences_transcript::Transcript;
+use crate::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
 
 /*
 /// Complete list of raw ballot markings.
@@ -105,5 +107,9 @@ impl ElectionData {
     pub fn is_atl_verifiable(&self,atl_index:usize,ballot_types_considered_unverifiable:&HashSet<String>) -> bool { Self::is_verifiable(&self.atl_types,atl_index,ballot_types_considered_unverifiable) }
     pub fn is_btl_verifiable(&self,btl_index:usize,ballot_types_considered_unverifiable:&HashSet<String>) -> bool { Self::is_verifiable(&self.btl_types,btl_index,ballot_types_considered_unverifiable) }
 
+    /// run the distribution of preferences with the values given in the metadata for the number of vacancies, who is ineligible, and EC resolutions. Convenience method.
+    pub fn distribute_preferences<Rules:PreferenceDistributionRules>(&self) -> Transcript<Rules::Tally> {
+        distribute_preferences::<Rules>(self,self.metadata.vacancies.unwrap(),&self.metadata.excluded.iter().cloned().collect::<HashSet<_>>(),&self.metadata.tie_resolutions,false)
+    }
 
 }

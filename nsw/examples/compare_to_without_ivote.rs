@@ -5,18 +5,10 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-use std::collections::HashSet;
 use nsw::NSWECLocalGov2021;
 use nsw::parse_lge::get_nsw_lge_data_loader_2021;
 use stv::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
-use stv::distribution_of_preferences_transcript::Transcript;
-use stv::election_data::ElectionData;
 use stv::parse_util::{FileFinder, RawDataSource};
-use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
-
-fn plain_count<R:PreferenceDistributionRules>(data : &ElectionData) -> Transcript<R::Tally> {
-    distribute_preferences::<R>(data,data.metadata.vacancies.unwrap(),&data.metadata.excluded.iter().cloned().collect::<HashSet<_>>(),&data.metadata.tie_resolutions,false)
-}
 
 /// Compare the "official" website results vs. the results of counting vs the results if iVote votes are not included.
 fn main() -> anyhow::Result<()> {
@@ -32,8 +24,8 @@ fn main() -> anyhow::Result<()> {
         let total_num_ivotes = total_num_votes-data_without_ivotes.num_votes();
         let turnout = if let Some(enrolment) = data_with_ivotes.metadata.enrolment { format!(" enrolment {} informal {} turnout {:.1}%",enrolment.0,data_with_ivotes.informal,100.0*(total_num_votes+data_with_ivotes.informal) as f64/enrolment.0 as f64) } else { "".to_string() };
         println!("Electorate {} {} formal votes including {} formal iVotes ({:.1}%){}",&electorate,total_num_votes,total_num_ivotes,100.0*total_num_ivotes as f64/total_num_votes as f64,turnout);
-        let transcript_with_ivotes = plain_count::<NSWECLocalGov2021>(&data_with_ivotes);
-        let transcript_without_ivotes = plain_count::<NSWECLocalGov2021>(&data_without_ivotes);
+        let transcript_with_ivotes = data_with_ivotes.distribute_preferences::<NSWECLocalGov2021>();
+        let transcript_without_ivotes = data_without_ivotes.distribute_preferences::<NSWECLocalGov2021>();
         let compare_official : DeltasInCandidateLists = DifferentCandidateLists{ list1: data_with_ivotes.metadata.results.as_ref().unwrap().clone(), list2: transcript_with_ivotes.elected.clone() }.into();
         if !compare_official.is_empty() {
             println!("  Different to official results for {} : {}",&electorate,compare_official.pretty_print(&data_with_ivotes.metadata));
