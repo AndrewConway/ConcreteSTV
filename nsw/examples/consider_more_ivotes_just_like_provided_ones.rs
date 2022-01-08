@@ -27,18 +27,19 @@ fn main() -> anyhow::Result<()> {
     let mut num_nonzero_different = 0;
     //let mut rng = ChaCha20Rng::from_entropy();
     let potential_list = include_str!("putative_lost_ivotes.csv");
+    let mut summary = vec![];
+    let num_runs = 1000000;
     for electorate_line in potential_list.split('\n') {
         let (electorate,said_to_be_lost) = electorate_line.trim().split_once(',').unwrap();
         if said_to_be_lost.is_empty() { continue; }
         let said_to_be_lost : usize = said_to_be_lost.parse().unwrap();
         num_electorate+=1;
         let data : ElectionData = loader.read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021>(&electorate)?;
-        println!("Processing electorate {}",electorate);
+        // println!("Processing electorate {}",electorate);
         let num_elements_to_add = said_to_be_lost;
         let sampler = build_sampler(&data);
         let mut num_same = 0;
         let mut num_others: HashMap<DeltasInCandidateLists,usize> = Default::default();
-        let num_runs = 1000000;
         //let res = run_elections(&data,&sampler,num_elements_to_add,num_runs,&mut rng);
         let res = run_lots_threads(&data,&sampler,num_elements_to_add,num_runs);
         for diff in res {
@@ -49,8 +50,12 @@ fn main() -> anyhow::Result<()> {
         for (result,num) in num_others {
             println!("-{}, +{} : {}",pretty_print_candidate_list(&result.list1only,&data.metadata),pretty_print_candidate_list(&result.list2only,&data.metadata),num);
         }
+        if num_same!=num_runs { summary.push((electorate.to_string(),num_elements_to_add,num_same))}
     }
-    println!("Of {} electorates, {} have at least one difference",num_electorate,num_nonzero_different);
+    println!("Of {} electorates, {} have at least one difference\n\n",num_electorate,num_nonzero_different);
+    for (electorate,num_elements_to_add,num_same) in summary {
+        println!("Electorate {} adding {} same as official {} different {}",electorate,num_elements_to_add,num_same,num_runs-num_same);
+    }
     Ok(())
 }
 
