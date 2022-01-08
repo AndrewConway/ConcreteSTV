@@ -7,5 +7,13 @@
 //! This crate tries to provide a unified API to different file formats and counting algorithms.
 //! It also contains the main binaries.
 
+use std::num::ParseIntError;
+use stv::ballot_metadata::CandidateIndex;
+
 pub mod rules;
 pub mod ec_data_source;
+
+/// Utility that is helpful for parsing in clap a Vec<Vec<CandidateIndex>>.
+pub fn try_parse_candidate_list(s:&str) -> Result<Vec<CandidateIndex>,ParseIntError> {
+    s.split(',').map(|s|s.trim().parse::<CandidateIndex>()).collect()
+}

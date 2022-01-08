@@ -15,6 +15,7 @@ use std::fs::File;
 use std::collections::HashMap;
 use std::iter::Map;
 use std::ops::{Range, Sub};
+use std::str::FromStr;
 use crate::tie_resolution::TieResolutionsMadeByEC;
 
 /// a candidate, referred to by position on the ballot paper, 0 being first
@@ -27,6 +28,14 @@ impl fmt::Display for CandidateIndex {
 // type alias really, don't want long display
 impl fmt::Debug for CandidateIndex {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "#{}", self.0) }
+}
+
+impl FromStr for CandidateIndex {
+    type Err = <usize as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CandidateIndex(usize::from_str(s)?))
+    }
 }
 
 

@@ -41,7 +41,8 @@ struct Opts {
 
     /// An optional list of candidates to exclude. This is a comma separated list of numbers,
     /// starting counting at zero. E.g. --exclude=5,6 would do the count assuming the candidates
-    /// with 5 and 6 other candidates listed before them are ineligible.
+    /// with 5 and 6 other candidates listed before them are ineligible. If specified, this overrides
+    /// any candidates specified as excluded in the .stv file.
     #[clap(short, long,use_delimiter=true,require_delimiter=true)]
     exclude : Option<Vec<usize>>,
 
@@ -53,6 +54,19 @@ struct Opts {
     /// This can be used to prove an upper bound on the margin.
     #[clap(short, long)]
     modification : Option<usize>,
+
+    /// Specified resolution of ties that need to be resolved by the electoral commission, often by lot.
+    ///
+    /// ConcreteSTV, by default, chooses in favour of the candidate in a worse donkey-vote position (higher indices favoured).
+    /// This is overriden by explicit tie resolutions specified when creating the .stv file.
+    /// This flag overrides both of these.
+    ///
+    /// You can override this by specifying a list of candidate indices (starting counting at 0) to favour in said priority order.
+    /// For example in a tie resolved between candidates 27 and 43, ConcreteSTV would favour 43 by default. Enter `--tie 43,27` to
+    /// indicate that 27 should be favoured over 43 in a decision between them.
+    /// This flag may be used multiple times for multiple tie resolutions.
+    #[clap(long,parse(try_from_str=main_app::try_parse_candidate_list))]
+    tie : Vec<Vec<CandidateIndex>>,
 
 }
 
@@ -80,7 +94,10 @@ fn main() -> anyhow::Result<()> {
         None => Default::default(),
         Some(v) => HashSet::from_iter(v.iter().map(|c|CandidateIndex(*c))),
     };
-    let transcript = opt.rules.count(&votes,vacancies,&excluded,&TieResolutionsMadeByEC::default(),opt.verbose);
+
+    let ec_resolutions = if opt.tie.is_empty() { votes.metadata.tie_resolutions.clone() } else { TieResolutionsMadeByEC{ tie_resolutions: opt.tie }};
+
+    let transcript = opt.rules.count(&votes,vacancies,&excluded,&ec_resolutions,opt.verbose);
 
     let transcript_file = match &opt.transcript {
         None => {

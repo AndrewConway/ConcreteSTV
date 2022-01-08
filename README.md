@@ -121,6 +121,7 @@ if you wish.
 Currently parse_ec_data can accept (as first argument) the following elections:
 * Federal Senate : AEC2013, AEC2016, AEC2019 [AEC](https://results.aec.gov.au/)
 * ACT Legislative assembly : ACT2008, ACT2012, ACT2016, ACT2020 [ElectionsACT](https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections)
+* NSW Local Government : NSWLG2021 [NSW Election Commission](https://www.elections.nsw.gov.au/) See [docs](nsw/parse_ec_data_lge.md) for specific instructions.
 
 ## To count (concrete_stv)
 
