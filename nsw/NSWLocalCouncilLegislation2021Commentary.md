@@ -9,7 +9,7 @@ Based on content from the New South Wales Legislation website at 3 Dec 2021. For
 The following is my interpretation of the (many) ambiguities in the legislation, and my opinions. I am not a lawyer. I am merely an expert in implementation of Australian STV algorithms. I do wish
 the people who drafted the legislation spoke to someone who had experience in implementing such algorithms when writing it.
 
-This is done prior to seeing how the NSW electoral commission has interpreted this legislation. 
+This was done prior to seeing how the NSW electoral commission has interpreted this legislation. 
 The legislation is very ambiguous in many places, meaning in many cases I have made a fairly arbitrary choice
 between two comparably plausible interpretations. It is very likely that the NSWEC has made a different
 set of choices. If their interpretation results in different candidates being elected to my interpretation, 
@@ -17,6 +17,16 @@ this does not necessarily mean that one of us has to be wrong as there is no rea
 I write this having found multiple errors in the NSWEC's (and other EC's) prior local government counts, and want to make it
 clear that if their results differ from mine this year, that is not necessarily proof that they (or ConcreteSTV for that matter) are wrong.
 I am very dubious about my (or any other) interpretation.
+
+After the NSW Electoral Commission published their results, I made a new algorithm that matched their interpretation,
+which is significantly different from mine, and could produce different candidates elected (although it does not do so
+in any of the 2021 elections, assuming the provided vote lists were correct). I have added to this document comments on how they
+interpreted the legislation. Their interpretation is, in my opinion, plausible, given the ambiguous legislation.
+
+My interpretation is used for the rule set `NSWLocalGov2021`; The rules `NSWECLocalGov2021` are my interpretation
+of the NSWEC's implementation, and match the dopfulldetails.xlsx perfectly (although they track some things
+I do not, and I track some things they do not, and some times - e.g. City of Albury, count 13, there are
+ties that are broken by lot - the choice that the NSWEC made must be specified by the `--tie` parameter)
 
 I strongly believe that the legislation should be made unambiguous.
 
@@ -47,7 +57,7 @@ This matters
  * For continuing candidate definitions in 10(2).
 
 Even though this is not explicitly stated, it is reasonably unambiguous that an exclusion is divided into
-multiple transfers. 
+multiple transfers. The NSWEC appears to make the same decision (evidence - almost everywhere).
 
 However the situation becomes more complex when we look at clause 7, where there are likely to be multiple transfer values
 produced. 7(4)(c)(ii) explicitly breaks up the computation of votes into separate computations with different transfer
@@ -56,7 +66,9 @@ at this point, then there will be a problem later on at 9(2)(b)(i) which expects
 make the rounding for each transfer value gratuitous, increasing the number of votes lost to rounding for no reason.
 
 This seems like strong evidence for a transfer of a surplus under clause 7 to be broken into multiple transfers
-by transfer value.  I assume that each different transfer value corresponds to a different transfer, but that for each transfer value all distributions to different candidates in 7(4)(c) are the same transfer.
+by transfer value.  I assume that each different transfer value corresponds to a different transfer, 
+but that for each transfer value all distributions to different candidates in 7(4)(c) are the same transfer.
+
 
 However, there is a major problem with this - there is no order specified for such transfers, and the order matters
 for similar reasons to the order of clause 9 transfers.
@@ -87,6 +99,12 @@ There is no obvious interpretation of the legislation. I consider the least intr
 this portion of the legislation functional to be to add in an order for the multiple transfer values for clause 7,
 doing highest transfer value first. I do not think that other interpretations are untenable or even less reasonable.
 
+The interpretation used by the NSWEC (evidence example: City of Albury, count 47) is
+to treat each prior sub-transfer to be treated (and rounded down) separately. This could come by interpreting
+the word *transfer* in 7 to mean sub-transfer (as described below) for the purpose of 7(4) but not for the
+purpose of clause 7(5). This interpretation has the benefit of being similar to the explicit separation
+for exclusions, but the disadvantage of introducing a gratuitously large number of votes lost to rounding.
+
 ### When do 10(2) and 10(4) apply?
 
 10(2) says that if a candidate obtains a quota through an exclusion, then 
@@ -111,7 +129,11 @@ a new ambiguity.
 I interpret 10(2) as applying to a sub-transfer, and 10(4) to require the exclusion under section 9 to complete,
 at which point the surplus transfer is done. I do not think that other interpretations are untenable.
 
-### What is the analogue of 10(2) for transfers under clause 7?
+The NSWEC takes the opposite interpretation for 10(2), interpreting 10(2) to mean a compound-transfer
+(evidence example : City of Albury, count 46). This seems plausible to me. They choose the same interpretation as
+me for 10(4).
+
+## What is the analogue of 10(2) for transfers under clause 7?
 
 Clause 7(2) is similar to 10(3) but applies to surplus distributions.
 
@@ -137,6 +159,9 @@ I consider the least bad solution to this to be to say that reaching a quota is 
 end of all sub-transfers under clause 7. I do not think that other interpretations are untenable or even less reasonable.
 In particular, given the similarity in language between 10(2) and 7(2), I do not like this difference
 in interpretation.
+
+The NSWEC makes the same interpretation as me for this (evidence example City of Albury, count 47).
+This is a more compelling interpretation for them than me given their interpretation of 10(2).
 
 ### Multi way ties.
 
@@ -164,6 +189,28 @@ There are many plausible ways of solving this problem:
 The first is arguably the closest to the language, and the least powerful solution, in the sense that it is the least likely to successfully break a tie. It was used in the Federal Senate counting legislation prior to 2 Dec 2021. The last is arguably the least close to the language, and the most powerful solution. It was used in federal senate counting legislation after 2 Dec 2021.
 
 I will choose the first of these as the interpretation (for both 9(5)/(6) and 8(4)), as it seems the closest to the literal language. I don't consider the other choices as untenable.
+
+The NSWEC appears to have chosen the third of these methods (evidence: three way tie resolution at the end of count 29 for City of Campbelltown). This 
+is reasonable, and has the advantage of resolving more ties.
+
+#### Does the countback in 8(4) or 9(5) apply to sub-transfers or compound transfers?
+
+There is another ambiguity I did not consider at first. Do clauses 8(4) and 9(5) apply to sub-transfers or compound-transfers?
+I interpreted it as sub-transfers (like most other jurisdictions) but the NSWEC seems to have interpreted it as
+compound-transfers. Evidence example : City of Albury, count 39,
+TIERNAN Jodie was eliminated. At the end of count 38, TIERNAN Jodie was tied on 94 with DOCKSEY Graham.
+A subset of votes are shown here:
+```text
+Count     TIERNAN Jodie   DOCKSEY Graham
+37             88             92
+...
+38.27.23.1     94             93
+...
+38             94             94
+```
+The NSWEC decided to exclude TIERNAN Jodie, presumably because of count 37, ignoring the subcounts of 38 such as 38.27.23.1.
+
+The NSWEC's decision seems a plausible interpretation, but has the disadvantage of resolving fewer ties.
 
 ### Aggregate value of exhausted votes.
 
@@ -219,6 +266,8 @@ I am not at all claiming that other interpretations are untenable. There is not 
 `the exhausted votes are to be excluded at the value that the votes were transferred to the candidate.`
 
 This is ambiguous, and could change who gets elected.
+I believe the NSWEC uses the same interpretation, although I have not checked quite as carefully as in
+other cases.
 
 ### When to apply clause 11 Election without reaching quota
 
@@ -273,6 +322,8 @@ anyway; it will not change who gets elected in 11(1),(2) or (3) applies, and 11(
 if there are undistributed surpluses. It could change the order of election. Of course all of this
 is moot if somehow surplus distributions are all done in one monolithic transfer - see earlier discussion.
 
+The NSWEC seems to use the same interpretation as me on this case. 
+
 ### Tracking exhausted votes
 
 Clause 15(1)(f) says that the counter must track `the votes which at some stage become exhausted votes.`
@@ -311,6 +362,13 @@ This is a lot of detail to deduce from the phrase `the votes which at some stage
 but to some extent it does not matter as the column is only for informational purposes; it does not
 change the outcome of the election in any way.
 
+The NSWEC seems to solve this ambiguity by not tracking them. Rather than separating out votes lost
+to exhaustion and rounding, they have a *Votes Lost* column, which only gets aggregate values
+for compound transfers. This neatly avoids the ambiguities, but does seem to be against the vibe
+of the legislation in 15 1(c) and (f). In their defense they do track many of these
+things in an even more detailed (although possibly harder to interpret) manner in their
+excellent dopfulldetails.xlsx file. 
+
 ### Tracking votes for the candidate having a surplus distributed.
 
 Clause 15(1)(a) requires tracking `the number of votes counted for each candidate`. How to do this
@@ -347,9 +405,29 @@ is a reasonably accurate (although ignoring some distortions from exhausted vote
 
 Many alternatives are tenable; none of them affect who is elected in any way - this is solely a communication issue.
 
+The NSWEC solves it by not including any figures here. This seems reasonable to me even if they seem to be required
+as they are not well defined.
+
 ### Typos
 
 9 (2) (a) starts "the total number of ballot-papers of the excluded candidate on which first preferences are recorded and which express a next available preference...".
 It is not immediately obvious why one bothers to mention "on which first preferences are recorded". 
 A careful examination of context makes it clear that the only sensible thing for this to mean is that this means that the first preference should be for the excluded candidate in question.
 This is almost certainly just a typo and will be treated as meaning that.
+
+### Bizarre transfer ordering.
+
+Section 9(2)(b) says that in an exclusion transfers are to be done `in the order of the transfers on which the excluded candidate obtained them`.
+This seems pretty unambiguous. However, there is some bizarre ordering done by the NSWEC:
+
+In the City of Albury, Count 42.41.20.5.1 is listed after counts 42.41.20.14.1 and 42.41.20.14.5.1.
+This is not the order in which the excluded candidate attained them - count 41.20.5.1, for instance, is listed before 41.20.14.1. 
+Similarly count 46.40.30.23.4.1 is listed before 46.40.30.4.1. 
+I believe this is because the counts are sorted numerically on the first 3 numbers, but lexicographically on the fourth number.
+
+A very similar thing happens for surplus distributions - compare 47.45.40.4.1 and 47.45.40.37.6.2.1
+
+This is almost certainly a bug in the NSWEC's program. However it is a minor issue, as their interpretations of the 
+legislation, taken as a whole, means that the order of sub-transfers never matters for determining who is elected or in what order.
+
+I emulate this bizarre behaviour in the rules `NSWECLocalGov2021`

@@ -35,7 +35,8 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **ACTPre2020** Rules used for ACT Legislative Assembly by ElectionsACT prior to 2020.
 - **ACT2020** Very buggy rules used by ElectionsACT in 2020
 - **ACT2021** Rules that should have been used by ElectionsACT in 2020 and were used for the 2021 recount.
-- **NSWLocalGov2021** My dubious and poorly tested interpretation of the new, very ambiguous, legislation for NSW local government elections introduced before the 2021 elections. 
+- **NSWLocalGov2021** My dubious interpretation of the new, very ambiguous, legislation for NSW local government elections introduced before the 2021 elections. 
+- **NSWECLocalGov2021** Rules used by the NSWEC in the 2021 local government elections. This differs in many respects from my interpretation of the very ambiguous legislation. See [my thoughts](nsw/NSWLocalCouncilLegislation2021Commentary.md) for details.
 
 This list is expected to grow as ConcreteSTV supports more jurisdictions.
 
