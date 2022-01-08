@@ -1,9 +1,9 @@
 City of Albury,142
 Armidale Regional,71
 Ballina - A Ward,35
-Ballina - B Ward,
-Ballina - C Ward,
-Ballina Mayoral,
+Ballina - B Ward,53
+Ballina - C Ward,52
+Ballina Mayoral,140
 Bathurst Regional,137
 Bayside - Ward 1,170
 Bayside - Ward 2,245
@@ -12,68 +12,68 @@ Bayside - Ward 4,167
 Bayside - Ward 5,130
 Bega Valley,49
 Bellingen,29
-Bellingen Mayoral,
+Bellingen Mayoral,29
 Berrigan,20
 City of Blacktown - Ward 1,611
 City of Blacktown - Ward 2,356
-City of Blacktown - Ward 3,
-City of Blacktown - Ward 4,242
+City of Blacktown - Ward 3,304
+City of Blacktown - Ward 4,343
 City of Blacktown - Ward 5,419
-Bland,
-Blayney,
+Bland,25
+Blayney,23
 City of Blue Mountains - Ward 1,65
 City of Blue Mountains - Ward 2,73
 City of Blue Mountains - Ward 3,94
 City of Blue Mountains - Ward 4,79
 Bogan,13
-Brewarrina,
+Brewarrina,0
 City of Broken Hill,38
-City of Broken Hill Mayoral,
+City of Broken Hill Mayoral,38
 Burwood,149
-Burwood Mayoral,127
+Burwood Mayoral,149
 Byron,127
-Byron Mayoral,
+Byron Mayoral,127
 Cabonne,57
 Camden - Central Ward,269
 Camden - North Ward,362
 Camden - South Ward,201
 City of Campbelltown,764
 Canada Bay,491
-Canada Bay Mayoral,
-Canterbury-Bankstown - Bankstown Ward,
+Canada Bay Mayoral,491
+Canterbury-Bankstown - Bankstown Ward,337
 Canterbury-Bankstown - Bass Hill Ward,363
 Canterbury-Bankstown - Canterbury Ward,369
 Canterbury-Bankstown - Revesby Ward,391
-Canterbury-Bankstown - Roselands Ward,
+Canterbury-Bankstown - Roselands Ward,360
 Carrathool - Ward A,4
 City of Cessnock - A Ward,73
 City of Cessnock - B Ward,69
 City of Cessnock - C Ward,86
 City of Cessnock - D Ward,89
-City of Cessnock Mayoral,
+City of Cessnock Mayoral,317
 Clarence Valley,143
 City of Coffs Harbour,251
 City of Coffs Harbour Mayoral,251
 Coolamon,19
 Coonamble,10
-Cootamundra-Gundagai Regional,
+Cootamundra-Gundagai Regional,19
 Cowra,32
 Cumberland - Granville Ward,215
-Cumberland - Greystanes Ward,
+Cumberland - Greystanes Ward,208
 Cumberland - Regents Park Ward,184
-Cumberland - South Granville Ward,
+Cumberland - South Granville Ward,196
 Cumberland - Wentworthville Ward,221
-Dubbo Regional - Dubbo Central Ward,
-Dubbo Regional - Dubbo East Ward,
+Dubbo Regional - Dubbo Central Ward,36
+Dubbo Regional - Dubbo East Ward,28
 Dubbo Regional - Dubbo North Ward,45
 Dubbo Regional - Dubbo South Ward,47
-Dubbo Regional - Wellington Ward,
-Dungog - A Ward,
-Dungog - B Ward,
-Dungog - C Ward,
-Edward River,
+Dubbo Regional - Wellington Ward,24
+Dungog - A Ward,9
+Dungog - B Ward,16
+Dungog - C Ward,8
+Edward River,9
 Eurobodalla,114
-Eurobodalla Mayoral,
+Eurobodalla Mayoral,114
 Federation,22
 Forbes,37
 Georges River - Blakehurst Ward,122
@@ -81,60 +81,60 @@ Georges River - Hurstville Ward,133
 Georges River - Kogarah Bay Ward,159
 Georges River - Mortdale Ward,124
 Georges River - Peakhurst Ward,161
-Gilgandra,
+Gilgandra,11
 Glen Innes Severn Shire,8
 Goulburn Mulwaree,93
-Greater Hume Shire - North Ward,
-Greater Hume Shire - West Ward,
+Greater Hume Shire - North Ward,8
+Greater Hume Shire - West Ward,5
 City of Griffith,73
 City of Griffith Mayoral,73
 Gunnedah,50
-Gwydir,
+Gwydir,17
 City of Hawkesbury,300
 Hay,6
 Hilltops,45
 Hornsby - Ward A,200
 Hornsby - Ward B,241
-Hornsby - Ward C,
-Hornsby Mayoral,
+Hornsby - Ward C,212
+Hornsby Mayoral,653
 Hunter's Hill - North Ward,37
 Hunter's Hill - South Ward,34
-Hunter's Hill Mayoral,
+Hunter's Hill Mayoral,71
 Inner West - Ashfield - Djarrawunang (Magpie) Ward,220
 Inner West - Balmain - Baludarri (Leather Jacket) Ward,196
 Inner West - Leichhardt - Gulgadya (Grass Tree) Ward,199
 Inner West - Marrickville - Midjuburi (Lillypilly) Ward,242
 Inner West - Stanmore - Damun (Port Jackson Fig) Ward,266
-Inverell,
+Inverell,26
 Junee,13
 Kempsey,34
-Kempsey Mayoral,
+Kempsey Mayoral,66
 Kiama,57
 Ku-ring-gai - Comenarra Ward,120
 Ku-ring-gai - Gordon Ward,117
 Ku-ring-gai - Roseville Ward,128
 Ku-ring-gai - St Ives Ward,83
 Ku-ring-gai - Wahroonga Ward,125
-Kyogle - B Ward,
-Kyogle - C Ward,
-Lachlan - E Ward,
+Kyogle - B Ward,6
+Kyogle - C Ward,2
+Lachlan - E Ward,1
 City of Lake Macquarie - East Ward,336
 City of Lake Macquarie - North Ward,429
 City of Lake Macquarie - West Ward,364
-City of Lake Macquarie Mayoral,
+City of Lake Macquarie Mayoral,1129
 Lane Cove - Central Ward,58
 Lane Cove - East Ward,81
 Lane Cove - West Ward,61
 Leeton,32
 City of Lismore,123
-City of Lismore Mayoral,
+City of Lismore Mayoral,123
 City of Lithgow,70
 City of Liverpool - North Ward,518
 City of Liverpool - South Ward,661
-City of Liverpool Mayoral,
-Liverpool Plains,
-Lockhart - A Ward,
-Lockhart - B Ward,
+City of Liverpool Mayoral,1179
+Liverpool Plains,27
+Lockhart - A Ward,2
+Lockhart - B Ward,3
 City of Maitland - Central Ward,110
 City of Maitland - East Ward,96
 City of Maitland - North Ward,122
@@ -144,20 +144,20 @@ Mid-Coast,259
 Mid-Western Regional,74
 Moree Plains,41
 Mosman,131
-Mosman Mayoral,
-Murrumbidgee - Jerilderie Ward,
-Murrumbidgee - Murrumbidgee East Ward,
-Murrumbidgee - Murrumbidgee Ward,
+Mosman Mayoral,131
+Murrumbidgee - Jerilderie Ward,3
+Murrumbidgee - Murrumbidgee East Ward,12
+Murrumbidgee - Murrumbidgee Ward,1
 Muswellbrook,69
 Nambucca Valley,35
-Nambucca Valley Mayoral,
+Nambucca Valley Mayoral,35
 Narrabri,53
 Narrandera,22
 City of Newcastle - Ward 1,248
 City of Newcastle - Ward 2,287
 City of Newcastle - Ward 3,256
 City of Newcastle - Ward 4,220
-City of Newcastle Mayoral,
+City of Newcastle Mayoral,1011
 North Sydney - Cammeraygal Ward,251
 North Sydney - St Leonards Ward,257
 Northern Beaches - Curl Curl Ward,305
@@ -170,37 +170,37 @@ City of Orange,172
 City of Orange Mayoral,172
 Parkes,41
 City of Parramatta - Dundas Ward,259
-City of Parramatta - Epping Ward,
+City of Parramatta - Epping Ward,226
 City of Parramatta - North Rocks Ward,213
 City of Parramatta - Parramatta Ward,227
 City of Parramatta - Rosehill Ward,119
 Port Macquarie-Hastings,266
-Port Macquarie-Hastings Mayoral,
+Port Macquarie-Hastings Mayoral,266
 Port Stephens - Central Ward,118
-Port Stephens - East Ward,
+Port Stephens - East Ward,83
 Port Stephens - West Ward,105
-Port Stephens Mayoral,
+Port Stephens Mayoral,306
 Queanbeyan-Palerang Regional,143
 City of Randwick - Central Ward,135
-City of Randwick - East Ward,
-City of Randwick - North Ward,
+City of Randwick - East Ward,146
+City of Randwick - North Ward,147
 City of Randwick - South Ward,134
 City of Randwick - West Ward,140
 Richmond Valley,52
-Richmond Valley Mayoral,
+Richmond Valley Mayoral,52
 City of Ryde - Central Ward,211
 City of Ryde - East Ward,220
 City of Ryde - West Ward,145
 City of Shellharbour - Ward A,54
 City of Shellharbour - Ward B,86
-City of Shellharbour - Ward C,
-City of Shellharbour Mayoral,
+City of Shellharbour - Ward C,69
+City of Shellharbour Mayoral,399
 City of Shoalhaven - Ward 1,145
 City of Shoalhaven - Ward 2,131
-City of Shoalhaven - Ward 3,
+City of Shoalhaven - Ward 3,127
 City of Shoalhaven Mayoral,403
 Singleton,55
-Singleton Mayoral,
+Singleton Mayoral,104
 Snowy Monaro Regional,45
 Snowy Valleys,13
 Strathfield,197
@@ -213,29 +213,29 @@ City of Sydney,2003
 City of Sydney Mayoral,2003
 Tamworth Regional,194
 Temora,13
-Tenterfield - Ward D,
+Tenterfield - Ward D,0
 The Hills Shire - Central Ward,312
-The Hills Shire - East Ward,
+The Hills Shire - East Ward,250
 The Hills Shire - North Ward,360
-The Hills Shire - West Ward,
-The Hills Shire Mayoral,
+The Hills Shire - West Ward,305
+The Hills Shire Mayoral,1227
 Tweed,166
 Upper Hunter Shire,47
-Upper Lachlan Shire,
-Uralla - Ward A,
-Uralla - Ward B,
-Uralla Mayoral,
+Upper Lachlan Shire,19
+Uralla - Ward A,8
+Uralla - Ward B,10
+Uralla Mayoral,18
 City of Wagga Wagga,229
-Walcha - B Ward,
-Walcha - D Ward,
+Walcha - B Ward,4
+Walcha - D Ward,2
 Walgett,23
-Warren - A Ward,
-Warren - B Ward,
-Warren - D Ward,
+Warren - A Ward,5
+Warren - B Ward,1
+Warren - D Ward,0
 Warrumbungle Shire,30
 Waverley - Bondi Ward,117
-Waverley - Hunter Ward,
-Waverley - Lawson Ward,
+Waverley - Hunter Ward,91
+Waverley - Lawson Ward,98
 Waverley - Waverley Ward,74
 Weddin,23
 Wentworth,12
@@ -243,17 +243,17 @@ City of Willoughby - Middle Harbour Ward,81
 City of Willoughby - Naremburn Ward,43
 City of Willoughby - Sailors Bay Ward,86
 City of Willoughby - West Ward,88
-City of Willoughby Mayoral,
+City of Willoughby Mayoral,333
 Wollondilly - East Ward,95
 Wollondilly - North Ward,116
 Wollondilly Mayoral,211
 City of Wollongong - Ward 1,345
 City of Wollongong - Ward 2,438
 City of Wollongong - Ward 3,304
-City of Wollongong Mayoral,
-Woollahra - Bellevue Hill Ward,
+City of Wollongong Mayoral,1087
+Woollahra - Bellevue Hill Ward,89
 Woollahra - Cooper Ward,69
-Woollahra - Double Bay Ward,
-Woollahra - Paddington Ward,
-Woollahra - Vaucluse Ward,
+Woollahra - Double Bay Ward,67
+Woollahra - Paddington Ward,87
+Woollahra - Vaucluse Ward,57
 Yass Valley,70

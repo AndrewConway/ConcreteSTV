@@ -23,19 +23,19 @@ fn main() -> anyhow::Result <()> {
 
     create_dir_all("changes")?;
     let mut summary = File::create("changes/summary.csv")?;
-    writeln!(summary,"Electorate,Votes,Min Addition,Min Manipulation")?;
     let ballot_types_considered_unverifiable = ["iVote"];
     let ballot_types_considered_unverifiable : HashSet<String> = ballot_types_considered_unverifiable.iter().map(|s|s.to_string()).collect();
     let options1 = ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: false, ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone() };
     let options2 = ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone() };
+    writeln!(summary,"Electorate,Votes,Min Addition,Min Manipulation")?;
     for electorate in &electorates {
         println!("Electorate: {}", electorate);
         // let data = loader.load_cached_data(electorate)?;
         let data = loader.read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021>(electorate)?;
         data.print_summary();
         let mut results = find_outcome_changes::<NSWECLocalGov2021>(&data,&options1);
-        let results2 = find_outcome_changes::<NSWECLocalGov2021>(&data,&options2);
-        results.merge(results2);
+        //let results2 = find_outcome_changes::<NSWECLocalGov2021>(&data,&options2);
+        //results.merge(results2);
         results.sort();
 
         let out = File::create(format!("changes/{}.vchange", electorate))?;
