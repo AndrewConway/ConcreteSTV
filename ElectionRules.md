@@ -109,7 +109,10 @@ gave different results when counted multiple times.
 The [new legislation](nsw/NSWLocalCouncilLegislation2021.md) is very ambiguous, and while I have
 made an [interpretation](nsw/NSWLocalCouncilLegislation2021Commentary.md) of it, I would not say
 that my interpretation precludes just as valid other interpretations which are likely to result
-in different candidates being elected. At the time of writing, I have not heard anything about
-the NSWEC interpretation, nor seen any output of their interpretation; I anticipate it will
-be significantly different.
+in different candidates being elected. After writing my interpretation, 
+the NSWEC published the transcript of distribution of preferences, from which I was able
+to work out my interpretation of their interpretation, which is now also in the above link
+
+- **NSWLocalGov2021** My interpretation, for what it is worth
+- **NSWECLocalGov2021** My interpretation of the rules used by the NSWEC for the 2021 NSW local government elections.
 
