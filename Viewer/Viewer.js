@@ -282,15 +282,47 @@ function RenderTranscript(full_transcript,render_div) {
     }
 }
 
+/** Received a list of possible URLs to choose from for data.
+ *  The list should be in the format { title : "New window title", choices : [ "name1.vchange", "name2.vchange" ]}.
+ *  Consider "ls -Q -m" to produce this file.
+ */
+function GotURLList(baseURL,list) {
+    if (list.title) document.title = list.title;
+    const box = document.getElementById("ChooseBox");
+    box.className = "";
+    for (const choice of list.choices) {
+        const option = add(box,"option");
+        option.value = choice;
+        option.innerText = choice.replace(/.vchange$/," vote changes");
+    }
+    document.getElementById("NothingChosen").innerText="Please choose the document you wish to display"
+    function changeFunction() {
+        let url = new URL(box.value,baseURL);
+        function failure(message) { document.getElementById("NothingChosen").innerText="Could not load "+url.toString()+" because "+message; }
+        function success(data) { document_to_show=data; Render(); }
+        getWebJSON(url.toString(),success,failure);
+    };
+    box.onchange = changeFunction;
+    changeFunction();
+}
 function ChooseTranscript() {
     const files = document.getElementById("ChooseTranscript").files;
     if (files.length>0) files[0].text().then(text=>{document_to_show=JSON.parse(text); Render(); });
 }
 
 window.onload = function () {
-    document.getElementById("ChooseTranscript").onchange = ChooseTranscript;
+    const url = new URL(document.location.href);
+    const provided_list_url = url.searchParams.get("list");
+    if (provided_list_url) { // fetch a list of options from the list
+        const resolved_provided_list_url = new URL(provided_list_url,url);
+        function failure(message) { document.getElementById("NothingChosen").innerText="Could not load "+resolved_provided_list_url.toString()+" because "+message; }
+        getWebJSON(resolved_provided_list_url.toString(),list => GotURLList(resolved_provided_list_url,list),failure);
+        document.getElementById("ChooseTranscript").className="hidden";
+    } else { // access local files
+        document.getElementById("ChooseTranscript").onchange = ChooseTranscript;
+    }
     document.getElementById("ShowPapers").onchange = Render;
     document.getElementById("heading-orientation").onchange = Render;
-    function got_std(data) { document_to_show=data; Render(); }
+    // function got_std(data) { document_to_show=data; Render(); }
     // getWebJSON("../transcript.json",data=>{full_transcript=data; Render();},null);
 }

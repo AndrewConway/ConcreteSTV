@@ -145,6 +145,6 @@ table.changes td {
 div#TranscriptOnly {
     display: inline;
 }
-div.hidden, div.hidden#TranscriptOnly {
+.hidden, div.hidden#TranscriptOnly {
     display: none;
 }
