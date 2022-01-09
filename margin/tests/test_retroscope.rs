@@ -205,7 +205,7 @@ fn test_retroscope() {
         }
     }
 
-    let optimize_result = optimise::<FederalRules>(&vote_changes,&vote_data,&retroscope,&ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default() }).unwrap();
+    let optimize_result = optimise::<FederalRules>(&vote_changes,&vote_data,&retroscope,&ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default() },true).unwrap();
     assert_eq!(optimize_result.deltas.list2only,vec![CandidateIndex(3)]);
     assert_eq!(optimize_result.deltas.list1only,vec![CandidateIndex(1)]);
     assert_eq!(optimize_result.changes.n,BallotPaperCount(17)); // optimized it down to 17.

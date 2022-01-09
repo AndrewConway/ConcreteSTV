@@ -16,7 +16,7 @@ use crate::ballot_pile::{VotesWithMultipleTransferValues, HowSplitByCountNumber,
 use std::collections::{HashSet, VecDeque};
 use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use crate::transfer_value::{TransferValue, StringSerializedRational};
-use std::ops::{AddAssign, Neg, SubAssign, Sub, Range};
+use std::ops::{AddAssign, Neg, SubAssign, Sub, Range, Div};
 use std::fmt::Display;
 use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, DecisionMadeByEC, CountIndex};
 use crate::util::{DetectUnique, CollectAll};
@@ -102,7 +102,7 @@ impl RoundUpToUsize for usize {
 
 pub trait PreferenceDistributionRules {
     /// The type for the number of votes. Usually an integer.
-    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>+RoundUpToUsize;
+    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>+RoundUpToUsize+Div<usize,Output=Self::Tally>;
     type SplitByNumber : HowSplitByCountNumber;
 
     /// Whether to transfer all the votes or just the last parcel.

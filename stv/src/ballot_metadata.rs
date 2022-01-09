@@ -58,6 +58,11 @@ impl fmt::Debug for PartyIndex {
 #[derive(Clone, Copy, PartialEq, Eq, Hash,Serialize,Deserialize,Ord, PartialOrd)]
 pub struct NumberOfCandidates(pub usize);
 
+impl FromStr for NumberOfCandidates {
+    type Err = <usize as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(NumberOfCandidates(usize::from_str(s)?)) }
+}
 // type alias really, don't want long display
 impl fmt::Display for NumberOfCandidates {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.0) }

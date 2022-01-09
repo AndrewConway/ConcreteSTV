@@ -17,7 +17,9 @@ use std::fmt::{Display, Formatter};
 use act::{ACTPre2020, ACT2020, ACT2021};
 use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 use serde::{Serialize,Deserialize};
+use margin::record_changes::ElectionChanges;
 use nsw::{NSWECLocalGov2021, NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation};
+use crate::ChangeOptions;
 
 #[derive(Copy, Clone)]
 pub enum Rules {
@@ -90,11 +92,43 @@ impl Rules {
         };
         PossibleTranscripts::Integers(TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript })
     }
+
+    pub fn find_changes(&self,data:&ElectionData,options:&ChangeOptions,verbose:bool) -> anyhow::Result<PossibleChanges> {
+        Ok(match self {
+            Rules::AEC2013 => PossibleChanges::Integers(options.find_changes::<FederalRulesUsed2013>(data,verbose)?),
+            Rules::AEC2016 => PossibleChanges::Integers(options.find_changes::<FederalRulesUsed2016>(data,verbose)?),
+            Rules::AEC2019 => PossibleChanges::Integers(options.find_changes::<FederalRulesUsed2019>(data,verbose)?),
+            Rules::Federal => PossibleChanges::Integers(options.find_changes::<FederalRules>(data,verbose)?),
+            Rules::ACTPre2020 => PossibleChanges::Integers(options.find_changes::<ACTPre2020>(data,verbose)?),
+            Rules::ACT2020 => PossibleChanges::SixDigitDecimals(options.find_changes::<ACT2020>(data,verbose)?),
+            Rules::ACT2021 => PossibleChanges::SixDigitDecimals(options.find_changes::<ACT2021>(data,verbose)?),
+            Rules::NSWLocalGov2021 => PossibleChanges::Integers(options.find_changes::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(data,verbose)?),
+            Rules::NSWECLocalGov2021 => PossibleChanges::Integers(options.find_changes::<NSWECLocalGov2021>(data,verbose)?),
+        })
+    }
 }
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PossibleChanges {
+    Integers(ElectionChanges<usize>),
+    SixDigitDecimals(ElectionChanges<FixedPrecisionDecimal<6>>),
+}
+
+
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PossibleTranscripts {
     Integers(TranscriptWithMetadata<usize>),
     SixDigitDecimals(TranscriptWithMetadata<FixedPrecisionDecimal<6>>),
+}
+
+impl PossibleTranscripts {
+    pub fn elected(&self) -> &Vec<CandidateIndex> {
+        match self {
+            PossibleTranscripts::Integers(t) => {&t.transcript.elected}
+            PossibleTranscripts::SixDigitDecimals(t) => {&t.transcript.elected}
+        }
+    }
 }

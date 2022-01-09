@@ -8,7 +8,7 @@
 
 //! A fixed precision decimal type for jurisdictions like ACT who count votes to a particular number of decimal places.
 
-use std::ops::{AddAssign, SubAssign, Sub, Add};
+use std::ops::{AddAssign, SubAssign, Sub, Add, Div};
 use num::{Zero, BigRational, BigInt, ToPrimitive};
 use std::fmt::{Display, Formatter};
 use std::iter::Sum;
@@ -151,6 +151,14 @@ impl <const DIGITS:usize> RoundUpToUsize for FixedPrecisionDecimal<DIGITS> {
     }
 }
 
+impl <const DIGITS:usize> Div<usize> for FixedPrecisionDecimal<DIGITS> {
+    type Output = Self;
+
+    fn div(self, rhs: usize) -> Self::Output {
+        FixedPrecisionDecimal{scaled_value: self.scaled_value/(rhs as u64)}
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::fixed_precision_decimal::FixedPrecisionDecimal;
@@ -174,6 +182,7 @@ mod tests {
         assert_eq!("43",format!("{}",d_42));
         d_42-=d_1;
         assert_eq!("42",format!("{}",d_42));
+        assert_eq!("21",format!("{}",d_42/2));
         let parsed : SixDigitDecimal = "45.25".parse().unwrap();
         assert_eq!("45.25",format!("{}",parsed));
 

@@ -42,23 +42,23 @@ pub struct FoundChange<Tally> {
     pub deltas : DeltasInCandidateLists,
     pub changes : BallotChanges<Tally>
 }
-pub fn optimise<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:&ChooseVotesOptions) -> Option<FoundChange<R::Tally>> {
-    optimise_work::<R>(vote_changes,election_data,retroscope,options,0)
+pub fn optimise<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:&ChooseVotesOptions,verbose:bool) -> Option<FoundChange<R::Tally>> {
+    optimise_work::<R>(vote_changes,election_data,retroscope,options,verbose,0)
 }
-pub fn optimise_work<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:&ChooseVotesOptions,tried_already:usize) -> Option<FoundChange<R::Tally>> {
+pub fn optimise_work<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:&ChooseVotesOptions,verbose:bool,tried_already:usize) -> Option<FoundChange<R::Tally>> {
     match simple_test::<R>(vote_changes,election_data,retroscope,options) {
         ChangeResult::NotEnoughVotesAvailable => { // could try reducing.
-            println!("Not enough votes available - looking for {} from {}",vote_changes.changes.iter().map(|c|c.vote_value.clone()).sum::<R::Tally>(),vote_changes.changes.first().and_then(|c|c.from).map(|c|election_data.metadata.candidate(c).name.as_str()).unwrap_or(""));
+            if verbose { println!("Not enough votes available - looking for {} from {}",vote_changes.changes.iter().map(|c|c.vote_value.clone()).sum::<R::Tally>(),vote_changes.changes.first().and_then(|c|c.from).map(|c|election_data.metadata.candidate(c).name.as_str()).unwrap_or(""));}
             None // TODO try reducing
         }
         ChangeResult::NoChange => { // could try increasing
             if tried_already==0 {
-                println!("No change - trying doubling everything");
+                if verbose { println!("No change - trying doubling everything"); }
                 let mut new_changes = vote_changes.clone();
                 for c in &mut new_changes.changes { c.vote_value+=c.vote_value.clone(); }
-                optimise_work::<R>(&new_changes,election_data,retroscope,options,tried_already+1)
+                optimise_work::<R>(&new_changes,election_data,retroscope,options,verbose,tried_already+1)
             } else {
-                println!("No change - giving up");
+                if verbose { println!("No change - giving up"); }
                 None
             }
         }
@@ -72,12 +72,12 @@ pub fn optimise_work<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R:
                 for i in 0..vote_changes.changes.len() {
                     let current_tally = opt_vote_changes.changes[i].vote_value.ceil();
                     let try_value = |new_count:usize| {
-                        println!("Trying change to {}",new_count);
+                        if verbose { println!("Trying change to {}",new_count); }
                         simple_test::<R>(&opt_vote_changes.change_single_value(i,new_count),election_data,retroscope,options)
                     };
                     if let Some(search_res) = binary_search(try_value,0,current_tally) {
                         if search_res.n<current_tally { // had an improvement!
-                            println!("Improved change from {} to {}",current_tally,search_res.n);
+                            if verbose { println!("Improved change from {} to {}",current_tally,search_res.n); }
                             opt_vote_changes.changes[i].vote_value=search_res.n.into();
                             if vote_changes.changes.len()>1 { had_change=true; }
                             if best_so_far.changes.n>=search_res.changes.n { // almost always the case if votes are reduced

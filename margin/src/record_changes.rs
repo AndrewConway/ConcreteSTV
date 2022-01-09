@@ -115,25 +115,25 @@ impl <Tally:Clone> ElectionChanges<Tally> {
     pub fn new(data:&ElectionData,ballot_types_considered_unverifiable:&HashSet<String>) -> Self { ElectionChanges { original: data.clone(), changes: vec![] , ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone()} }
 
     /// Add a change, if there is no strictly better one already known.
-    pub fn add_change(&mut self,change:ElectionChange<Tally>) {
-        println!("Recorder given a change of {} ballots",change.ballots.n);
+    pub fn add_change(&mut self,change:ElectionChange<Tally>,verbose:bool) {
+        if verbose { println!("Recorder given a change of {} ballots",change.ballots.n); }
         for existing in &self.changes {
             if change.is_dominated_by_or_equivalent_to(existing) { return; } // no point keeping it.
         }
         // see if any existing should be removed
         self.changes.retain(|existing|!existing.is_dominated_by_or_equivalent_to(&change));
-        println!("This is a new personal best.");
+        if verbose { println!("This is a new personal best."); }
         self.changes.push(change);
     }
 
-    pub fn merge(&mut self,other:Self) {
+    pub fn merge(&mut self,other:Self,verbose:bool) {
         for v in other.changes {
-            self.add_change(v);
+            self.add_change(v,verbose);
         }
     }
     /// add an outcome once found.
-    pub fn add(&mut self,found:FoundChange<Tally>) {
-        self.add_change(ElectionChange::new(found.deltas,found.changes,&self.original,&self.ballot_types_considered_unverifiable));
+    pub fn add(&mut self,found:FoundChange<Tally>,verbose:bool) {
+        self.add_change(ElectionChange::new(found.deltas,found.changes,&self.original,&self.ballot_types_considered_unverifiable),verbose);
     }
 
     pub fn smallest_manipulation_found(&self) -> Option<BallotPaperCount> {
