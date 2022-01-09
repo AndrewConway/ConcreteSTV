@@ -14,6 +14,7 @@ use std::collections::HashSet;
 use federal::{FederalRulesUsed2013, FederalRulesUsed2019, FederalRulesUsed2016, FederalRules};
 use stv::preference_distribution::distribute_preferences;
 use std::fmt::{Display, Formatter};
+use anyhow::anyhow;
 use act::{ACTPre2020, ACT2020, ACT2021};
 use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 use serde::{Serialize,Deserialize};
@@ -71,6 +72,10 @@ impl Display for Rules {
 }
 
 impl Rules {
+
+    pub fn count_simple(&self, data:&ElectionData, verbose:bool) -> anyhow::Result<PossibleTranscripts> {
+        Ok(self.count(data,data.metadata.vacancies.ok_or_else(||anyhow!("Need to specify number of vacancies"))?,&data.metadata.excluded.iter().cloned().collect(),&data.metadata.tie_resolutions,verbose))
+    }
 
     pub fn count(&self,data: &ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,print_progress_to_stdout:bool) -> PossibleTranscripts {
         let transcript = match self {

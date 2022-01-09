@@ -164,6 +164,14 @@ You can compare this to the [AEC provided transcript](https://results.aec.gov.au
 Other STV counting programs include Grahame Bowland's [Dividebatur](https://github.com/grahame/dividebatur) 
 and its successor [Dividebatur2](https://github.com/grahame/dividebatur2), Lee Yingtong Li's [OpenTally](https://yingtongli.me/git/OpenTally/), and Milad Ghale's [formally verified STV](https://github.com/MiladKetabGhale/STV-Counting-ProtocolVerification).
 
+## Margins and modifications.
+
+There is a program `change outcomes` that can find modifications that change the outcome of the
+election, and thus are an upper bound on the margin. This program takes a `.stv` file like
+`concrete_stv` and produces a `.vchange` file with details of what it found.
+
+See [margins.md](margins.md) for details.
+
 ## Example data files
 
 The `examples` directory contains some interesting contrived examples where the rules used matter.
@@ -183,7 +191,7 @@ has winners W1, W3, W7, W6, W5, W4, the same as 2016 but in a different order. T
 
 ## File formats
 
-Both the .stv and .transcript files are JSON format. 
+The .stv, .transcript, and .vchange files are all JSON format. 
 
 The .stv files are a straight forward JSON representation of the `ElectionData` structure defined in
 [election_data.rs](stv/src/election_data.rs) which reference structures in [ballot_paper.rs](stv/src/ballot_paper.rs), 
@@ -200,6 +208,12 @@ Writing them as JSON numbers could lead to loss of precision.
 * Most vote counts and ballot paper counts are stored as JSON numbers (integers).
 * When a vote count could be a non-integer (e.g. ACT2020 or ACT2021 rules), vote tallys are stored as strings like "345.288272". Ballot counts are still stored as JSON numbers as they are integers
 * Votes lost to rounding is a special case, as unlike all other numbers mentioned here it can be negative (ACT2020 rules). These are stored as JSON strings, even when using rule sets where they must be integers.
+
+The .vchange files contain the .stv file, as well as a list of possible modifications. The only part
+that is not straight forward is the list of affected votes. Affected votes are represented by a multiplicity and an
+integer:
+* If less than the number of entries in the `atl` array in the contained `.stv` file, it is an index into this `atl` array - an above the line vote.
+* Otherwise, subtract the number of entries in the `atl` array, and it is now an index into the `btl` array of below the line votes.
 
 ## LaTeX tables
 
