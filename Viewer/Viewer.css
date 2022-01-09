@@ -140,3 +140,11 @@ table.changes td {
     visibility: visible;
     opacity: 1;
 }
+
+/* Classes for determining the appropriate messages by what is showing */
+div#TranscriptOnly {
+    display: inline;
+}
+div.hidden, div.hidden#TranscriptOnly {
+    display: none;
+}

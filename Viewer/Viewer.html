@@ -11,28 +11,39 @@
 
 <header>
     <input type="file" id="ChooseTranscript" accept=".json,.transcript,.vchange"/>
-    <select id="heading-orientation">
-        <option value="horiz">Horizontal Candidate Names</option>
-        <option value="vert">Vertical Candidate Names</option>
-        <option value="slanted" selected>Slanted Candidate Names</option>
-    </select>
+    <div id="TranscriptOnly" class="hidden">
+        <select id="heading-orientation">
+            <option value="horiz">Horizontal Candidate Names</option>
+            <option value="vert">Vertical Candidate Names</option>
+            <option value="slanted" selected>Slanted Candidate Names</option>
+        </select>
 
-    <input type="checkbox" id="ShowPapers"> <label for="ShowPapers">Show Papers</label>
+        <input type="checkbox" id="ShowPapers"> <label for="ShowPapers">Show Papers</label>
+    </div>
+    <div id="NothingChosen" class="">
+        Please choose a .transcript file to view a transcript, or a .vchange file to view election changes using the Browse button above.
+    </div>
 </header>
 
-<h2 id="MainHeading">Instructions for viewing election changes or transcripts</h2>
-<p>This page allows you to examine specific vote changes that can change outcomes in elections.
-<p>Click on the browse button above to select the contest. You will be shown one or more small vote changes
-or vote additions that alter the outcome in that contest, specifying:
+<div id="ChangeOnly" class="hidden">
+    <h2>Instructions for viewing election changes</h2>
+    <p>This page allows you to examine specific vote changes that can change outcomes in elections.
+    <p>Click on the browse button above to select the .vchange file. You will be shown one or more small vote changes
+        or vote additions that alter the outcome in that contest, specifying:
     <ul>
+        <li><b>Ballots:</b> how many votes are involved </li>
+        <li><b>Effect:</b> which candidate(s) are added or removed from the list of elected candidates</li>
+        <li><b>How:</b> What the change involves. <em>Changed</em> means some ballots were changed; <em>Added</em>
+            means some votes were added. <em>Removed</em> means some ballots were removed.
+            <em>ATL</em> means some above the line votes were affected (this can be
+            prohibited in some scenarios). <em>First Preferences</em> means some first preference votes were
+            affected (this can be prohibited in some scenarios). <em>Affected Verifiable</em> means some
+            votes considered verifiable were affected (this is situation dependent).</li>
+        <li><b>Details:</b> a summary of the vote changes. Hover your mouse over them to see exactly which votes are changed or added</li>
+    </ul>
+</div>
 
-    <li><b>Ballots:</b> how many votes are involved </li>
-    <li><b>Effect:</b> which candidate(s) are added or removed</li>
-    <li><b>How:</b> whether the
-    change requires vote changes or only additions, or restrictions to particular
-    kinds of votes, such as ATL (above-the-line) or BTL (below-the-line)</li>
-    <li><b>Details:</b> a summary of the vote changes. Hover your mouse over them to see exactly which votes are changed or added</li>
-</ul>
+<h2 id="MainHeading"></h2>
 <div id="render">
 </div>
 

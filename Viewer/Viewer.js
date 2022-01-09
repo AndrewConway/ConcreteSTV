@@ -61,10 +61,17 @@ function Render() {
         add(render_div,"div","comment").innerText=metadata.name.comment;
     }
     // work out what to show.
+    document.getElementById("TranscriptOnly").className="hidden";
+    document.getElementById("ChangeOnly").className="hidden";
+    document.getElementById("NothingChosen").className="hidden";
     if (document_to_show.transcript) {
+        document.getElementById("TranscriptOnly").className="";
         RenderTranscript(document_to_show,render_div);
     } else if (document_to_show.original && document_to_show.changes) {
+        document.getElementById("ChangeOnly").className="";
         RenderChanges(document_to_show,render_div);
+    } else {
+        document.getElementById("NothingChosen").className="";
     }
 }
 
