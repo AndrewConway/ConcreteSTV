@@ -3,7 +3,7 @@
 The margin is the minimum number of votes that need to be changed in order to change the
 election outcome. Computing this for an STV election in a reasonable amount of time is, in general, 
 an unsolved problem. However, it is straight forward to produce an *upper bound* on the margin
-by finding a specific set of ballots that can be changed to chance the outcome.
+by finding a specific set of ballots that can be changed to change the outcome.
 
 ConcreteSTV provides a tool, `change_outcomes` to search for such manipulations. It tries a large
 number of different manipulations, and chooses the best. The definition of *best* is not
@@ -11,11 +11,11 @@ entirely clear - for instance, two manipulations may both result in changes in w
 but they may be different outcomes in which case both are of interest.
 
 One of the purposes of margin computation is to evaluate whether it was possible for 
-the election outcome to have been changes by a
+the election outcome to have been changed by a software bug or a
 malicious actor (hacker or insider) who had a limited ability to alter votes.
 For instance, it may be possible for the actor to only tamper with internet votes,
 or preferences other than first preferences, or only below the line votes. In order to
-support this, manipulations with different values of these properties are also separated.
+support this, manipulations with different values of these properties are also reported separately.
 
 To run, execute the program `change_outcomes` in a very similar manner to `concrete_stv`,
 except a .vchange file is the output instead of a .transcript file. Run `change_outcomes --help`
@@ -28,7 +28,7 @@ will be found in `target/release/change_outcomes` after compiling with `cargo bu
 
 ## Example of use.
 
-Suppose one generated the `Albury.stv` file as described [here](nsw/parse_ec_data_lge.md), and
+Suppose we generated the `Albury.stv` file as described [here](nsw/parse_ec_data_lge.md), and
 we wished to see what modifications could be produced using only iVote votes. This could be computed
 using the command:
 ```bash
@@ -93,7 +93,7 @@ file by a very similar command:
 concrete_stv --modification 1 NSWECLocalGov2021 Albury_NSWECLocalGov2021.vchange
 ```
 This creates a file `Albury_NSWECLocalGov2021_1_NSWECLocalGov2021.transcript` of the modified
-transcript. We can look at these two transcripts in the same Viewer.html by clicking on
+transcript - the `--modification 1` command specifies that we want to apply the first modification in the .vchange file. We can look at these two transcripts in the same Viewer.html by clicking on
 the `Browse...` button and selecting the desired .transcript file.
 
 Investigating the .transcript files shows that in the unmodified case, VAN DE VEN Henk
