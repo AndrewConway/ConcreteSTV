@@ -46,7 +46,7 @@ changes it found.
 ### Viewing a .vchange file
 
 This can be viewed with the same viewer used to view `.transcript` files, in the ConcreteSTV
-directory at `Viewer/Viewer.html`. Open this fine in a web browser, and click on the button labeled
+directory at `docs/Viewer.html`. Open this fine in a web browser, and click on the button labeled
 `Browse...` and select the `Albury_NSWECLocalGov2021.vchange` file created above. This will create
 a table like
 
