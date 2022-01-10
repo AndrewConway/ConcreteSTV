@@ -145,8 +145,8 @@ Note that you can pass --help as an option to either of these programs for detai
 
 ## To view a transcript
 
-The `Viewer` folder of this project contains a web based viewer for transcript files.
-Open `Viewer/Viewer.html` in a web browser. 
+The `docs` folder of this project contains a web based viewer for transcript files.
+Open `docs/Viewer.html` in a web browser. 
 
 In the upper left corner, there will be a *Browse* button. Use it to select the `TAS2019_AEC2019.transcript`
 file from before.
@@ -268,7 +268,7 @@ extent.
   and licensed under the [Creative Commons Attribution 4.0 License](https://creativecommons.org/licenses/by/4.0/) (CCA License).
 * The gh-pages branch of the git repository contains companion data for some papers
   associated with this project. They may contain data derived from other copyrighted information.
-  See the copyright section in the index.html describing the companion page for details (these will be in the Viewer folder).
+  See the copyright section in the index.html describing the companion page for details (these will be in the docs folder).
 
 Kudos to the State of New South Wales for the use of such a license. 
 
