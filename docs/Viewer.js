@@ -95,14 +95,23 @@ function RenderChanges(vote_changes_document,render_div) {
         const effect_td = add(tr,"td");
         add(effect_td,"div").innerText="+ "+effect_to_string(metadata,change.outcome.list1only);
         add(effect_td,"div").innerText="- "+effect_to_string(metadata,change.outcome.list2only);
-        let how = [];
-        if (change.requires.changed_first_preference) how.push("First Preferences");
-        if (change.requires.changed_atl) how.push("ATL");
-        if (change.requires.added_ballots) how.push("Added");
-        if (change.requires.removed_ballots) how.push("Removed");
-        if (change.requires.changed_ballots) how.push("Changed");
-        if (change.requires.affected_verifiable_ballots) how.push("Affected Verifiable");
-        add(tr,"td").innerText=how.join(", ")
+        let howbox = add(tr,"td");
+        let how_is_empty = true;
+        function how(text,description) {
+            if (how_is_empty) how_is_empty=false;
+            else howbox.appendChild(document.createTextNode(", "));
+            let entry = add(howbox,"abbr");
+            entry.innerText=text;
+            entry.title=description;
+        }
+        if (change.requires.changed_first_preference) how("First Preferences","At least one first preference vote was changed or removed");
+        if (change.requires.changed_atl) how("ATL","At least one above the line ballot was affected");
+        if (change.requires.added_ballots) how("Added","At least one ballot was added");
+        if (change.requires.removed_ballots) how("Removed","At least one ballot was removed");
+        if (change.requires.changed_ballots) how("Changed","At least one ballot was changed");
+        if (change.requires.affected_verifiable_ballots) how("Affected Verifiable","At least one ballot that is in principle considered verifiable was affected");
+        if (change.requires.directly_benefited_new_winner) how("Direct to beneficiary","At least one modification directly went to a candidate (or party for ATL) who ended up elected as a result");
+        if (change.requires.directly_hurt_new_loser) how("Direct from victim","At least one modification directly came from a candidate (or party for ATL) who ended up not elected as a result");
         let details = add(tr,"td");
         for (const sc of change.ballots.changes) {
             let text = sc.n+" ("+sc.tally+" votes)";
