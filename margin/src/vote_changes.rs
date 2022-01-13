@@ -10,7 +10,7 @@
 
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::iter::Sum;
 use std::ops::{AddAssign, Sub, SubAssign};
@@ -35,6 +35,15 @@ pub struct VoteChanges<Tally> {
     pub changes : Vec<VoteChange<Tally>>,
 }
 
+impl <Tally:Display> Display for VoteChanges<Tally> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for i in 0..self.changes.len() {
+            if i!=0 { write!(f," & ")?}
+            write!(f,"{}",self.changes[i])?;
+        }
+        Ok(())
+    }
+}
 
 impl <Tally:Clone+RoundUpToUsize> VoteChanges<Tally> {
     /// Add a command to transfer n votes from candidate `from` to candidate `to`.
@@ -69,13 +78,17 @@ impl <Tally:Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+Fr
         let mut choosers : HashMap<CandidateIndex,ChooseVotes> = HashMap::new();
         let (atl_ok_changes,btl_only_changes):(Vec<_>,Vec<_>) = self.changes.iter().partition(|vc|vc.to.map(|c|retroscope.is_highest_continuing_member_party_ticket(c,&election_data.metadata)).unwrap_or(true));
         for (change,allow_atl) in btl_only_changes.iter().map(|&x|(x,false)).chain(atl_ok_changes.iter().map(|&x|(x,true))) {
+            if change.vote_value==Tally::zero() { continue; }
             if let Some(from) = change.from {
                 let chooser = choosers.entry(from).or_insert_with(||retroscope.get_chooser(from,election_data,options));
+                // println!("Trying to find {} votes from {} allowing ATL: {} Total available : {}   BTL available : {}",change.vote_value,from,allow_atl,chooser.votes_available_total::<R>(),chooser.votes_available_btl::<R>());
                 if let Some(ballots) = chooser.get_votes::<R>(change.vote_value.clone(),allow_atl) {
                     for b in ballots {
                         builder.add(change.from,change.to,b);
                     }
-                } else { return None; } // could not find the requisite votes.
+                } else {
+                    return None;
+                } // could not find the requisite votes.
             } else {
                 if let Some(_to) = change.to { // insert votes
                     builder.add(change.from,change.to,BallotsWithGivenTransferValue{
@@ -86,7 +99,6 @@ impl <Tally:Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+Fr
                     });
                 } else { eprintln!("Trying to do a vote change that does nothing."); } // don't actually do anything...
             }
-
         }
         Some(builder.to_ballot_changes())
     }
@@ -147,6 +159,11 @@ pub struct VoteChange<Tally> {
     pub to : Option<CandidateIndex>,
 }
 
+impl <Tally:Display> Display for VoteChange<Tally> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"{} votes {} → {}",self.vote_value,self.from.map(|c|c.to_string()).unwrap_or("-".to_string()),self.to.map(|c|c.to_string()).unwrap_or("-".to_string()))
+    }
+}
 /// A bunch of votes taken from the same candidate with the same transfer value.
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct BallotsFromCandidateWithGivenTransferValue {

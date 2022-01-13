@@ -22,6 +22,7 @@ fn main() -> anyhow::Result <()> {
     let electorates = loader.all_electorates();
 
     create_dir_all("changes")?;
+    create_dir_all("nsw2021stv")?;
     let mut summary = File::create("changes/summary.csv")?;
     let ballot_types_considered_unverifiable = ["iVote"];
     let ballot_types_considered_unverifiable : HashSet<String> = ballot_types_considered_unverifiable.iter().map(|s|s.to_string()).collect();
@@ -29,10 +30,14 @@ fn main() -> anyhow::Result <()> {
     // let options2 = ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone() };
     writeln!(summary,"Electorate,Votes,Min Addition,Min Manipulation")?;
     for electorate in &electorates {
+        // if electorate!="Federation" { continue; }
         println!("Electorate: {}", electorate);
         // let data = loader.load_cached_data(electorate)?;
         let data = loader.read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021>(electorate)?;
         data.print_summary();
+        let out = File::create(format!("nsw2021stv/{}.stv", electorate))?;
+        serde_json::to_writer(out,&data)?;
+
         let mut results = find_outcome_changes::<NSWECLocalGov2021>(&data,&options1,true);
         //let results2 = find_outcome_changes::<NSWECLocalGov2021>(&data,&options2);
         //results.merge(results2);

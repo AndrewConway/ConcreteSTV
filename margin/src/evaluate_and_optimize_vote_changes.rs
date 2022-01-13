@@ -107,7 +107,7 @@ fn binary_search<F,Tally>(f:F,mut low:usize,mut high:usize) -> Option<BinarySear
     while low<high || low==high && (last_good.is_none() || last_good.as_ref().unwrap().n!=low) {
         let mid = (low+high)/2;
         match f(mid) {
-            ChangeResult::NotEnoughVotesAvailable => { high=mid-1; } // has to be smaller.
+            ChangeResult::NotEnoughVotesAvailable => { if mid==0 { return None; } else { high=mid-1;} } // has to be smaller.
             ChangeResult::NoChange => { low=mid+1 } // has to be bigger
             ChangeResult::Change(deltas, changes) => { high=mid; last_good=Some(BinarySearchSuccess{n:mid,deltas,changes}) }
         }

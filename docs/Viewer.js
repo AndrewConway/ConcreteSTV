@@ -119,8 +119,10 @@ function RenderChanges(vote_changes_document,render_div) {
                 text+=" TV "+sc.from.tv;
                 text+=" "+metadata.candidates[sc.from.candidate].name;
             }
-            if (sc.candidate_to) {
+            if ((typeof sc.candidate_to)==="number") {
                 text+=" → "+metadata.candidates[sc.candidate_to].name;
+            } else {
+                text+=" removed"
             }
             let detailsdiv = add(details,"div","hoverable");
             detailsdiv.innerText=text;

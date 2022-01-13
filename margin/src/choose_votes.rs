@@ -180,6 +180,10 @@ impl <'a> ChooseVotes<'a> {
             // upto: None,
         }
     }
+    /// produce a dummy zero value.
+    pub fn zero(election_data:&'a ElectionData) -> Self {
+        ChooseVotes{ election_data, sources:vec![]}
+    }
     /// Total available votes, both below and above the line, taking rounding into account.
     pub fn votes_available_total<R:PreferenceDistributionRules>(&self) -> R::Tally { self.sources.iter().map(|s|s.votes_available_total::<R>()).sum() }
     /// available votes below the line, taking rounding into account.
