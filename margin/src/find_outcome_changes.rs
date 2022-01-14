@@ -5,11 +5,12 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
+use num_traits::Zero;
 use stv::ballot_metadata::{CandidateIndex};
 use stv::distribution_of_preferences_transcript::{CountIndex, ReasonForCount, SingleCount};
 use stv::election_data::ElectionData;
 use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
-use crate::choose_votes::ChooseVotesOptions;
+use crate::choose_votes::{ChooseVotes, ChooseVotesOptions};
 use crate::evaluate_and_optimize_vote_changes::optimise;
 use crate::record_changes::ElectionChanges;
 use crate::retroscope::Retroscope;
@@ -44,12 +45,38 @@ where Rules : PreferenceDistributionRules {
             Some(ReasonForCount::Elimination(eliminated_candidates)) if eliminated_candidates.len()==1 => {
                 let eliminated_candidate = eliminated_candidates[0];
                 // TODO: Add break when we've found at least one value for each kind of change (manipulation and addition)
-                for &candidate in &sorted_continuing_candidates {
+                for (index_of_target_in_sorted_list,&candidate) in sorted_continuing_candidates.iter().enumerate() {
                     if candidate!=eliminated_candidate {
                         let vote_change = compute_vote_change::<Rules>(eliminated_candidate, candidate, count,verbose);
                         let vote_changes = VoteChanges{ changes: vec![vote_change] };
                         if let Some(possible_manipulation) = optimise::<Rules>(&vote_changes, &original_data, &retroscope, vote_choice_options,verbose) {
                             change_recorder.add(possible_manipulation,verbose);
+                        }
+                        // try leveling
+                        if let Some(leveling) = compute_vote_change_leveling::<Rules>(index_of_target_in_sorted_list,true,count,&sorted_continuing_candidates,&original_data, &retroscope, vote_choice_options,true,verbose) {
+                            if verbose { println!("Found a levelling to try {}",leveling); }
+                            if let Some(possible_manipulation) = optimise::<Rules>(&leveling, &original_data, &retroscope, vote_choice_options,verbose) {
+                                change_recorder.add(possible_manipulation,verbose);
+                                // that worked! Try related things.
+                                if let Some(leveling) = compute_vote_change_leveling::<Rules>(index_of_target_in_sorted_list,true,count,&sorted_continuing_candidates,&original_data, &retroscope, vote_choice_options,false,verbose) {
+                                    if verbose { println!("Found a related levelling to try {}",leveling); }
+                                    if let Some(possible_manipulation) = optimise::<Rules>(&leveling, &original_data, &retroscope, vote_choice_options,verbose) {
+                                        change_recorder.add(possible_manipulation,verbose);
+                                    }
+                                }
+                                if let Some(leveling) = compute_vote_change_leveling::<Rules>(index_of_target_in_sorted_list,false,count,&sorted_continuing_candidates,&original_data, &retroscope, vote_choice_options,false,verbose) {
+                                    if verbose { println!("Found a related levelling to try {}",leveling); }
+                                    if let Some(possible_manipulation) = optimise::<Rules>(&leveling, &original_data, &retroscope, vote_choice_options,verbose) {
+                                        change_recorder.add(possible_manipulation,verbose);
+                                    }
+                                }
+                                if let Some(leveling) = compute_vote_change_leveling::<Rules>(index_of_target_in_sorted_list,false,count,&sorted_continuing_candidates,&original_data, &retroscope, vote_choice_options,true,verbose) {
+                                    if verbose { println!("Found a related levelling to try {}",leveling); }
+                                    if let Some(possible_manipulation) = optimise::<Rules>(&leveling, &original_data, &retroscope, vote_choice_options,verbose) {
+                                        change_recorder.add(possible_manipulation,verbose);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -104,6 +131,8 @@ where Rules : PreferenceDistributionRules {
     change_recorder
 }
 
+/// Find an addition that makes to_candidate have a higher number of votes that next_largest.
+/// Used to make the current candidate be eliminated.
 fn compute_vote_addition<Rules:PreferenceDistributionRules>(to_candidate: CandidateIndex, next_largest: CandidateIndex, count: &SingleCount<Rules::Tally>,verbose:bool) -> VoteChange<Rules::Tally> {
     let vote_difference = count.status.tallies.candidate[next_largest.0].clone() - count.status.tallies.candidate[to_candidate.0].clone();
     if verbose { println!("Vote difference: {}", vote_difference); }
@@ -114,6 +143,7 @@ fn compute_vote_addition<Rules:PreferenceDistributionRules>(to_candidate: Candid
     }
 }
 
+/// Find a change that takes directly from one candidate and gives directly to another candidate, typically to make to_candidate be eliminated.
 fn compute_vote_change<Rules:PreferenceDistributionRules>(to_candidate: CandidateIndex, from_candidate: CandidateIndex, count: &SingleCount<Rules::Tally>,verbose:bool) -> VoteChange<Rules::Tally> {
     let tally_to_candidate = count.status.tallies.candidate[to_candidate.0].clone();
     let tally_from_candidate = count.status.tallies.candidate[from_candidate.0].clone();
@@ -125,5 +155,115 @@ fn compute_vote_change<Rules:PreferenceDistributionRules>(to_candidate: Candidat
         vote_value: votes_to_change,
         from: Some(from_candidate),
         to: Some(to_candidate)
+    }
+}
+
+/// Find a change that tries to get one target candidate excluded by making them lower than all other candidates.
+/// Takes votes from the target (if may_take_votes_from_candidate) and possibly higher candidates.
+/// Gives votes to the candidates with a tally equal or less than the target until the target is one less than all lower.
+///
+/// Method:
+///
+/// Will aim for a level base_level for the target. Everyone else should be > base_level.
+///
+fn compute_vote_change_leveling<Rules:PreferenceDistributionRules>(index_of_target_in_sorted_list:usize,may_take_votes_from_target:bool, count: &SingleCount<Rules::Tally>,sorted_continuing_candidates:&[CandidateIndex],election_data:&ElectionData,retroscope:&Retroscope,options:&ChooseVotesOptions,reverse_secondary_targets:bool,verbose:bool) -> Option<VoteChanges<Rules::Tally>> {
+    let can_use_atl = |c:CandidateIndex|retroscope.is_highest_continuing_member_party_ticket(c,&election_data.metadata);
+    let target: CandidateIndex=sorted_continuing_candidates[index_of_target_in_sorted_list];
+    let current_target_tally = count.status.tallies.candidate[target.0].clone();
+    let target_chooser = if may_take_votes_from_target { retroscope.get_chooser(target,election_data,options) } else { ChooseVotes::zero(election_data) };
+    let max_can_take_from_target : Rules::Tally = target_chooser.votes_available_total::<Rules>();
+    let base_level = if may_take_votes_from_target { // level that the target is aimed at.
+        let mut sub_targets_to_raise = 0;
+        let mut sum_of_target_plus_subtargets_plus_one = current_target_tally.clone()+Rules::Tally::from(1);
+        let mut currently_being_considered_level = current_target_tally.clone();
+        while sub_targets_to_raise < index_of_target_in_sorted_list {
+            let subtarget_tally = count.status.tallies.candidate[sorted_continuing_candidates[sub_targets_to_raise].0].clone();
+            if currently_being_considered_level<subtarget_tally { break; } // the currently considered level is sufficient.
+            sum_of_target_plus_subtargets_plus_one+=subtarget_tally;
+            sub_targets_to_raise+=1;
+            let consider_level = sum_of_target_plus_subtargets_plus_one.clone()/(sub_targets_to_raise+1); // still need to subtract 1, but may be < 1 which would cause underflow.
+            let consider_level = if consider_level<=Rules::Tally::from(1) { Rules::Tally::zero() } else { consider_level-Rules::Tally::from(1)};
+            currently_being_considered_level = consider_level.max(current_target_tally.clone()-max_can_take_from_target.clone())
+        }
+        currently_being_considered_level
+    } else { current_target_tally.clone() };
+    if verbose { println!("{}Target candidate {} with tally {} is to be reduced to {}. Can take {} from target.",if election_data.metadata.results.as_ref().unwrap().contains(&target) {"ELECTED "} else {""},target,current_target_tally,base_level,max_can_take_from_target); }
+    // need to raise everything up to target.
+    let mut res =VoteChanges { changes: vec![] };
+    let mut source = PolyFromSource{
+        from_sources: vec![target],
+        available_to_take_from_sources: vec![target_chooser],
+        index_currently_taking_from_btl_only: 0,
+        index_currently_taking_from_atl_ok: 0
+    };
+    // find other sources.
+    let secondary_targets : Vec<CandidateIndex> = if reverse_secondary_targets { sorted_continuing_candidates[index_of_target_in_sorted_list+1..].iter().rev().take_while(|&&c|c!=target).cloned().collect() } else {sorted_continuing_candidates[index_of_target_in_sorted_list+1..].iter().take_while(|&&c|c!=target).cloned().collect()};
+    for secondary_target in secondary_targets {
+        source.from_sources.push(secondary_target);
+        source.available_to_take_from_sources.push(retroscope.get_chooser(secondary_target,election_data,options));
+    }
+    let fudge_factor = 1;
+    let margin_above_base = Rules::Tally::from(1+fudge_factor); // want to go to above base tally. Go 2 higher instead of 1 just to allow for wierd things with rounding. 1 fudge factor.
+    for atl_ok in [false,true] {
+        for &c in sorted_continuing_candidates {
+            if c!=target && atl_ok == can_use_atl(c) { // do those not in a party first as they can't take ATL votes
+                let tally = count.status.tallies.candidate[c.0].clone();
+                if tally<= base_level {
+                    let increment = base_level.clone()-tally.clone()+margin_above_base.clone();
+                    if !source.give_to_candidate::<Rules>(increment,c,&mut res,atl_ok) { return None; }
+                }
+            }
+        }
+    }
+    // it is possible that not enough votes have been taken from target, if the votes available were largely ATL and the people being given to were largely BTL.
+    let after_mods_tally_for_target = current_target_tally+source.available_to_take_from_sources[0].votes_available_total::<Rules>()-max_can_take_from_target;
+    if after_mods_tally_for_target>base_level {
+        if verbose { println!("Could not take enough from target. Taking more."); }
+        if let Some(&recipient) = sorted_continuing_candidates[index_of_target_in_sorted_list+1..].iter().rev().find(|&&c|can_use_atl(c)) {
+            res.transfer(after_mods_tally_for_target-base_level,target,recipient);
+            res.changes.reverse(); // put at start, so binary search reduces it first.
+        }
+        // could do an "else return None" but there is a chance the current thing will still do something useful.
+    }
+    Some(res)
+}
+
+struct PolyFromSource<'a> {
+    from_sources : Vec<CandidateIndex>,
+    available_to_take_from_sources : Vec<ChooseVotes<'a>>,
+    index_currently_taking_from_btl_only : usize,
+    index_currently_taking_from_atl_ok : usize,
+}
+
+impl <'a> PolyFromSource<'a> {
+    fn available_to_take_atl_ok<Rules:PreferenceDistributionRules>(&mut self) -> Option<Rules::Tally> {
+        while self.index_currently_taking_from_atl_ok<self.from_sources.len() {
+            let available : Rules::Tally = self.available_to_take_from_sources[self.index_currently_taking_from_atl_ok].votes_available_total::<Rules>();
+            if available == Rules::Tally::zero() { self.index_currently_taking_from_atl_ok+=1; }
+            else { return Some(available); }
+        }
+        None
+    }
+    fn available_to_take_btl_only<Rules:PreferenceDistributionRules>(&mut self) -> Option<Rules::Tally> {
+        while self.index_currently_taking_from_btl_only<self.from_sources.len() {
+            let available : Rules::Tally = self.available_to_take_from_sources[self.index_currently_taking_from_btl_only].votes_available_btl::<Rules>();
+            if available == Rules::Tally::zero() { self.index_currently_taking_from_btl_only+=1; }
+            else { return Some(available); }
+        }
+        None
+    }
+    /// Try to give a certain amount of votes to a given recipient, return true iff success.
+    fn give_to_candidate<Rules:PreferenceDistributionRules>(&mut self, amount:Rules::Tally, recipient:CandidateIndex, changes:&mut VoteChanges<Rules::Tally>,may_be_atl:bool) -> bool {
+        let mut togo = amount;
+        while togo>Rules::Tally::zero() {
+            if let Some(available) = if may_be_atl { self.available_to_take_atl_ok::<Rules>() } else { self.available_to_take_btl_only::<Rules>() } {
+                let parcel = togo.clone().min(available);
+                let index_currently_taking_from = if may_be_atl {self.index_currently_taking_from_atl_ok} else { self.index_currently_taking_from_btl_only};
+                changes.transfer(parcel.clone(),self.from_sources[index_currently_taking_from],recipient);
+                if self.available_to_take_from_sources[index_currently_taking_from].get_votes::<Rules>(parcel.clone(),may_be_atl).is_none() { return false; } // unlikely
+                togo-=parcel.clone();
+            } else { return false; }
+        }
+        true
     }
 }
