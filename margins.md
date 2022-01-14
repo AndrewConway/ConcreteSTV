@@ -34,7 +34,7 @@ using the command:
 ```bash
 change_outcomes --unverifiable iVote --allow-verifiable false --verbose NSWECLocalGov2021 Albury.stv 
 ```
-This will probably take several seconds to run. Remove the `--verbose` flag to not print out diagnostic messages.
+This will probably take several seconds to a minute to run. Remove the `--verbose` flag to not print out diagnostic messages.
 
 This will produce the file `Albury_NSWECLocalGov2021.vchange`.
 
@@ -51,6 +51,9 @@ directory at `docs/Viewer.html`. Open this fine in a web browser, and click on t
 a table like
 
 ![Web browser extract for Albury](readme_images/AlburyChangesScreenshot.png)
+
+Note that there is some randomness in the searching algorithm, 
+and different runs will sometimes produce slightly different results.
 
 This means that there were 3 interesting changes found. The first affected 18 ballots. Its effect was for
 the formerly elected candidate THURLEY David to lose a set and HAMILTON Ross to gain a set. This involved

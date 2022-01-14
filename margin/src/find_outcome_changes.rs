@@ -53,10 +53,29 @@ where Rules : PreferenceDistributionRules {
                             change_recorder.add(possible_manipulation,verbose);
                         }
                         // try leveling
-                        if let Some(leveling) = compute_vote_change_leveling::<Rules>(index_of_target_in_sorted_list,true,count,&sorted_continuing_candidates,&original_data, &retroscope, vote_choice_options,verbose) {
+                        if let Some(leveling) = compute_vote_change_leveling::<Rules>(index_of_target_in_sorted_list,true,count,&sorted_continuing_candidates,&original_data, &retroscope, vote_choice_options,true,verbose) {
                             if verbose { println!("Found a levelling to try {}",leveling); }
                             if let Some(possible_manipulation) = optimise::<Rules>(&leveling, &original_data, &retroscope, vote_choice_options,verbose) {
                                 change_recorder.add(possible_manipulation,verbose);
+                                // that worked! Try related things.
+                                if let Some(leveling) = compute_vote_change_leveling::<Rules>(index_of_target_in_sorted_list,true,count,&sorted_continuing_candidates,&original_data, &retroscope, vote_choice_options,false,verbose) {
+                                    if verbose { println!("Found a related levelling to try {}",leveling); }
+                                    if let Some(possible_manipulation) = optimise::<Rules>(&leveling, &original_data, &retroscope, vote_choice_options,verbose) {
+                                        change_recorder.add(possible_manipulation,verbose);
+                                    }
+                                }
+                                if let Some(leveling) = compute_vote_change_leveling::<Rules>(index_of_target_in_sorted_list,false,count,&sorted_continuing_candidates,&original_data, &retroscope, vote_choice_options,false,verbose) {
+                                    if verbose { println!("Found a related levelling to try {}",leveling); }
+                                    if let Some(possible_manipulation) = optimise::<Rules>(&leveling, &original_data, &retroscope, vote_choice_options,verbose) {
+                                        change_recorder.add(possible_manipulation,verbose);
+                                    }
+                                }
+                                if let Some(leveling) = compute_vote_change_leveling::<Rules>(index_of_target_in_sorted_list,false,count,&sorted_continuing_candidates,&original_data, &retroscope, vote_choice_options,true,verbose) {
+                                    if verbose { println!("Found a related levelling to try {}",leveling); }
+                                    if let Some(possible_manipulation) = optimise::<Rules>(&leveling, &original_data, &retroscope, vote_choice_options,verbose) {
+                                        change_recorder.add(possible_manipulation,verbose);
+                                    }
+                                }
                             }
                         }
                     }
@@ -147,7 +166,7 @@ fn compute_vote_change<Rules:PreferenceDistributionRules>(to_candidate: Candidat
 ///
 /// Will aim for a level base_level for the target. Everyone else should be > base_level.
 ///
-fn compute_vote_change_leveling<Rules:PreferenceDistributionRules>(index_of_target_in_sorted_list:usize,may_take_votes_from_target:bool, count: &SingleCount<Rules::Tally>,sorted_continuing_candidates:&[CandidateIndex],election_data:&ElectionData,retroscope:&Retroscope,options:&ChooseVotesOptions,verbose:bool) -> Option<VoteChanges<Rules::Tally>> {
+fn compute_vote_change_leveling<Rules:PreferenceDistributionRules>(index_of_target_in_sorted_list:usize,may_take_votes_from_target:bool, count: &SingleCount<Rules::Tally>,sorted_continuing_candidates:&[CandidateIndex],election_data:&ElectionData,retroscope:&Retroscope,options:&ChooseVotesOptions,reverse_secondary_targets:bool,verbose:bool) -> Option<VoteChanges<Rules::Tally>> {
     let can_use_atl = |c:CandidateIndex|retroscope.is_highest_continuing_member_party_ticket(c,&election_data.metadata);
     let target: CandidateIndex=sorted_continuing_candidates[index_of_target_in_sorted_list];
     let current_target_tally = count.status.tallies.candidate[target.0].clone();
@@ -178,7 +197,8 @@ fn compute_vote_change_leveling<Rules:PreferenceDistributionRules>(index_of_targ
         index_currently_taking_from_atl_ok: 0
     };
     // find other sources.
-    for &secondary_target in sorted_continuing_candidates[index_of_target_in_sorted_list+1..].iter().rev().take_while(|&&c|c!=target) { // is reversing it ideal? Consider the other way. Also, do we want to limit this to go down to base_level?
+    let secondary_targets : Vec<CandidateIndex> = if reverse_secondary_targets { sorted_continuing_candidates[index_of_target_in_sorted_list+1..].iter().rev().take_while(|&&c|c!=target).cloned().collect() } else {sorted_continuing_candidates[index_of_target_in_sorted_list+1..].iter().take_while(|&&c|c!=target).cloned().collect()};
+    for secondary_target in secondary_targets {
         source.from_sources.push(secondary_target);
         source.available_to_take_from_sources.push(retroscope.get_chooser(secondary_target,election_data,options));
     }

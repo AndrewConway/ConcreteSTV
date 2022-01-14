@@ -12,9 +12,9 @@
 
 
 use num_traits::Zero;
-use stv::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
+use stv::compare_transcripts::{DeltasInCandidateLists};
 use stv::election_data::ElectionData;
-use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules, RoundUpToUsize};
+use stv::preference_distribution::{PreferenceDistributionRules, RoundUpToUsize};
 use crate::choose_votes::ChooseVotesOptions;
 use crate::retroscope::Retroscope;
 use crate::vote_changes::{BallotChanges, VoteChanges};
@@ -30,9 +30,7 @@ pub enum ChangeResult<Tally> {
 /// ElectionData must contain vacancy information and results (official winners).
 pub fn simple_test<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R::Tally>,election_data:&ElectionData,retroscope:&Retroscope,options:&ChooseVotesOptions) -> ChangeResult<R::Tally> {
     if let Some(ballot_changes) = vote_changes.make_concrete::<R>(retroscope,election_data,options) {
-        let changed_data = ballot_changes.apply_to_votes(election_data,false);
-        let transcript = distribute_preferences::<R>(&changed_data,election_data.metadata.vacancies.unwrap(),&election_data.metadata.excluded.iter().cloned().collect(),&election_data.metadata.tie_resolutions,false);
-        let diffs  : DeltasInCandidateLists = DifferentCandidateLists{ list1: transcript.elected.clone(), list2: election_data.metadata.results.as_ref().unwrap().clone() }.into();
+        let diffs  : DeltasInCandidateLists = ballot_changes.see_effect::<R>(election_data);
         if diffs.is_empty() { ChangeResult::NoChange } else { ChangeResult::Change(diffs,ballot_changes)}
     } else {ChangeResult::NotEnoughVotesAvailable}
 }

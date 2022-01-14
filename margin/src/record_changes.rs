@@ -9,13 +9,15 @@
 
 
 use std::collections::HashSet;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
+use std::str::FromStr;
 use stv::compare_transcripts::DeltasInCandidateLists;
 use stv::election_data::ElectionData;
 use crate::vote_changes::BallotChanges;
 use serde::Serialize;
 use serde::Deserialize;
 use stv::ballot_pile::BallotPaperCount;
+use stv::preference_distribution::PreferenceDistributionRules;
 use crate::evaluate_and_optimize_vote_changes::FoundChange;
 
 /// Sufficient information to document one or more changes to an election completely.
@@ -38,7 +40,9 @@ pub struct ChangeTypes {
     pub removed_ballots : bool, // if ballots were removed
     pub changed_ballots : bool, // if ballots were changed (rather than added or removed).
     pub affected_verifiable_ballots: bool, // if ballot_types_considered_unverifiable is not empty, but does not contain the current ballot
+    #[serde(default)]
     pub directly_benefited_new_winner: bool, // if a change gives votes to a candidate who ended up winning a seat as a result of the modification
+    #[serde(default)]
     pub directly_hurt_new_loser: bool, // if a change takes votes from a candidate who ended up winning a seat as a result of the modification
 }
 
@@ -149,6 +153,7 @@ impl <Tally:Clone> ElectionChanges<Tally> {
         self.changes.push(change);
     }
 
+    /// Add in an existing data structure
     pub fn merge(&mut self,other:Self,verbose:bool) {
         for v in other.changes {
             self.add_change(v,verbose);
@@ -168,3 +173,14 @@ impl <Tally:Clone> ElectionChanges<Tally> {
     }
 }
 
+impl <Tally:PartialEq+Clone+Display+FromStr> ElectionChanges<Tally> {
+    /// Add in a (suspicious, possible old) extra data structure, reevaluating everything
+    pub fn merge_reevaluating<R:PreferenceDistributionRules<Tally=Tally>>(&mut self,other:&[ElectionChange<Tally>],election_data:&ElectionData,ballot_types_considered_unverifiable:&HashSet<String>,verbose:bool) {
+        for v in other {
+            let deltas  : DeltasInCandidateLists = v.ballots.see_effect::<R>(election_data);
+            if !deltas.is_empty() {
+                self.add_change(ElectionChange::new(deltas,v.ballots.clone(),election_data,ballot_types_considered_unverifiable),verbose);
+            }
+        }
+    }
+}
