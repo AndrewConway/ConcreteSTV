@@ -8,6 +8,7 @@ members= [
     "act",
     "federal",
     "nsw",
+    "statistics",
     "main-app",
 ]
 

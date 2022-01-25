@@ -51,6 +51,10 @@ impl ElectionData {
     pub fn num_atl(&self) -> usize {
         self.atl.iter().map(|v|v.n).sum()
     }
+    /// Number of formal above the line votes with only one preference listed
+    pub fn num_satl(&self) -> usize {
+        self.atl.iter().filter(|v|v.parties.len()==1).map(|v|v.n).sum()
+    }
     /// Number of formal below the line votes
     pub fn num_btl(&self) -> usize {
         self.btl.iter().map(|v|v.n).sum()

@@ -81,7 +81,7 @@ pub struct PartiallyDistributedVote<'a> {
     /// The number of voters
     pub n : BallotPaperCount,
     /// Preferred candidates, with index 0 being the most favoured candidate.
-    pub(crate) prefs : &'a[CandidateIndex],
+    pub prefs : &'a[CandidateIndex],
     pub(crate) source : VoteSource<'a>,
 }
 
