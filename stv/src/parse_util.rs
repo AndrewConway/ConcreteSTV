@@ -9,7 +9,7 @@
 
 
 use std::env::temp_dir;
-use crate::ballot_metadata::{Candidate, Party, CandidateIndex, PartyIndex, ElectionName, NumberOfCandidates};
+use crate::ballot_metadata::{Candidate, Party, CandidateIndex, PartyIndex, ElectionName, NumberOfCandidates, ElectionMetadata};
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{BufReader, Seek, BufRead, SeekFrom, Read};
@@ -21,6 +21,7 @@ use std::fmt::{Display, Formatter};
 use std::process::Command;
 use std::str::FromStr;
 use reqwest::Url;
+use crate::ballot_paper::{RawBallotMarkings};
 
 /// A utility for helping to read a list of candidates and parties.
 #[derive(Default)]
@@ -127,7 +128,39 @@ pub trait RawDataSource {
     fn bad_electorate(&self,electorate:&str) -> anyhow::Error {
         anyhow!("No such electorate as {}. Supported electorates are : {}.",electorate,self.all_electorates().join(", "))
     }
+
+    /// if it is possible to run the iterate_over_raw_markings function
+    fn can_iterate_over_raw_btl_preferences(&self) -> bool { false }
+    /// if it is possible to run the read_raw_data function
+    fn can_load_full_data(&self) -> bool { true }
+
+    fn iterate_over_raw_markings<F>(&self,_electorate:&str,_callback:F)  -> anyhow::Result<ElectionMetadata>
+    where F:FnMut(&RawBallotMarkings,RawBallotPaperMetadata)
+    {
+        Err(anyhow!("Iterating over raw btl preferences not supported."))
+    }
+
+    fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata>;
 }
+
+/// Raw ballot paper metadata is a slice of pairs of strings.
+/// The first string is the name of the metadata (typically a constant static string)
+/// The second string is the value of the corresponding metadata.
+pub type RawBallotPaperMetadata<'a> = &'a[(&'a str,&'a str)];
+/*
+/// The type of functions that can be used as a callback when iterating over all btl preferences.
+/// The first argument is a list of strings, being the marks next to the candidates in candidate order.
+/// The third argument is information about the current vote being iterated over, such as polling station. It is a set of pairs of metadata, the first in the pair being the name of the metadata and the second being the actual metadata.
+pub trait RawPreferencesCallbackFunction : FnMut(&RawBallotMarkings,&[(&str,&str)])-> () {
+
+}
+
+/// We don't want to explicitly implement RawPreferencesCallbackFunction in client code;
+/// this is a trick (see https://www.worthe-it.co.za/blog/2017-01-15-aliasing-traits-in-rust.html)
+/// to get an effective trait alias in rust. If rust ever makes trait aliases stable, this should
+/// be replaced by a trait alias.
+impl <T> RawPreferencesCallbackFunction for T where T : FnMut(&RawBallotMarkings,&[(&str,&str)])-> () {}
+*/
 
 /// Datafiles from Electoral Commissions could be stored in the current working directory,
 /// but may also be in some other (reference) folder. Alternatively, they could be in

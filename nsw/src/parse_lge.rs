@@ -21,7 +21,7 @@ use stv::ballot_pile::BallotPaperCount;
 use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use stv::parse_util::parse_xlsx_by_converting_to_csv_using_openoffice;
-use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
+use stv::preference_distribution::PreferenceDistributionRules;
 
 
 pub fn get_nsw_lge_data_loader_2021(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
@@ -53,7 +53,7 @@ impl RawDataSource for NSWLGEDataLoader {
         ElectionName {
             year: self.year.clone(),
             authority: "NSW Electoral Commission".to_string(),
-            name: "Local Government".to_string(),
+            name: "NSW Local Government".to_string(),
             electorate: electorate.to_string(),
             modifications: vec![],
             comment: None,
@@ -83,6 +83,16 @@ impl RawDataSource for NSWLGEDataLoader {
     }
     fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> { self.read_raw_data_possibly_rejecting_some_types(electorate,None) }
 
+    fn read_raw_metadata(&self, electorate: &str) -> anyhow::Result<ElectionMetadata> {
+        let contest = &self.find_contest(electorate)?.url;
+        let mayoral = electorate.ends_with(" Mayoral");
+        let metadata_data_file = self.find_raw_data_file_relative(contest,
+                                                                  if mayoral {"mayoral/report"} else {"councillor/report"},
+                                                                  if mayoral {"mayoral-fp-by-candidate.html"} else {"fp-by-grp-and-candidate-by-vote-type.html"},
+                                                                  if mayoral {"mayoral/report/fp-by-grp-and-candidate-by-vote-type"} else {"councillor/report/fp-by-grp-and-candidate-by-vote-type"})?;
+        let metadata = self.parse_candidate_list(File::open(metadata_data_file)?,mayoral,electorate)?;
+        Ok(metadata)
+    }
 }
 
 fn decode(tally:usize) -> f64 { tally as f64 }
@@ -96,7 +106,7 @@ impl NSWLGEDataLoader {
         // let mut tie_resolutions = TieResolutionsMadeByEC::default();
         let official_transcript = self.read_official_dop_transcript(&data.metadata)?;
         loop {
-            let transcript = distribute_preferences::<Rules>(&data, data.metadata.vacancies.unwrap(), &data.metadata.excluded.iter().cloned().collect(), &data.metadata.tie_resolutions, false);
+            let transcript = data.distribute_preferences::<Rules>();
             if let Some((favoured_candidate, unfavoured_candidate)) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript, decode,false) {
                 println!("Observed tie resolution favouring {} over {}", favoured_candidate, unfavoured_candidate);
                 assert!(favoured_candidate.0 < unfavoured_candidate.0, "favoured candidate should be lower as higher candidates are assumed favoured.");
@@ -113,11 +123,7 @@ impl NSWLGEDataLoader {
     pub fn read_raw_data_possibly_rejecting_some_types(&self, electorate: &str, reject_vote_type : Option<HashSet<String>>) -> anyhow::Result<ElectionData> {
         let contest = &self.find_contest(electorate)?.url;
         let mayoral = electorate.ends_with(" Mayoral");
-        let metadata_data_file = self.find_raw_data_file_relative(contest,
-                                                                  if mayoral {"mayoral/report"} else {"councillor/report"},
-                                                                  if mayoral {"mayoral-fp-by-candidate.html"} else {"fp-by-grp-and-candidate-by-vote-type.html"},
-                                                                  if mayoral {"mayoral/report/fp-by-grp-and-candidate-by-vote-type"} else {"councillor/report/fp-by-grp-and-candidate-by-vote-type"})?;
-        let mut metadata = self.parse_candidate_list(File::open(metadata_data_file)?,mayoral,electorate)?;
+        let mut metadata = self.read_raw_metadata(electorate)?;
         let winner_info_file = self.find_raw_data_file_relative(contest,"",
                                                                 if mayoral {"mayoral.html"} else {"councillor.html"},
                                                                 if mayoral {"mayoral"} else {"councillor"})?;

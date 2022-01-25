@@ -24,6 +24,19 @@ pub enum RawBallotMarking {
     Other,
 }
 
+impl RawBallotMarking {
+    /// interpret a marking as a number between 1 and num_candidates inclusive, if possible.
+    pub fn as_preference(self,num_candidates:usize) -> Option<usize> {
+        match self {
+            RawBallotMarking::Number(n) if n>0 && n as usize <=num_candidates => Some(n as usize),
+            RawBallotMarking::Number(_) => None,
+            RawBallotMarking::OneEquivalent => Some(1),
+            RawBallotMarking::Blank => None,
+            RawBallotMarking::Other => None,
+        }
+    }
+}
+
 pub fn parse_marking(marking:&str) -> RawBallotMarking {
     if marking.is_empty() { RawBallotMarking::Blank }
     else if marking=="X" || marking=="*" || marking=="/" { RawBallotMarking::OneEquivalent }

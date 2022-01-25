@@ -8,6 +8,7 @@
 use federal::FederalRulesUsed2016;
 use federal::parse::get_federal_data_loader_2016;
 use statistics::correlations::{CorrelationOptions, SquareMatrix};
+use statistics::errors_btl::ObviousErrorsInBTLVotes;
 use statistics::intent_table::{IntentTable, IntentTableOptions};
 use statistics::mean_preference::{MeanPreferenceByCandidate, MeanPreferences};
 use statistics::simple_statistics::SimpleStatistics;
@@ -15,7 +16,7 @@ use statistics::who_got_votes::WhoGotVotes;
 use stv::parse_util::{FileFinder, RawDataSource};
 
 #[test]
-fn test_tasmanian_statistics() {
+fn test_tasmanian_statistics_using_just_formal_votes() {
     // compare against values computed in the old scala implementation
 
     let loader = get_federal_data_loader_2016(&FileFinder::find_ec_data_repository());
@@ -143,4 +144,34 @@ fn test_tasmanian_statistics() {
     expect_mean(&mean.btl_by_first_preference[0],0,996,vec![ 1.0,10.038152610441767, 27.183232931726906, 27.296686746987948, 29.608433734939755, 30.572791164658632, 30.71787148594377, 29.82028112449799, 30.989959839357425, 33.084839357429715]);
     expect_mean(&mean.btl_by_first_preference[1],0,175,vec![16.665714285714287, 1.0, 29.982857142857142, 27.414285714285715, 29.96, 30.92, 29.63714285714286, 29.18, 30.92, 30.96]);
 
+}
+
+#[test]
+fn test_obvious_btl_errors() {
+    // compare against values computed in the old scala implementation
+
+    let loader = get_federal_data_loader_2016(&FileFinder::find_ec_data_repository());
+    let errors = ObviousErrorsInBTLVotes::compute(loader,"TAS").unwrap();
+    println!("{:?}",errors);
+    assert_eq!(2643,errors.repeated[0]);
+    assert_eq!(1547,errors.repeated[1]);
+    assert_eq!(584,errors.repeated[2]);
+    assert_eq!(328,errors.repeated[3]);
+    assert_eq!(324,errors.repeated[4]);
+    assert_eq!(573,errors.repeated_papers[0].0);
+    assert_eq!(385,errors.repeated_papers[1].0);
+    assert_eq!(303,errors.repeated_papers[2].0);
+    assert_eq!(231,errors.repeated_papers[3].0);
+    // numbers below here have a different meaning to numbers from the old Scala interpretation so are not verified by it.
+    assert_eq!(233,errors.missing[0].0);
+    assert_eq!(36,errors.missing[1].0);
+    assert_eq!(47,errors.missing[2].0);
+    assert_eq!(46,errors.missing[3].0);
+    assert_eq!(242535,errors.ok_up_to[0].0);
+    assert_eq!(570,errors.ok_up_to[1].0);
+    assert_eq!(255,errors.ok_up_to[2].0);
+    assert_eq!(171,errors.ok_up_to[3].0);
+    assert_eq!(107,errors.ok_up_to[4].0);
+    assert_eq!(136,errors.ok_up_to[5].0);
+    assert_eq!(2602,errors.ok_up_to[6].0);
 }

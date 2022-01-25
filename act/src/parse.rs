@@ -63,15 +63,8 @@ impl RawDataSource for ACTDataLoader {
 
     /// These are deduced by looking at the actual transcript of results.
     /// I have not included anything if all decisions are handled by the fallback "earlier on the ballot paper candidates are listed in worse positions.
-    fn ec_decisions(&self,state:&str) -> TieResolutionsMadeByEC { // TODO
-        match self.year.as_str() {
-            "2013" => match state {
-                "VIC" => TieResolutionsMadeByEC{ tie_resolutions: vec![vec![CandidateIndex(54), CandidateIndex(23),CandidateIndex(85),CandidateIndex(88)]] } , // 4 way tie at count 10.
-                "NSW" => TieResolutionsMadeByEC{ tie_resolutions: vec![vec![CandidateIndex(82),CandidateIndex(52),CandidateIndex(54)], vec![CandidateIndex(104),CandidateIndex(68),CandidateIndex(72)], vec![CandidateIndex(56),CandidateIndex(7)], vec![CandidateIndex(20),CandidateIndex(12),CandidateIndex(96)]] } ,
-                _ => Default::default(),
-            },
-            _ => Default::default(),
-        }
+    fn ec_decisions(&self,_electorate:&str) -> TieResolutionsMadeByEC {
+        TieResolutionsMadeByEC::default()
     }
 
     /// These are due to a variety of events.
@@ -126,6 +119,30 @@ impl RawDataSource for ACTDataLoader {
     fn all_electorates(&self) -> Vec<String> {
         self.electorate_to_ecode.keys().cloned().collect()
     }
+
+    fn read_raw_metadata(&self,electorate:&str) -> anyhow::Result<ElectionMetadata> {
+        let ecode = self.electorate_to_ecode.get(electorate).cloned().ok_or_else(||self.bad_electorate(electorate))?;
+        let mut parties = self.load_parties(ecode)?;
+        let candidates = self.load_candidates(ecode,&mut parties)?;
+        let vacancies = self.candidates_to_be_elected(electorate);
+        Ok(ElectionMetadata{
+            name: self.name(electorate),
+            candidates,
+            parties,
+            source: vec![DataSource{
+                url: self.page_url.clone(),
+                files: vec!["Candidates.txt".to_string(),"Electorates.txt".to_string(),"Groups.txt".to_string()],
+                comments: None
+            }],
+            results: None,
+            vacancies: Some(vacancies),
+            enrolment: None,
+            secondary_vacancies: None,
+            excluded: self.excluded_candidates(electorate),
+            tie_resolutions : self.ec_decisions(electorate),
+        })
+    }
+
 
 }
 
@@ -201,29 +218,6 @@ impl ACTDataLoader {
             }
         }
         Ok(res)
-    }
-
-    fn read_raw_metadata(&self,electorate:&str) -> anyhow::Result<ElectionMetadata> {
-        let ecode = self.electorate_to_ecode.get(electorate).cloned().ok_or_else(||self.bad_electorate(electorate))?;
-        let mut parties = self.load_parties(ecode)?;
-        let candidates = self.load_candidates(ecode,&mut parties)?;
-        let vacancies = self.candidates_to_be_elected(electorate);
-        Ok(ElectionMetadata{
-            name: self.name(electorate),
-            candidates,
-            parties,
-            source: vec![DataSource{
-                url: self.page_url.clone(),
-                files: vec!["Candidates.txt".to_string(),"Electorates.txt".to_string(),"Groups.txt".to_string()],
-                comments: None
-            }],
-            results: None,
-            vacancies: Some(vacancies),
-            enrolment: None,
-            secondary_vacancies: None,
-            excluded: self.excluded_candidates(electorate),
-            tie_resolutions : self.ec_decisions(electorate),
-        })
     }
 
     /// Read the official distribution of prefererences, which are excel files in a folder "Distribution Of Preferences".

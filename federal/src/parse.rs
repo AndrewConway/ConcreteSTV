@@ -20,7 +20,7 @@ use serde::Deserialize;
 use stv::ballot_pile::BallotPaperCount;
 use stv::official_dop_transcript::{candidate_elem, OfficialDistributionOfPreferencesTranscript};
 use stv::tie_resolution::TieResolutionsMadeByEC;
-use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder, RawDataSource, MissingFile, FileFinder};
+use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder, RawDataSource, MissingFile, FileFinder, RawBallotPaperMetadata};
 use crate::parse2013::{read_from_senate_group_voting_tickets_download_file2013, read_ticket_votes2013, read_btl_votes2013};
 
 pub fn get_federal_data_loader_2013(finder:&FileFinder) -> FederalDataLoader {
@@ -90,9 +90,39 @@ impl RawDataSource for FederalDataLoader {
         }
     }
 
+    fn find_raw_data_file(&self,filename:&str) -> Result<PathBuf,MissingFile> {
+        self.finder.find_raw_data_file(filename,&self.archive_location,&self.page_url)
+    }
+    fn all_electorates(&self) -> Vec<String> {
+        vec!["ACT".to_string(),"NT".to_string(),"TAS".to_string(),"VIC".to_string(),"NSW".to_string(),"QLD".to_string(),"SA".to_string(),"WA".to_string()]
+    }
+
     // This below should be made more general and most of it factored out into a separate function.
     fn read_raw_data(&self,state:&str) -> anyhow::Result<ElectionData> {
         if self.year=="2013" { return self.read_raw_data2013(state); }
+//        let mut metadata = self.read_raw_metadata(state)?;
+        let mut atls : HashMap<Vec<PartyIndex>,usize> = HashMap::default();
+        let mut btls : HashMap<Vec<CandidateIndex>,usize> = HashMap::default();
+        let mut informal = 0;
+        let callback = |markings:&RawBallotMarkings,_meta:&[(&str,&str)]| { // TODO use the metadata to divide votes by source
+            match markings.interpret_vote(1,6) {
+                None => { informal+=1 }
+                Some(FormalVote::Btl(btl)) => { *btls.entry(btl.candidates).or_insert(0)+=btl.n }
+                Some(FormalVote::Atl(atl)) => { *atls.entry(atl.parties).or_insert(0)+=atl.n }
+            }
+        };
+        let metadata = self.iterate_over_raw_markings(state,callback)?;
+        let atl = atls.into_iter().map(|(parties,n)|ATL{ parties, n }).collect();
+        let btl = btls.into_iter().map(|(candidates,n)|BTL{ candidates , n }).collect();
+        Ok(ElectionData{ metadata, atl, atl_types: vec![], btl, btl_types: vec![], informal })
+    }
+
+    fn can_iterate_over_raw_btl_preferences(&self) -> bool { self.year!="2013" }
+
+    fn iterate_over_raw_markings<F>(&self,state:&str,mut callback:F)  -> anyhow::Result<ElectionMetadata>
+        where F:FnMut(&RawBallotMarkings,RawBallotPaperMetadata)
+    {
+        if self.year=="2013" { return Err(anyhow!("Iterating over raw btl preferences not supported.")); }
         let mut metadata = self.read_raw_metadata(state)?;
         let filename = self.name_of_vote_source(state);
         let preferences_zip_file = self.find_raw_data_file(&filename)?;
@@ -103,30 +133,35 @@ impl RawDataSource for FederalDataLoader {
             if metadata.parties[i].atl_allowed { parties_that_can_get_atls.push(PartyIndex(i)); }
         }
         let mut zipfile = zip::ZipArchive::new(File::open(preferences_zip_file)?)?;
-        let mut atls : HashMap<Vec<PartyIndex>,usize> = HashMap::default();
-        let mut btls : HashMap<Vec<CandidateIndex>,usize> = HashMap::default();
-        let mut informal = 0;
         for record in ParsedRawVoteIterator::new(&mut zipfile)? {
             let record=record?;
             let markings = RawBallotMarkings::new(&parties_that_can_get_atls,&record.markings);
-            //println!("Markings {:#?}",record.markings);
-            //println!("Interpretatation {:#?}",markings.interpret_vote(1,6));
-            match markings.interpret_vote(1,6) {
-                None => { informal+=1 }
-                Some(FormalVote::Btl(btl)) => { *btls.entry(btl.candidates).or_insert(0)+=btl.n }
-                Some(FormalVote::Atl(atl)) => { *atls.entry(atl.parties).or_insert(0)+=atl.n }
-            }
+            callback(&markings,&[]); // TODO put some real metadata in.
         }
-        let atl = atls.into_iter().map(|(parties,n)|ATL{ parties, n }).collect();
-        let btl = btls.into_iter().map(|(candidates,n)|BTL{ candidates , n }).collect();
-        Ok(ElectionData{ metadata, atl, atl_types: vec![], btl, btl_types: vec![], informal })
+        Ok(metadata)
     }
 
-    fn find_raw_data_file(&self,filename:&str) -> Result<PathBuf,MissingFile> {
-        self.finder.find_raw_data_file(filename,&self.archive_location,&self.page_url)
-    }
-    fn all_electorates(&self) -> Vec<String> {
-        vec!["ACT".to_string(),"NT".to_string(),"TAS".to_string(),"VIC".to_string(),"NSW".to_string(),"QLD".to_string(),"SA".to_string(),"WA".to_string()]
+    fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata> {
+        let mut builder = CandidateAndGroupInformationBuilder::default();
+        if self.year=="2013" { read_from_senate_group_voting_tickets_download_file2013(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
+        else { read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
+        let vacancies = self.candidates_to_be_elected(state);
+        Ok(ElectionMetadata{
+            name: self.name(state),
+            candidates: builder.candidates.clone(),
+            parties: builder.extract_parties(),
+            source: vec![DataSource{
+                url: self.page_url.clone(),
+                files: vec![self.name_of_candidate_source_post_election()],
+                comments: None
+            }],
+            results: None,
+            vacancies: Some(vacancies),
+            enrolment: None,
+            secondary_vacancies: if vacancies==NumberOfCandidates(12) { Some(NumberOfCandidates(6)) } else {None},
+            excluded: self.excluded_candidates(state),
+            tie_resolutions : self.ec_decisions(state),
+        })
     }
 
 }
@@ -156,28 +191,6 @@ impl FederalDataLoader {
     }
     fn name_of_official_transcript_zip_file(&self) -> String {
         format!("SenateDopDownload-{}.zip",self.election_number)
-    }
-    pub fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata> {
-        let mut builder = CandidateAndGroupInformationBuilder::default();
-        if self.year=="2013" { read_from_senate_group_voting_tickets_download_file2013(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
-        else { read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
-        let vacancies = self.candidates_to_be_elected(state);
-        Ok(ElectionMetadata{
-            name: self.name(state),
-            candidates: builder.candidates.clone(),
-            parties: builder.extract_parties(),
-            source: vec![DataSource{
-                url: self.page_url.clone(),
-                files: vec![self.name_of_candidate_source_post_election()],
-                comments: None
-            }],
-            results: None,
-            vacancies: Some(vacancies),
-            enrolment: None,
-            secondary_vacancies: if vacancies==NumberOfCandidates(12) { Some(NumberOfCandidates(6)) } else {None},
-            excluded: self.excluded_candidates(state),
-            tie_resolutions : self.ec_decisions(state),
-        })
     }
 
 
