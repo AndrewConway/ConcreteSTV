@@ -104,7 +104,7 @@ impl RawDataSource for FederalDataLoader {
         let mut atls : HashMap<Vec<PartyIndex>,usize> = HashMap::default();
         let mut btls : HashMap<Vec<CandidateIndex>,usize> = HashMap::default();
         let mut informal = 0;
-        let callback = |markings:&RawBallotMarkings,_meta:&[(&str,&str)]| { // TODO use the metadata to divide votes by source
+        let callback = |markings:&RawBallotMarkings,_meta:&[(&str,&str)]| { // TODO use the metadata to divide votes by source. Collection point meta[1].1 can start with PROVISIONAL, PRE_POLL, POSTAL, ABSENT at the minimum.
             match markings.interpret_vote(1,6) {
                 None => { informal+=1 }
                 Some(FormalVote::Btl(btl)) => { *btls.entry(btl.candidates).or_insert(0)+=btl.n }
@@ -133,10 +133,11 @@ impl RawDataSource for FederalDataLoader {
             if metadata.parties[i].atl_allowed { parties_that_can_get_atls.push(PartyIndex(i)); }
         }
         let mut zipfile = zip::ZipArchive::new(File::open(preferences_zip_file)?)?;
-        for record in ParsedRawVoteIterator::new(&mut zipfile)? {
+        let num_atl_plus_num_btl_hint = metadata.candidates.len()+metadata.parties.len();
+        for record in ParsedRawVoteIterator::new(&mut zipfile,num_atl_plus_num_btl_hint)? {
             let record=record?;
             let markings = RawBallotMarkings::new(&parties_that_can_get_atls,&record.markings);
-            callback(&markings,&[]); // TODO put some real metadata in.
+            callback(&markings,&[("Electorate",&record.record[record.electorate_column]),("Collection Point",&record.record[record.collection_column])]);
         }
         Ok(metadata)
     }
@@ -352,13 +353,15 @@ struct ParsedRawVoteIterator<'a> {
     electorate_column : usize,
     collection_column : usize,
     preferences_column : Option<usize>,
+    num_atl_plus_num_btl_hint : usize,
     // reader : Reader<ZipFile<'a>>,
     records : StringRecordsIntoIter<ZipFile<'a>>
 }
 
 
 impl<'a> ParsedRawVoteIterator<'a> {
-    fn new(zipfile : &'a mut ZipArchive<File>) -> anyhow::Result<Self> {
+    /// the num_atl_plus_num_btl_hint is used for initial capacity of the vector - it only matters for performance, and if it is a few over that is fine,
+    fn new(zipfile : &'a mut ZipArchive<File>,num_atl_plus_num_btl_hint:usize) -> anyhow::Result<Self> {
         let zip_contents = zipfile.by_index(0)?;
         let mut reader = csv::ReaderBuilder::new().flexible(true).from_reader(zip_contents);
         let headings = reader.headers()?;
@@ -370,6 +373,7 @@ impl<'a> ParsedRawVoteIterator<'a> {
             electorate_column,
             collection_column,
             preferences_column,
+            num_atl_plus_num_btl_hint,
             records,
         })
     }
@@ -398,7 +402,7 @@ impl <'a> Iterator for ParsedRawVoteIterator<'a> {
         match self.records.next() {
             Some(Ok(record)) => {
                 if record[0].starts_with("---") { return self.next(); } // skip dummy heading "underlines" if there.
-                let mut markings : Vec<RawBallotMarking> = Vec::with_capacity(100); // TODO num_atl+num_btl
+                let mut markings : Vec<RawBallotMarking> = Vec::with_capacity(self.num_atl_plus_num_btl_hint);
                 match self.preferences_column {
                     Some(preferences_column) => { // preferences are all in 1 column, comma separated
                         for s in record[preferences_column].split(',') {

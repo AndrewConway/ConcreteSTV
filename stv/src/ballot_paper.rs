@@ -11,6 +11,7 @@
 use crate::ballot_metadata::{CandidateIndex, ElectionMetadata, PartyIndex};
 use serde::{Deserialize,Serialize};
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use anyhow::anyhow;
 use crate::election_data::{ElectionData, VoteTypeSpecification};
 
@@ -37,12 +38,23 @@ impl RawBallotMarking {
     }
 }
 
+impl Display for RawBallotMarking {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            RawBallotMarking::Number(n) => { write!(f,"{}",n) }
+            RawBallotMarking::OneEquivalent => { write!(f,"X") }
+            RawBallotMarking::Blank => { Ok(()) }
+            RawBallotMarking::Other => { write!(f,"?") }
+        }
+    }
+}
+
 pub fn parse_marking(marking:&str) -> RawBallotMarking {
     if marking.is_empty() { RawBallotMarking::Blank }
     else if marking=="X" || marking=="*" || marking=="/" { RawBallotMarking::OneEquivalent }
     else if let Ok(num) = marking.parse::<u16>() { RawBallotMarking::Number(num) }
     else {
-        println!("Found other marking : {}",marking);
+        // println!("Found other marking : {}",marking);
         RawBallotMarking::Other
     }
 }

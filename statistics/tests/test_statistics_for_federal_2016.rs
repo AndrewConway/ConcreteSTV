@@ -9,6 +9,7 @@ use federal::FederalRulesUsed2016;
 use federal::parse::get_federal_data_loader_2016;
 use statistics::correlations::{CorrelationOptions, SquareMatrix};
 use statistics::errors_btl::ObviousErrorsInBTLVotes;
+use statistics::find_vote::{FindMyVoteQuery, FindMyVoteResult};
 use statistics::intent_table::{IntentTable, IntentTableOptions};
 use statistics::mean_preference::{MeanPreferenceByCandidate, MeanPreferences};
 use statistics::simple_statistics::SimpleStatistics;
@@ -174,4 +175,32 @@ fn test_obvious_btl_errors() {
     assert_eq!(107,errors.ok_up_to[4].0);
     assert_eq!(136,errors.ok_up_to[5].0);
     assert_eq!(2602,errors.ok_up_to[6].0);
+}
+
+
+#[test]
+fn test_find_vote() {
+    // compare against values computed in the old scala implementation
+
+    let loader = get_federal_data_loader_2016(&FileFinder::find_ec_data_repository());
+    let found = FindMyVoteResult::compute(loader, "TAS",FindMyVoteQuery{ query: "9,10,21,22,23,24,25,26,54,55,56,7,8,19,20,1,2,3,4,5,6,51,52,53,49,50,47,48,57,58,29,30,13,14,44,45,46,33,34,42,43,11,12,31,32,27,28,15,16,17,18,35,36,37,38,39,40,41".to_string(), blank_matches_anything: false }).unwrap();
+    // Test at http://192.168.2.20:8095/tools/federal/2016/TAS/PrepareVote.html
+    // This is the first listed vote from AEC : 9,10,21,22,23,24,25,26,54,55,56,7,8,19,20,1,2,3,4,5,6,51,52,53,49,50,47,48,57,58,29,30,13,14,44,45,46,33,34,42,43,11,12,31,32,27,28,15,16,17,18,35,36,37,38,39,40,41
+    assert_eq!(3,found.best.len());
+    assert_eq!(58,found.best[0].score);
+    assert_eq!(false,found.best[0].truncated);
+    assert_eq!(1,found.best[0].hits.len());
+    assert_eq!("9,10,21,22,23,24,25,26,54,55,56,7,8,19,20,1,2,3,4,5,6,51,52,53,49,50,47,48,57,58,29,30,13,14,44,45,46,33,34,42,43,11,12,31,32,27,28,15,16,17,18,35,36,37,38,39,40,41",&found.best[0].hits[0].votes);
+    assert_eq!("Bass",found.best[0].hits[0].metadata["Electorate"]);
+    assert_eq!("Branxholm",found.best[0].hits[0].metadata["Collection Point"]);
+    assert_eq!(17,found.best[1].score);
+    assert_eq!(false,found.best[1].truncated);
+    assert_eq!(1,found.best[1].hits.len());
+    assert_eq!("17,18,21,22,23,24,25,26,55,56,54,19,20,27,28,1,3,2,4,5,6,53,52,51,49,50,47,48,45,46,29,30,31,32,7,8,9,41,42,43,44,57,58,10,11,33,34,35,36,37,38,39,40,12,13,14,15,16",&found.best[1].hits[0].votes);
+    assert_eq!(16,found.best[2].score);
+    assert_eq!(false,found.best[2].truncated);
+    assert_eq!(3,found.best[2].hits.len());
+
+
+    println!("{:?}", found);
 }

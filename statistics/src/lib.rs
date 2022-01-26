@@ -13,3 +13,4 @@ pub mod intent_table;
 pub mod mean_preference;
 pub mod util;
 pub mod errors_btl;
+pub mod find_vote;
