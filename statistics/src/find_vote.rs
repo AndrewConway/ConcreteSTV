@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 use stv::ballot_paper::{parse_marking, RawBallotMarking, RawBallotMarkings};
-use stv::parse_util::RawDataSource;
+use stv::parse_util::{CanReadRawMarkings, RawDataSource};
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug,Serialize,Deserialize,Clone)]
@@ -83,7 +83,7 @@ impl FindMyVoteResult {
         }
     }
 
-    pub fn compute<S:RawDataSource>(loader:S,electorate:&str,query:FindMyVoteQuery) -> anyhow::Result<Self> {
+    pub fn compute<S:RawDataSource+CanReadRawMarkings>(loader:&S,electorate:&str,query:FindMyVoteQuery) -> anyhow::Result<Self> {
         let mut res = FindMyVoteResult { best: vec![] };
         let my_query = query.parse_query();
         let callback = |markings:&RawBallotMarkings,meta:&[(&str,&str)]| {

@@ -6,7 +6,7 @@
 
 use stv::ballot_paper::RawBallotMarkings;
 use stv::ballot_pile::BallotPaperCount;
-use stv::parse_util::RawDataSource;
+use stv::parse_util::{CanReadRawMarkings, RawDataSource};
 use serde::{Serialize,Deserialize};
 
 #[derive(Debug,Serialize,Deserialize,Clone)]
@@ -23,7 +23,7 @@ pub struct ObviousErrorsInBTLVotes {
 
 
 impl ObviousErrorsInBTLVotes {
-    pub fn compute<S:RawDataSource>(loader:S,electorate:&str) -> anyhow::Result<Self> {
+    pub fn compute<S:RawDataSource+CanReadRawMarkings>(loader:S,electorate:&str) -> anyhow::Result<Self> {
 
         let metadata = loader.read_raw_metadata(electorate)?;
         let num_candidates = metadata.candidates.len();

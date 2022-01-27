@@ -22,3 +22,4 @@ pub mod fixed_precision_decimal;
 pub mod signed_version;
 pub mod download;
 pub mod monte_carlo;
+pub mod datasource_description;

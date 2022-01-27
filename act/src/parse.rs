@@ -11,7 +11,7 @@
 
 
 use std::collections::{HashMap, HashSet};
-use stv::parse_util::{FileFinder, MissingFile, RawDataSource};
+use stv::parse_util::{CantReadRawMarkings, FileFinder, MissingFile, RawDataSource};
 use std::path::PathBuf;
 use stv::ballot_metadata::{Party, CandidateIndex, Candidate, PartyIndex, ElectionMetadata, DataSource, ElectionName, NumberOfCandidates};
 use stv::election_data::ElectionData;
@@ -21,6 +21,7 @@ use anyhow::anyhow;
 use serde::Deserialize;
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use calamine::{open_workbook_auto, DataType};
+use stv::datasource_description::{AssociatedRules, Copyright};
 use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
 
 pub fn get_act_data_loader_2020(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
@@ -44,6 +45,8 @@ pub struct ACTDataLoader {
     // data used for multiple electorates/reasons
     electorate_to_ecode : HashMap<String,usize>, // convert a human readable electorate to a ecode used in Elections ACT datafiles. An ecode is a small integer.
 }
+
+impl CantReadRawMarkings for ACTDataLoader {}
 
 impl RawDataSource for ACTDataLoader {
     fn name(&self,electorate:&str) -> ElectionName {
@@ -143,7 +146,33 @@ impl RawDataSource for ACTDataLoader {
         })
     }
 
+    /* as at current time, requires distribution to be in unaltered form */
+    fn copyright(&self) -> Copyright {
+        Copyright{
+            statement: Some("© Australian Capital Territory.".into()),
+            url: Some("https://www.elections.act.gov.au/copyright".into()),
+            license_name: None,
+            license_url: None,
+        }
+    }
 
+    fn rules(&self, _electorate: &str) -> AssociatedRules {
+        match self.year.as_str() {
+            "2008"|"2012"|"2016" => AssociatedRules{
+                rules_used: Some("ACTPre2020".into()),
+                rules_recommended: Some("ACTPre2020".into()),
+                comment: None,
+                reports: vec![]
+            },
+            "2020" => AssociatedRules{
+                rules_used: Some("ACT2020".into()),
+                rules_recommended: Some("ACT2021".into()),
+                comment: Some("The election was initially run with buggy rules ACT2020. After we pointed out the bugs, the counts on Elections ACT website were changed in 2021 to use the correct rules ACT2021".into()),
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/2020%20Errors%20In%20ACT%20Counting.pdf".into()]
+            },
+            _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
+        }
+    }
 }
 
 

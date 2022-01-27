@@ -22,6 +22,7 @@ use std::process::Command;
 use std::str::FromStr;
 use reqwest::Url;
 use crate::ballot_paper::{RawBallotMarkings};
+use crate::datasource_description::{AssociatedRules, Copyright};
 
 /// A utility for helping to read a list of candidates and parties.
 #[derive(Default)]
@@ -93,7 +94,8 @@ impl Display for MissingFile {
 impl Error for MissingFile {
 }
 
-pub trait RawDataSource {
+
+pub trait RawDataSource : KnowsAboutRawMarkings {
     fn name(&self,electorate:&str) -> ElectionName;
     /// The number of candidates to be elected in this election.
     fn candidates_to_be_elected(&self,electorate:&str) -> NumberOfCandidates;
@@ -119,6 +121,8 @@ pub trait RawDataSource {
         }
     }
 
+
+
     /// Like read_raw_data, but with a better error message for invalid electorates.
     fn read_raw_data_checking_electorate_valid(&self,electorate:&str) -> anyhow::Result<ElectionData> {
         if !self.all_electorates().iter().any(|s|s==electorate) { Err(self.bad_electorate(electorate)) }
@@ -133,15 +137,34 @@ pub trait RawDataSource {
     fn can_iterate_over_raw_btl_preferences(&self) -> bool { false }
     /// if it is possible to run the read_raw_data function
     fn can_load_full_data(&self) -> bool { true }
+    fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata>;
+    fn copyright(&self) -> Copyright;
+    fn rules(&self,electorate:&str) -> AssociatedRules;
+}
 
+pub trait KnowsAboutRawMarkings {
+    fn can_read_raw_markings(&self) -> bool;
+}
+/*
+impl <T:CanReadRawMarkings> KnowsAboutRawMarkings for T {
+    fn can_read_raw_markings(&self) -> bool { true }
+}*/
+impl <T:CantReadRawMarkings> KnowsAboutRawMarkings for T {
+    fn can_read_raw_markings(&self) -> bool { false }
+}
+
+pub trait CantReadRawMarkings {
+
+}
+pub trait CanReadRawMarkings {
     fn iterate_over_raw_markings<F>(&self,_electorate:&str,_callback:F)  -> anyhow::Result<ElectionMetadata>
-    where F:FnMut(&RawBallotMarkings,RawBallotPaperMetadata)
+        where F:FnMut(&RawBallotMarkings,RawBallotPaperMetadata)
     {
         Err(anyhow!("Iterating over raw btl preferences not supported."))
     }
-
-    fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata>;
 }
+
+
 
 /// Raw ballot paper metadata is a slice of pairs of strings.
 /// The first string is the name of the metadata (typically a constant static string)

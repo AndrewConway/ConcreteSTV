@@ -183,7 +183,7 @@ fn test_find_vote() {
     // compare against values computed in the old scala implementation
 
     let loader = get_federal_data_loader_2016(&FileFinder::find_ec_data_repository());
-    let found = FindMyVoteResult::compute(loader, "TAS",FindMyVoteQuery{ query: "9,10,21,22,23,24,25,26,54,55,56,7,8,19,20,1,2,3,4,5,6,51,52,53,49,50,47,48,57,58,29,30,13,14,44,45,46,33,34,42,43,11,12,31,32,27,28,15,16,17,18,35,36,37,38,39,40,41".to_string(), blank_matches_anything: false }).unwrap();
+    let found = FindMyVoteResult::compute(&loader, "TAS",FindMyVoteQuery{ query: "9,10,21,22,23,24,25,26,54,55,56,7,8,19,20,1,2,3,4,5,6,51,52,53,49,50,47,48,57,58,29,30,13,14,44,45,46,33,34,42,43,11,12,31,32,27,28,15,16,17,18,35,36,37,38,39,40,41".to_string(), blank_matches_anything: false }).unwrap();
     // Test at http://192.168.2.20:8095/tools/federal/2016/TAS/PrepareVote.html
     // This is the first listed vote from AEC : 9,10,21,22,23,24,25,26,54,55,56,7,8,19,20,1,2,3,4,5,6,51,52,53,49,50,47,48,57,58,29,30,13,14,44,45,46,33,34,42,43,11,12,31,32,27,28,15,16,17,18,35,36,37,38,39,40,41
     assert_eq!(3,found.best.len());

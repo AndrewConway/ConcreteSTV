@@ -6,6 +6,7 @@
 
 //! Functions to parse NSW election data
 
+use std::borrow::Cow;
 use std::collections::{HashSet};
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -14,10 +15,11 @@ use stv::election_data::ElectionData;
 use anyhow::anyhow;
 use scraper::{ElementRef, Html, Selector};
 use stv::ballot_paper::PreferencesComingOutOfOrderHelper;
-use stv::parse_util::{file_to_string, FileFinder, MissingFile, RawDataSource};
+use stv::parse_util::{CantReadRawMarkings, file_to_string, FileFinder, MissingFile, RawDataSource};
 use stv::tie_resolution::TieResolutionsMadeByEC;
 use serde::{Serialize,Deserialize};
 use stv::ballot_pile::BallotPaperCount;
+use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
 use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use stv::parse_util::parse_xlsx_by_converting_to_csv_using_openoffice;
@@ -26,6 +28,21 @@ use stv::preference_distribution::PreferenceDistributionRules;
 
 pub fn get_nsw_lge_data_loader_2021(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
     NSWLGEDataLoader::new(finder,"2021","https://vtr.elections.nsw.gov.au/LG2101/results")
+}
+
+pub struct NSWLGEDataSource {}
+
+impl ElectionDataSource for NSWLGEDataSource {
+    fn name(&self) -> Cow<'static, str> { "NSW Local Government".into() }
+    fn ec_name(&self) -> Cow<'static, str> { "NSW Electoral Commission".into() }
+    fn ec_url(&self) -> Cow<'static, str> { "https://www.elections.nsw.gov.au/".into() }
+    fn years(&self) -> Vec<String> { vec!["2021".to_string()] }
+    fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource>> {
+        match year {
+            "2021" => Ok(Box::new(get_nsw_lge_data_loader_2021(finder)?)),
+            _ => Err(anyhow!("Not a valid year")),
+        }
+    }
 }
 
 pub struct NSWLGEDataLoader {
@@ -47,6 +64,8 @@ pub struct NSWLGEContest {
     /// number of councillors to elect.
     pub vacancies : NumberOfCandidates,
 }
+
+impl CantReadRawMarkings for NSWLGEDataLoader {}
 
 impl RawDataSource for NSWLGEDataLoader {
     fn name(&self,electorate:&str) -> ElectionName {
@@ -92,6 +111,27 @@ impl RawDataSource for NSWLGEDataLoader {
                                                                   if mayoral {"mayoral/report/fp-by-grp-and-candidate-by-vote-type"} else {"councillor/report/fp-by-grp-and-candidate-by-vote-type"})?;
         let metadata = self.parse_candidate_list(File::open(metadata_data_file)?,mayoral,electorate)?;
         Ok(metadata)
+    }
+
+    fn copyright(&self) -> Copyright {
+        Copyright{
+            statement: Some("© State of New South Wales through the NSW Electoral Commission".into()),
+            url: Some("https://www.elections.nsw.gov.au/Copyright".into()),
+            license_name: Some("Creative Commons Attribution 4.0 License".into()),
+            license_url: Some("https://creativecommons.org/licenses/by/4.0/".into())
+        }
+    }
+
+    fn rules(&self, _electorate: &str) -> AssociatedRules {
+        match self.year.as_str() {
+            "2021" => AssociatedRules{
+                rules_used: Some("NSWECLocalGov2021".into()),
+                rules_recommended: None,
+                comment: Some("The legislation is very ambiguous. My interpretation of the rules is NSWLocalGov2021 but NSWECLocalGov2021 seems a plausible interpretation.".into()),
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2021Report.pdf".into()],
+            },
+            _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
+        }
     }
 }
 

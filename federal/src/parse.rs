@@ -5,6 +5,7 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use stv::ballot_metadata::{ElectionName, Candidate, CandidateIndex, PartyIndex, ElectionMetadata, DataSource, NumberOfCandidates};
@@ -18,9 +19,10 @@ use stv::election_data::ElectionData;
 use stv::distribution_of_preferences_transcript::QuotaInfo;
 use serde::Deserialize;
 use stv::ballot_pile::BallotPaperCount;
+use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
 use stv::official_dop_transcript::{candidate_elem, OfficialDistributionOfPreferencesTranscript};
 use stv::tie_resolution::TieResolutionsMadeByEC;
-use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder, RawDataSource, MissingFile, FileFinder, RawBallotPaperMetadata};
+use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder, RawDataSource, MissingFile, FileFinder, RawBallotPaperMetadata, CanReadRawMarkings, KnowsAboutRawMarkings};
 use crate::parse2013::{read_from_senate_group_voting_tickets_download_file2013, read_ticket_votes2013, read_btl_votes2013};
 
 pub fn get_federal_data_loader_2013(finder:&FileFinder) -> FederalDataLoader {
@@ -35,6 +37,23 @@ pub fn get_federal_data_loader_2019(finder:&FileFinder) -> FederalDataLoader {
     FederalDataLoader::new(finder,"2019",false,"https://results.aec.gov.au/24310/Website/SenateDownloadsMenu-24310-Csv.htm",24310)
 }
 
+pub struct FederalDataSource {}
+
+impl ElectionDataSource for FederalDataSource {
+    fn name(&self) -> Cow<'static, str> { "Federal Senate".into() }
+    fn ec_name(&self) -> Cow<'static, str> { "Australian Electoral Commission (AEC)".into() }
+    fn ec_url(&self) -> Cow<'static, str> { "https://www.aec.gov.au/".into() }
+    fn years(&self) -> Vec<String> { vec!["2013".to_string(),"2016".to_string(),"2019".to_string()] }
+    fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource>> {
+        match year {
+            "2013" => Ok(Box::new(get_federal_data_loader_2013(finder))),
+            "2016" => Ok(Box::new(get_federal_data_loader_2016(finder))),
+            "2019" => Ok(Box::new(get_federal_data_loader_2019(finder))),
+            _ => Err(anyhow!("Not a valid year")),
+        }
+    }
+}
+
 
 pub struct FederalDataLoader {
     finder : FileFinder,
@@ -43,6 +62,11 @@ pub struct FederalDataLoader {
     double_dissolution : bool,
     page_url : String,
     election_number : usize,
+}
+
+
+impl KnowsAboutRawMarkings for FederalDataLoader {
+    fn can_read_raw_markings(&self) -> bool  { self.year!="2013" }
 }
 
 impl RawDataSource for FederalDataLoader {
@@ -117,30 +141,6 @@ impl RawDataSource for FederalDataLoader {
         Ok(ElectionData{ metadata, atl, atl_types: vec![], btl, btl_types: vec![], informal })
     }
 
-    fn can_iterate_over_raw_btl_preferences(&self) -> bool { self.year!="2013" }
-
-    fn iterate_over_raw_markings<F>(&self,state:&str,mut callback:F)  -> anyhow::Result<ElectionMetadata>
-        where F:FnMut(&RawBallotMarkings,RawBallotPaperMetadata)
-    {
-        if self.year=="2013" { return Err(anyhow!("Iterating over raw btl preferences not supported.")); }
-        let mut metadata = self.read_raw_metadata(state)?;
-        let filename = self.name_of_vote_source(state);
-        let preferences_zip_file = self.find_raw_data_file(&filename)?;
-        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
-        metadata.source[0].files.push(filename);
-        let mut parties_that_can_get_atls = vec![];
-        for i in 0..metadata.parties.len() {
-            if metadata.parties[i].atl_allowed { parties_that_can_get_atls.push(PartyIndex(i)); }
-        }
-        let mut zipfile = zip::ZipArchive::new(File::open(preferences_zip_file)?)?;
-        let num_atl_plus_num_btl_hint = metadata.candidates.len()+metadata.parties.len();
-        for record in ParsedRawVoteIterator::new(&mut zipfile,num_atl_plus_num_btl_hint)? {
-            let record=record?;
-            let markings = RawBallotMarkings::new(&parties_that_can_get_atls,&record.markings);
-            callback(&markings,&[("Electorate",&record.record[record.electorate_column]),("Collection Point",&record.record[record.collection_column])]);
-        }
-        Ok(metadata)
-    }
 
     fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata> {
         let mut builder = CandidateAndGroupInformationBuilder::default();
@@ -164,9 +164,65 @@ impl RawDataSource for FederalDataLoader {
             tie_resolutions : self.ec_decisions(state),
         })
     }
+    fn copyright(&self) -> Copyright {
+        Copyright{
+            statement: Some("© Commonwealth of Australia 2017".into()),
+            url: Some("https://www.aec.gov.au/footer/Copyright.htm".into()),
+            license_name: Some("Creative Commons Attribution 4.0 International Licence".into()),
+            license_url: Some("https://creativecommons.org/licenses/by/4.0".into())
+        }
+    }
 
+    fn rules(&self, _electorate: &str) -> AssociatedRules {
+        match self.year.as_str() {
+            "2013" => AssociatedRules{
+                rules_used: Some("AEC2013".into()),
+                rules_recommended: Some("Federal".into()),
+                comment: None,
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
+            },
+            "2016" => AssociatedRules{
+                rules_used: Some("AEC2016".into()),
+                rules_recommended: Some("Federal".into()),
+                comment: None,
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
+            },
+            "2019" => AssociatedRules{
+                rules_used: Some("AEC2019".into()),
+                rules_recommended: Some("Federal".into()),
+                comment: None,
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
+            },
+            _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
+        }
+    }
 }
 
+impl CanReadRawMarkings for FederalDataLoader {
+    fn iterate_over_raw_markings<F>(&self,state:&str,mut callback:F)  -> anyhow::Result<ElectionMetadata>
+        where F:FnMut(&RawBallotMarkings,RawBallotPaperMetadata)
+    {
+        if self.year=="2013" { return Err(anyhow!("Iterating over raw btl preferences not supported.")); }
+        let mut metadata = self.read_raw_metadata(state)?;
+        let filename = self.name_of_vote_source(state);
+        let preferences_zip_file = self.find_raw_data_file(&filename)?;
+        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
+        metadata.source[0].files.push(filename);
+        let mut parties_that_can_get_atls = vec![];
+        for i in 0..metadata.parties.len() {
+            if metadata.parties[i].atl_allowed { parties_that_can_get_atls.push(PartyIndex(i)); }
+        }
+        let mut zipfile = zip::ZipArchive::new(File::open(preferences_zip_file)?)?;
+        let num_atl_plus_num_btl_hint = metadata.candidates.len()+metadata.parties.len();
+        for record in ParsedRawVoteIterator::new(&mut zipfile,num_atl_plus_num_btl_hint)? {
+            let record=record?;
+            let markings = RawBallotMarkings::new(&parties_that_can_get_atls,&record.markings);
+            callback(&markings,&[("Electorate",&record.record[record.electorate_column]),("Collection Point",&record.record[record.collection_column])]);
+        }
+        Ok(metadata)
+    }
+
+}
 impl FederalDataLoader {
 
 
