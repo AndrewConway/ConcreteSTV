@@ -10,6 +10,7 @@ members= [
     "nsw",
     "statistics",
     "main-app",
+    "webserver"
 ]
 
 

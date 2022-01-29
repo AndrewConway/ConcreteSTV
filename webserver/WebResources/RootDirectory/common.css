@@ -1,0 +1,65 @@
+
+body {
+    margin : 0;
+}
+
+header {
+    background-color:#eee;
+    color: blue;
+    width:100%;
+    height:32px;
+
+}
+
+header a {
+    text-decoration: none;
+    font-size: 20pt;
+    color: blue;
+}
+
+header span {
+    line-height : 20px;
+    height : 20px;
+    vertical-align: text-top;
+}
+footer {
+    margin-top: 10px;
+    font-size:0.8em;
+    background-color:#eee;
+    width:100%;
+}
+
+span.year {
+    font-weight: bold;
+    margin-left: 1em;
+    margin-right: 1em;
+}
+
+span.rules {
+    font-weight: bold;
+}
+
+a.electorate {
+    margin-left: 1em;
+}
+
+div#ErrorMessages {
+    color: red;
+}
+
+.hidden {
+    display: none;
+}
+
+div#MainBody {
+    margin-left: 3px;
+    margin-right: 3px;
+}
+
+table.rightalign td {
+    text-align: right;
+}
+
+table.rightalign th {
+    text-align: right;
+}
