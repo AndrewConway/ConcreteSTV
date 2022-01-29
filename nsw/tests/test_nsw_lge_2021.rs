@@ -12,13 +12,13 @@ use stv::ballot_metadata::CandidateIndex;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::parse_util::{FileFinder, RawDataSource};
 use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
-use stv::tie_resolution::TieResolutionsMadeByEC;
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionsMadeByEC};
 
 mod test_nsw_lge;
 
 
 fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&str,loader:&NSWLGEDataLoader,decode:F) {
-    let data = loader.load_cached_data(electorate).unwrap();
+    let data = loader.read_raw_data(electorate).unwrap();
     data.print_summary();
     let mut tie_resolutions = TieResolutionsMadeByEC::default();
     let official_transcript = loader.read_official_dop_transcript(&data.metadata).unwrap();
@@ -30,13 +30,10 @@ fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&s
             let file = File::create(format!("test_transcripts/NSW LG{} {}.transcript",transcript.metadata.name.year,electorate)).unwrap();
             serde_json::to_writer_pretty(file,&transcript).unwrap();
         }
-        if let Some((favoured_candidate,unfavoured_candidate)) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,&decode,true) {
-            println!("Adding tie resolution {}>{}",favoured_candidate,unfavoured_candidate);
-            assert!(favoured_candidate.0<unfavoured_candidate.0,"favoured candidate should be lower as higher candidates are assumed favoured.");
-            if tie_resolutions.tie_resolutions.contains(&vec![unfavoured_candidate,favoured_candidate]) {
-                panic!("That tie resolution is already in the list.")
-            }
-            tie_resolutions.tie_resolutions.push(vec![unfavoured_candidate,favoured_candidate]);
+        if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,&decode,true) {
+            println!("Observed tie resolution favouring {:?} over {:?}", decision.favoured, decision.disfavoured);
+            assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
+            tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
         } else {
             return;
         }

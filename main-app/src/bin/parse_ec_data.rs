@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::stdout;
 use stv::ballot_metadata::CandidateIndex;
 use stv::parse_util::FileFinder;
-use stv::tie_resolution::TieResolutionsMadeByEC;
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionsMadeByEC};
 
 #[derive(Parser)]
 #[clap(version = "0.2", author = "Andrew Conway", name="ConcreteSTV")]
@@ -51,7 +51,7 @@ struct Opts {
     /// indicate that 27 should be favoured over 43 in a decision between them.
     /// This flag may be used multiple times for multiple tie resolutions.
     #[clap(long,parse(try_from_str=main_app::try_parse_candidate_list))]
-    tie : Vec<Vec<CandidateIndex>>,
+    tie : Vec<TieResolutionAtom>,
 }
 
 

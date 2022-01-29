@@ -15,6 +15,7 @@ use std::fmt::Display;
 use crate::ballot_pile::BallotPaperCount;
 use crate::signed_version::SignedVersion;
 use std::str::FromStr;
+use crate::tie_resolution::TieResolutionExplicitDecision;
 
 /// Information for a particular count from the official transcript.
 #[derive(Default)]
@@ -59,12 +60,12 @@ impl OfficialDistributionOfPreferencesTranscript {
     /// panic if there are differences.
     pub fn compare_with_transcript<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F) {
         let ec_decision = self.compare_with_transcript_checking_for_ec_decisions(transcript,decode,true);
-        if let Some((favoured,unfavoured)) = ec_decision {
-            panic!("An EC decision was not made the way we expected: {} was favoured over {}",favoured,unfavoured);
+        if let Some(decision) = ec_decision {
+            panic!("An EC decision was not made the way we expected: {:?} was favoured over {:?}",decision.favoured,decision.disfavoured);
         }
     }
-    /// like compare_with_transcript but don't panic if the first difference is caused by a difference in EC decision making. If so, return Some(candidate_favoured_by_ec,candidate_excluded_by_ec).
-    pub fn compare_with_transcript_checking_for_ec_decisions<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F,verbose:bool) -> Option<(CandidateIndex,CandidateIndex)> {
+    /// like compare_with_transcript but don't panic if the first difference is caused by a difference in EC decision making. If so, return the decision.
+    pub fn compare_with_transcript_checking_for_ec_decisions<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F,verbose:bool) -> Option<TieResolutionExplicitDecision> {
         if let Some(quota) = &self.quota {
             assert_eq!(quota.vacancies,transcript.quota.vacancies,"vacancies official vs me");
             assert_eq!(quota.papers,transcript.quota.papers,"papers with first preferences official vs me");
@@ -142,9 +143,10 @@ impl OfficialDistributionOfPreferencesTranscript {
                 if !my_count.not_continuing.contains(who) {
                     if let Some(relevant_decision) = my_count.decisions.iter().find(|d|d.affected.contains(who)) { // may exclude a different candidate because of random decisions.
                         // The EC excluded "who". Work out whom I excluded.
-                        if let Some(&who_was_lucky) = relevant_decision.affected.iter().find(|&c|my_count.not_continuing.contains(c)) {
+                        if let Some(&_who_was_lucky) = relevant_decision.affected.iter().find(|&c|my_count.not_continuing.contains(c)) {
                             // I excluded "who_was_lucky". They should have a higher priority than "who".
-                            return Some((who_was_lucky,*who));
+                            let favoured = relevant_decision.affected.iter().filter(|&&c|c!=*who).cloned().collect::<Vec<_>>();
+                            return Some(TieResolutionExplicitDecision{favoured,disfavoured:vec![*who], came_up_in: my_count.count_name.clone().or_else(||Some((i+1).to_string())) });
                             // panic!("I excluded candidate {} but the EC excluded candidate {}. This was chosen by lot.",who_was_lucky,who);
                         } else {
                             panic!("{} was not in the list of not continuing. There was a relevant decision involving {:?} but I didn't exclude any.",who,relevant_decision.affected);

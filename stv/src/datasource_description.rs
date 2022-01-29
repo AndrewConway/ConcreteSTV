@@ -23,7 +23,7 @@ pub trait ElectionDataSource {
     /// the years that it works for
     fn years(&self) -> Vec<String>;
     /// something that will load data given a year from the above list.
-    fn get_loader_for_year(&self,year:&str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource>>;
+    fn get_loader_for_year(&self,year:&str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>>;
 }
 
 /// Description of the copyright of the electoral data used.

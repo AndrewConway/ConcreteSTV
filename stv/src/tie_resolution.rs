@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -97,11 +97,31 @@ impl MethodOfTieResolution {
 #[derive(Serialize,Deserialize,Debug,Clone)]
 pub struct TieResolutionsMadeByEC {
     #[serde(skip_serializing_if = "Vec::is_empty",default)]
-    pub tie_resolutions : Vec<Vec<CandidateIndex>>
+    pub tie_resolutions : Vec<TieResolutionAtom>
 }
 
 impl Default for TieResolutionsMadeByEC {
     fn default() -> Self { TieResolutionsMadeByEC{tie_resolutions:vec![]}}
+}
+
+#[derive(Serialize,Deserialize,Debug,Clone,Eq,PartialEq)]
+#[serde(untagged)]
+pub enum TieResolutionAtom {
+    /// Old style, list candidates in order of increasing favour. Useful for 3 way ties on order of election, should that ever happen.
+    IncreasingFavour(Vec<CandidateIndex>),
+    /// New preferred style.
+    ExplicitDecision(TieResolutionExplicitDecision)
+}
+
+#[derive(Serialize,Deserialize,Debug,Clone,Eq,PartialEq)]
+pub struct TieResolutionExplicitDecision {
+    /// the candidate(s) that got the better result from the EC's decision. Order is not meaningful.
+    pub favoured : Vec<CandidateIndex>,
+    /// the candidate(s) that got the worse result from the EC's decision. Order is not meaningful.
+    pub disfavoured : Vec<CandidateIndex>,
+    /// if this came up in an official election, list the round it came up in.
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub came_up_in : Option<String>,
 }
 
 impl TieResolutionsMadeByEC {
@@ -115,22 +135,40 @@ impl TieResolutionsMadeByEC {
                 return Err(anyhow!("Tie resolutions {} contain at least one repeated candidate",decision.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(",")));
             }
         }
+        let tie_resolutions = tie_resolutions.into_iter().map(|v|TieResolutionAtom::IncreasingFavour(v)).collect();
         Ok(TieResolutionsMadeByEC{tie_resolutions})
     }
     /// Sort tied_candidates appropriately (low to high)
     pub fn resolve(&self, tied_candidates: &mut [CandidateIndex], granularity: TieResolutionGranularityNeeded) {
-        for decision in &self.tie_resolutions {
-            let deemed_order : Vec<CandidateIndex> = decision.iter().filter(|&c|tied_candidates.contains(c)).cloned().collect();
-            if deemed_order.len()==tied_candidates.len() {
-                tied_candidates.copy_from_slice(&deemed_order);
-                return;
-            }
-            if granularity==TieResolutionGranularityNeeded::LowestSeparated(1) && decision.len()==2 && deemed_order.len()==2 {
-                // This is sufficient. One will be excluded and this should not re-arise.
-                let last = decision[0]; // this is least favoured candidate, so should go at the start of the list, which is in ascending order.
-                let order_with_last_first = [last].into_iter().chain(tied_candidates.iter().cloned().filter(|&c|c!=last)).collect::<Vec<_>>();
-                tied_candidates.copy_from_slice(&order_with_last_first);
-                return;
+        println!("Trying to resolve {:?}",tied_candidates);
+        for atom in &self.tie_resolutions {
+            match atom {
+                TieResolutionAtom::IncreasingFavour(decision) => {
+                    let deemed_order : Vec<CandidateIndex> = decision.iter().filter(|&c|tied_candidates.contains(c)).cloned().collect();
+                    if deemed_order.len()==tied_candidates.len() {
+                        tied_candidates.copy_from_slice(&deemed_order);
+                        return;
+                    }
+                    if granularity==TieResolutionGranularityNeeded::LowestSeparated(1) && decision.len()==2 && deemed_order.len()==2 {
+                        // This is sufficient. One will be excluded and this should not re-arise.
+                        // This is a bit of a hack introduced before TieResolutionExplicitDecision which how handles this case more elegantly and expressively.
+                        let last = decision[0]; // this is least favoured candidate, so should go at the start of the list, which is in ascending order.
+                        let order_with_last_first = [last].into_iter().chain(tied_candidates.iter().cloned().filter(|&c|c!=last)).collect::<Vec<_>>();
+                        tied_candidates.copy_from_slice(&order_with_last_first);
+                        return;
+                    }
+                }
+                TieResolutionAtom::ExplicitDecision(decision) => {
+                    if granularity==TieResolutionGranularityNeeded::LowestSeparated(decision.disfavoured.len())
+                        && tied_candidates.len()==decision.disfavoured.len()+decision.favoured.len()
+                        && decision.disfavoured.iter().all(|c|tied_candidates.contains(c))
+                        && decision.favoured.iter().all(|c|tied_candidates.contains(c)) {
+                        // this decision is perfect for this particular case.
+                        tied_candidates[0..decision.disfavoured.len()].copy_from_slice(&decision.disfavoured);
+                        tied_candidates[decision.disfavoured.len()..].copy_from_slice(&decision.favoured);
+                        return;
+                    }
+                }
             }
         }
         tied_candidates.sort_by_key(|c|c.0);

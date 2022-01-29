@@ -114,13 +114,16 @@ pub trait RawDataSource : KnowsAboutRawMarkings {
         match self.name(electorate).load_cached_data() {
             Ok(data) => Ok(data),
             Err(_) => {
-                let data = self.read_raw_data(electorate)?;
+                let data = self.read_raw_data_best_quality(electorate)?;
                 data.save_to_cache()?;
                 Ok(data)
             }
         }
     }
 
+    /// Read the data for a given electorate. Usually this just calls  read_raw_data,
+    /// but it can be overridden to call something else, such as to (expensively) deduce EC decisions.
+    fn read_raw_data_best_quality(&self,electorate:&str) -> anyhow::Result<ElectionData> { self.read_raw_data(electorate) }
 
 
     /// Like read_raw_data, but with a better error message for invalid electorates.
@@ -271,6 +274,8 @@ pub fn file_to_string(file:&mut File) -> anyhow::Result<String> {
 ///
 /// It is generally better to use a library like calamine, but if that doesn't work for some reason,
 /// this is a fall back.
+///
+/// TODO this seems unreliable if running multiple simultaneously.
 pub fn parse_xlsx_by_converting_to_csv_using_openoffice(path:&PathBuf) -> anyhow::Result<Vec<Vec<String>>> {
     // run open office
 //    println!("Converting {:?}",path);
@@ -292,3 +297,4 @@ pub fn parse_xlsx_by_converting_to_csv_using_openoffice(path:&PathBuf) -> anyhow
     std::fs::remove_file(output_path)?;
     Ok(res)
 }
+

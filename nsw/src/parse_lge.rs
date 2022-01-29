@@ -16,14 +16,15 @@ use anyhow::anyhow;
 use scraper::{ElementRef, Html, Selector};
 use stv::ballot_paper::PreferencesComingOutOfOrderHelper;
 use stv::parse_util::{CantReadRawMarkings, file_to_string, FileFinder, MissingFile, RawDataSource};
-use stv::tie_resolution::TieResolutionsMadeByEC;
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
 use serde::{Serialize,Deserialize};
 use stv::ballot_pile::BallotPaperCount;
 use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
-use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
+use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo, ReasonForCount};
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use stv::parse_util::parse_xlsx_by_converting_to_csv_using_openoffice;
 use stv::preference_distribution::PreferenceDistributionRules;
+use crate::NSWECLocalGov2021;
 
 
 pub fn get_nsw_lge_data_loader_2021(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
@@ -37,7 +38,7 @@ impl ElectionDataSource for NSWLGEDataSource {
     fn ec_name(&self) -> Cow<'static, str> { "NSW Electoral Commission".into() }
     fn ec_url(&self) -> Cow<'static, str> { "https://www.elections.nsw.gov.au/".into() }
     fn years(&self) -> Vec<String> { vec!["2021".to_string()] }
-    fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource>> {
+    fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
         match year {
             "2021" => Ok(Box::new(get_nsw_lge_data_loader_2021(finder)?)),
             _ => Err(anyhow!("Not a valid year")),
@@ -102,6 +103,8 @@ impl RawDataSource for NSWLGEDataLoader {
     }
     fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> { self.read_raw_data_possibly_rejecting_some_types(electorate,None) }
 
+    fn read_raw_data_best_quality(&self,electorate:&str) -> anyhow::Result<ElectionData> { self.read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021>(electorate) }
+
     fn read_raw_metadata(&self, electorate: &str) -> anyhow::Result<ElectionMetadata> {
         let contest = &self.find_contest(electorate)?.url;
         let mayoral = electorate.ends_with(" Mayoral");
@@ -122,8 +125,14 @@ impl RawDataSource for NSWLGEDataLoader {
         }
     }
 
-    fn rules(&self, _electorate: &str) -> AssociatedRules {
+    fn rules(&self, electorate: &str) -> AssociatedRules {
         match self.year.as_str() {
+            "2021" if electorate.ends_with("Mayoral") => AssociatedRules{
+                rules_used: Some("IRV".into()),
+                rules_recommended: None,
+                comment: Some("This is not actually a STV election, having only one candidate. It is an IRV election. Almost any STV ruleset is a decent approximation to IRV, modulo tie resolution.".into()),
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2021Report.pdf".into()],
+            },
             "2021" => AssociatedRules{
                 rules_used: Some("NSWECLocalGov2021".into()),
                 rules_recommended: None,
@@ -141,20 +150,43 @@ impl NSWLGEDataLoader {
     /// Like read_raw_data, except also try to deduce the tie breaking decisions that were used by NSWEC.
     /// This is a powerful function, but it will be slow and panic if anything goes even slightly wrong.
     pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions<Rules:PreferenceDistributionRules<Tally=usize>>(&self, electorate: &str) -> anyhow::Result<ElectionData>  {
+        println!("Trying to deduce ec resolutions for {}",electorate);
         let mut data = self.read_raw_data(electorate)?;
         if electorate.ends_with("Mayoral") { return Ok(data); } // don't have DOP file for mayoral elections. Besides, STV is not necessarily exactly a generalization of IRV... e.g. early termination conditions.
         // let mut tie_resolutions = TieResolutionsMadeByEC::default();
         let official_transcript = self.read_official_dop_transcript(&data.metadata)?;
+        let mut initial_ec_decisions = data.metadata.tie_resolutions.clone(); // should be empty, unless we set it up some way else.
         loop {
+            println!("Looping...");
             let transcript = data.distribute_preferences::<Rules>();
-            if let Some((favoured_candidate, unfavoured_candidate)) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript, decode,false) {
-                println!("Observed tie resolution favouring {} over {}", favoured_candidate, unfavoured_candidate);
-                assert!(favoured_candidate.0 < unfavoured_candidate.0, "favoured candidate should be lower as higher candidates are assumed favoured.");
-                if data.metadata.tie_resolutions.tie_resolutions.contains(&vec![unfavoured_candidate, favoured_candidate]) {
-                    panic!("That tie resolution is already in the list.")
-                }
-                data.metadata.tie_resolutions.tie_resolutions.push(vec![unfavoured_candidate, favoured_candidate]);
+            if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript, decode,false) {
+                println!("Observed tie resolution favouring {:?} over {:?}", decision.favoured, decision.disfavoured);
+                assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
+                data.metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
             } else {
+                // now check for EC decisions that were compatible with my default assumption of reverse-donkey-vote.
+                for (count_index,count) in transcript.counts.iter().enumerate() {
+                    for decision in &count.decisions {
+                        match &count.reason {
+                            ReasonForCount::Elimination(disfavoured) => {
+                                if disfavoured.iter().all(|c|decision.affected.contains(c)) {
+                                    let disfavoured = disfavoured.clone();
+                                    let favoured = decision.affected.iter().filter(|&c|!disfavoured.contains(c)).cloned().collect();
+                                    let ecdecision = TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{favoured,disfavoured,came_up_in:count.count_name.clone().or_else(||Some((count_index+1).to_string()))});
+                                    initial_ec_decisions.tie_resolutions.push(ecdecision);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                // check the newly deduced list contains every decision previously deduced.
+                for decision in &data.metadata.tie_resolutions.tie_resolutions {
+                    if !initial_ec_decisions.tie_resolutions.contains(decision) {
+                        panic!("EC decision {:?} was not in the re-deduced set",decision);
+                    }
+                }
+                data.metadata.tie_resolutions=initial_ec_decisions; // overwrite to get decisions in count order.
                 return Ok(data);
             }
         }

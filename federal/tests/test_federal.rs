@@ -22,7 +22,7 @@ mod tests {
 
     fn test2019(state:&str) -> anyhow::Result<()> {
         let loader = get_federal_data_loader_2019(&FileFinder::find_ec_data_repository());
-        let data = loader.load_cached_data(state)?;
+        let data = loader.read_raw_data(state)?;
         data.print_summary();
         let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),true);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
@@ -36,7 +36,7 @@ mod tests {
 
     fn test2016(state:&str) -> anyhow::Result<()> {
         let loader = get_federal_data_loader_2016(&FileFinder::find_ec_data_repository());
-        let data = loader.load_cached_data(state)?;
+        let data = loader.read_raw_data(state)?;
         data.print_summary();
         let transcript = distribute_preferences::<FederalRulesUsed2016>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state),true);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
@@ -50,7 +50,7 @@ mod tests {
 
     fn test2013(state:&str) -> anyhow::Result<()> {
         let loader = get_federal_data_loader_2013(&FileFinder::find_ec_data_repository());
-        let data = loader.load_cached_data(state)?;
+        let data = loader.read_raw_data(state)?;
         data.print_summary();
         let transcript = distribute_preferences::<FederalRulesUsed2013>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state),true);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };

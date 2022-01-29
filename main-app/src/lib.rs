@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -19,15 +19,28 @@ use margin::record_changes::ElectionChanges;
 use stv::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use stv::election_data::ElectionData;
 use stv::preference_distribution::PreferenceDistributionRules;
-use stv::tie_resolution::TieResolutionsMadeByEC;
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
 use crate::rules::Rules;
 
 pub mod rules;
 pub mod ec_data_source;
 
-/// Utility that is helpful for parsing in clap a Vec<Vec<CandidateIndex>>.
-pub fn try_parse_candidate_list(s:&str) -> Result<Vec<CandidateIndex>,ParseIntError> {
+fn string_to_candidate_list(s:&str) -> Result<Vec<CandidateIndex>,ParseIntError> {
     s.split(',').map(|s|s.trim().parse::<CandidateIndex>()).collect()
+}
+
+/// Utility that is helpful for parsing in clap a Vec<Vec<CandidateIndex>>.
+pub fn try_parse_candidate_list(s:&str) -> Result<TieResolutionAtom,ParseIntError> {
+    if let Some((disfavoured,favoured)) = s.split_once(',') {
+        Ok(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{
+            favoured: string_to_candidate_list(favoured)?,
+            disfavoured: string_to_candidate_list(disfavoured)?,
+            came_up_in: None
+        }))
+    } else {
+        Ok(TieResolutionAtom::IncreasingFavour(string_to_candidate_list(s)?))
+    }
+
 }
 
 /// Options that pertain to what ballots are to be considered for changing
@@ -108,9 +121,14 @@ pub struct ModifyStvFileOptions {
     /// You can override this by specifying a list of candidate indices (starting counting at 0) to favour in said priority order.
     /// For example in a tie resolved between candidates 27 and 43, ConcreteSTV would favour 43 by default. Enter `--tie 43,27` to
     /// indicate that 27 should be favoured over 43 in a decision between them.
+    ///
+    /// To indicate that in a situation where there are 5 candidates 2,4,6,8 and 9, and two of them (2 & 6) end up being
+    /// disfavoured over the other three when such a decision needs to be made, enter `--tie 2,6/4,8,9` which does
+    /// not indicate relative ranking between 2 and 6, or 4,8 and 9.
+    ///
     /// This flag may be used multiple times for multiple tie resolutions.
     #[clap(long,parse(try_from_str=try_parse_candidate_list))]
-    tie : Vec<Vec<CandidateIndex>>,
+    tie : Vec<TieResolutionAtom>,
 
 }
 

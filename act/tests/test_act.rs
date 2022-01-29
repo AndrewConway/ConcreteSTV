@@ -20,7 +20,7 @@ mod tests {
     use act::{ACTPre2020, ACT2021, ACT2020};
 
     fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&str,loader:ACTDataLoader,decode:F,sub_folder:Option<&str>) -> anyhow::Result<()> {
-        let data = loader.load_cached_data(electorate)?;
+        let data = loader.read_raw_data(electorate)?;
         data.print_summary();
         let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &HashSet::default(), &TieResolutionsMadeByEC::default(),true);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };

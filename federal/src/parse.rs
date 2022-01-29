@@ -44,7 +44,7 @@ impl ElectionDataSource for FederalDataSource {
     fn ec_name(&self) -> Cow<'static, str> { "Australian Electoral Commission (AEC)".into() }
     fn ec_url(&self) -> Cow<'static, str> { "https://www.aec.gov.au/".into() }
     fn years(&self) -> Vec<String> { vec!["2013".to_string(),"2016".to_string(),"2019".to_string()] }
-    fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource>> {
+    fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
         match year {
             "2013" => Ok(Box::new(get_federal_data_loader_2013(finder))),
             "2016" => Ok(Box::new(get_federal_data_loader_2016(finder))),
@@ -94,8 +94,8 @@ impl RawDataSource for FederalDataLoader {
     fn ec_decisions(&self,state:&str) -> TieResolutionsMadeByEC {
         match self.year.as_str() {
             "2013" => match state {
-                "VIC" => TieResolutionsMadeByEC{ tie_resolutions: vec![vec![CandidateIndex(54), CandidateIndex(23),CandidateIndex(85),CandidateIndex(88)]] } , // 4 way tie at count 10.
-                "NSW" => TieResolutionsMadeByEC{ tie_resolutions: vec![vec![CandidateIndex(82),CandidateIndex(52),CandidateIndex(54)], vec![CandidateIndex(104),CandidateIndex(68),CandidateIndex(72)], vec![CandidateIndex(56),CandidateIndex(7)], vec![CandidateIndex(20),CandidateIndex(12),CandidateIndex(96)]] } ,
+                "VIC" => TieResolutionsMadeByEC::new(vec![vec![CandidateIndex(54), CandidateIndex(23),CandidateIndex(85),CandidateIndex(88)]]).unwrap() , // 4 way tie at count 10.
+                "NSW" => TieResolutionsMadeByEC::new( vec![vec![CandidateIndex(82),CandidateIndex(52),CandidateIndex(54)], vec![CandidateIndex(104),CandidateIndex(68),CandidateIndex(72)], vec![CandidateIndex(56),CandidateIndex(7)], vec![CandidateIndex(20),CandidateIndex(12),CandidateIndex(96)]]).unwrap() ,
                 _ => Default::default(),
             },
             _ => Default::default(),
