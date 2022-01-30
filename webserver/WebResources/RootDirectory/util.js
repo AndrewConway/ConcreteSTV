@@ -1,7 +1,7 @@
 "use strict";
 
 // This file contains a couple of general utilities that Andrew often uses.
-// Copyright 2018-2021 Andrew Conway. All rights reserved, but may be distributed under GPL 3.0 or later or other by arrangement.
+// Copyright 2018-2022 Andrew Conway. All rights reserved, but may be distributed under GPL 3.0 or later or other by arrangement.
 
 
 /** Add a new node of type addWhat to DOM element addTo, returning the new element. If the third argument is present, the new object is assigned that class. */
@@ -90,4 +90,59 @@ function addHeaderAndFooter() {
     }
     getFragment("/header.html",(fragment)=>{ document.body.prepend(...fragment); })
     getFragment("/footer.html",(fragment)=>{ document.body.append(...fragment); })
+}
+
+
+/// add some text, possibly with a href around it.
+function addMaybeA(div,text,href) {
+    if (href) {
+        const a = add(div,"a");
+        a.innerText=text;
+        a.href=href;
+    } else div.append(text);
+}
+
+function addRules(div,rules) {
+    let span = add(div,"span","rules");
+    span.innerText=rules;
+}
+
+/// Print a message to a div with id "ErrorMessages", creating it if not present
+function standardFailureFunction(message) {
+    let errorDiv = document.getElementById("ErrorMessages");
+    if (!errorDiv) {
+        errorDiv=document.createElement("div");
+        errorDiv.id="ErrorMessages";
+        document.body.prepend(errorDiv)
+    }
+    add(errorDiv,"h1").innerText="Error";
+    add(errorDiv,"div").innerText=message;
+}
+
+/// Like getWebJSON, but the returned JSON is a Rust Result. Convert an Err result to a failure, and extract the Ok field for a good result.
+/// Use standardFailureFunction if failure not given.
+function getWebJSONResult(url,success,failure) {
+    if (!failure) failure=standardFailureFunction;
+    function real_success(result) {
+        if (result.Err) failure(result.Err);
+        else if (result.Ok) success(result.Ok);
+        else failure("Received uninterpretable data.");
+    }
+    getWebJSON(url,real_success,failure);
+}
+
+/// Like getWebJSONResult, but takes an array of urls.
+/// Calls success with one arg per url of the results when all have returned.
+function getMultipleWebJSONResult(urls,success,failure) {
+    let togo = urls.length;
+    let res = [];
+    for (let i=0;i<urls.length;i++) {
+        res.push(null);
+        function partialSuccess(data) {
+            res[i]=data;
+            togo--;
+            if (togo==0) success(...res);
+        }
+        getWebJSONResult(urls[i],partialSuccess,failure);
+    }
 }

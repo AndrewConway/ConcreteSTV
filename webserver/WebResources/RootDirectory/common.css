@@ -63,3 +63,38 @@ table.rightalign td {
 table.rightalign th {
     text-align: right;
 }
+
+input[type=number] {
+    appearance : textfield;
+    height : 1.2em;
+    width : 1.2em;
+}
+input[type='number'] {
+    -moz-appearance:textfield;
+}
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+}
+input.bad {
+    background-color : red;
+}
+div#paperDiv {
+    display : flex;
+    flex-wrap : wrap;
+    align-items : top;
+}
+div.group {
+    display: inline-block;
+    width : 17em;
+}
+@media print {
+    .noprint { display:none; }
+}
+span.NumberBox {
+    border-style: groove;
+    width: 2em;
+}
+div.CandidateAndNumber {
+    margin-bottom: 5px;
+}

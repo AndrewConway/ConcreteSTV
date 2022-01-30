@@ -13,6 +13,7 @@ use actix_web::{HttpServer, middleware, web};
 use actix_web::web::Json;
 use actix_web::{get, post};
 use actix_web::http::header::{ContentDisposition, DispositionParam, DispositionType};
+use statistics::mean_preference::MeanPreferences;
 use stv::ballot_metadata::ElectionMetadata;
 use crate::cache::cache_json;
 use crate::find_election::{ALL_ELECTIONS_AS_LIST, ElectionInfo, ElectionsOfOneType, FoundElection};
@@ -36,6 +37,16 @@ async fn get_metadata(election : web::Path<FoundElection>) -> Json<Result<Electi
 async fn get_info(election : web::Path<FoundElection>) -> Json<Result<ElectionInfo,String>> {
     cache_json("simple.json",&election.spec,||election.get_info()).await
 }
+
+#[get("/{name}/{year}/{electorate}/MeanPreferences.json")]
+async fn get_mean_preferences(election : web::Path<FoundElection>) -> Json<Result<MeanPreferences,String>> {
+    async fn get_mean_preferences_uncached(election : &web::Path<FoundElection>) -> Result<MeanPreferences,String> {
+        Ok(MeanPreferences::compute(&election.data().await?))
+    }
+    cache_json("MeanVotes.json",&election.spec,||get_mean_preferences_uncached(&election)).await
+}
+
+
 
 #[post("/find_my_vote")]
 async fn find_my_vote() -> Json<Result<String,String>> {
@@ -80,6 +91,7 @@ async fn main() -> anyhow::Result<()> {
             .service(get_all_contests)
             .service(get_metadata)
             .service(get_info)
+            .service(get_mean_preferences)
             .service(find_my_vote)
             .service(get_data)
             .wrap(middleware::Compress::default())

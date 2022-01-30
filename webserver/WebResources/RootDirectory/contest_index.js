@@ -41,9 +41,9 @@ function process_good_info(info) {
         }
         if (info.rules.reports) {
             for (const report of info.rules.reports) {
-                rulesDiv.append("For details see our ")
+                rulesDiv.append("We have written a ")
                 addMaybeA(rulesDiv,"report",report);
-                rulesDiv.append(" ");
+                rulesDiv.append(" about this election. ");
             }
         }
     }
@@ -96,10 +96,11 @@ function process_good_info(info) {
 }
 
 function process_good_metadata(metadata) {
-    const title = metadata.name.electorate+" "+metadata.name.year+" "+metadata.name.name;
+    const title = title_from_metadata(metadata);
     document.title=title;
+    set_heading_from_metadata(metadata);
     document.getElementById("TitleHeading").innerText=title;
-    const metaDiv = document.getElementById("InfoPlaceholder");
+    const metaDiv = document.getElementById("MetadataPlaceholder");
     add(metaDiv,"h4").innerText="The contest";
     add(metaDiv,"div").innerText="There are "+metadata.candidates.length+" candidates"+(metadata.parties?" and "+metadata.parties.length+" groups":"")+".";
     if (metadata.vacancies) add(metaDiv,"div").innerText="There are "+metadata.vacancies+" vacancies to fill."
@@ -113,44 +114,6 @@ function process_good_metadata(metadata) {
             }
         }
     }
-}
-
-/// add some text, possibly with a href around it.
-function addMaybeA(div,text,href) {
-    if (href) {
-        const a = add(div,"a");
-        a.innerText=text;
-        a.href=href;
-    } else div.append(text);
-}
-
-function addRules(div,rules) {
-    let span = add(div,"span","rules");
-    span.innerText=rules;
-}
-
-/// Print a message to a div with id "ErrorMessages", creating it if not present
-function standardFailureFunction(message) {
-    let errorDiv = document.getElementById("ErrorMessages");
-    if (!errorDiv) {
-        errorDiv=document.createElement("div");
-        errorDiv.id="ErrorMessages";
-        document.body.prepend(errorDiv)
-    }
-    add(errorDiv,"h1").innerText="Error";
-    add(errorDiv,"div").innerText=message;
-}
-
-/// Like getWebJSON, but the returned JSON is a Rust Result. Convert an Err result to a failure, and extract the Ok field for a good result.
-/// Use standardFailureFunction if failure not given.
-function getWebJSONResult(url,success,failure) {
-    if (!failure) failure=standardFailureFunction;
-    function real_success(result) {
-        if (result.Err) failure(result.Err);
-        else if (result.Ok) success(result.Ok);
-        else failure("Received uninterpretable data.");
-    }
-    getWebJSON(url,real_success,failure);
 }
 
 
