@@ -13,7 +13,9 @@ use actix_web::{HttpServer, middleware, web};
 use actix_web::web::Json;
 use actix_web::{get, post};
 use actix_web::http::header::{ContentDisposition, DispositionParam, DispositionType};
+use statistics::intent_table::{IntentTable, IntentTableOptions};
 use statistics::mean_preference::MeanPreferences;
+use statistics::who_got_votes::WhoGotVotes;
 use stv::ballot_metadata::ElectionMetadata;
 use crate::cache::cache_json;
 use crate::find_election::{ALL_ELECTIONS_AS_LIST, ElectionInfo, ElectionsOfOneType, FoundElection};
@@ -46,6 +48,22 @@ async fn get_mean_preferences(election : web::Path<FoundElection>) -> Json<Resul
     cache_json("MeanVotes.json",&election.spec,||get_mean_preferences_uncached(&election)).await
 }
 
+
+#[get("/{name}/{year}/{electorate}/IntentTable.json")]
+async fn get_intent_table(election : web::Path<FoundElection>,options : web::Query<IntentTableOptions>) -> Json<Result<IntentTable,String>> {
+    async fn get_intent_table_uncached(election : &web::Path<FoundElection>,options : &web::Query<IntentTableOptions>) -> Result<IntentTable,String> {
+        Ok(IntentTable::compute(&election.data().await?,options))
+    }
+    cache_json("IntentTable.json",&(election.spec.clone(),options.clone()),||get_intent_table_uncached(&election,&options)).await
+}
+
+#[get("/{name}/{year}/{electorate}/WhoGotVotes.json")]
+async fn get_who_got_votes(election : web::Path<FoundElection>) -> Json<Result<WhoGotVotes,String>> {
+    async fn get_who_got_votes_uncached(election : &web::Path<FoundElection>) -> Result<WhoGotVotes,String> {
+        Ok(WhoGotVotes::compute(&election.data().await?))
+    }
+    cache_json("WhoGotVotes.json",&election.spec,||get_who_got_votes_uncached(&election)).await
+}
 
 
 #[post("/find_my_vote")]
@@ -92,6 +110,8 @@ async fn main() -> anyhow::Result<()> {
             .service(get_metadata)
             .service(get_info)
             .service(get_mean_preferences)
+            .service(get_intent_table)
+            .service(get_who_got_votes)
             .service(find_my_vote)
             .service(get_data)
             .wrap(middleware::Compress::default())

@@ -7,28 +7,7 @@ let showingCandidate = -1;
 let candidateBoxes = []; // will be one per candidate.
 
 function setupCandidates() {
-    let groupBoxes = []; // map from candidate group index to div
-    const paperDiv = document.getElementById("paperDiv");
-    removeAllChildElements(paperDiv); // get rid of loading message
-    if (metadata.parties) for (const group of metadata.parties) {
-        const groupDiv = add(paperDiv,"div","group");
-        groupBoxes.push(groupDiv);
-        add(groupDiv,"h4").innerText=group.column_id;
-        add(groupDiv,"h5").innerText=group.name;
-    }
-    let ungrouped_box = null;
-    if (metadata.candidates.some(c=> !c.hasOwnProperty("party"))) { // there exist ungrouped candidates
-        ungrouped_box = add(paperDiv,"div","group");
-        add(ungrouped_box,"h4").innerText="Ungrouped";
-    }
-    for (const candidate of metadata.candidates) {
-        const candidateIndex = candidateBoxes.length;
-        const cDiv=add(candidate.hasOwnProperty("party")?groupBoxes[candidate.party]:ungrouped_box,"div","CandidateAndNumber");
-        candidateBoxes.push(add(cDiv,"span","NumberBox"));
-        const cName=add(cDiv,"span");
-        cName.innerText = candidate.name;
-        cName.addEventListener("click",function () { setCandidate(candidateIndex); });
-    }
+    candidateBoxes=drawBallotPaper(true,(div,_index)=>add(div,"span","NumberBox"),setCandidate);
     document.getElementById("showATL").addEventListener("change",function () { setCandidate(showingCandidate); });
 }
 

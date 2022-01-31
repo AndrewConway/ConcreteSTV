@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/common.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="/util.js"></script>
+    <script src="/common.js"></script>
+    <script src="/IntentTable.js"></script>
+
+    <title>Intent Table</title>
+</head>
+<body>
+
+<div id="MainBody">
+    <p class="noprint">This table lets you choose some "major parties" or candidates. Each formal ballot paper is then assigned to one of the
+        "major parties" based on which of these gets the first preference for one of them. If none, it is considered exhausted.
+        This determines the appropriate
+        column for the ballot. The ballots are also divided based on the first preference. This determines the appropriate
+        row for the ballot. Each cell in the table contains the number of ballots for that row and column. The sum of
+        each column is the "major party" preferred vote for that party; the sum of each row is the number of first
+        preference votes for that candidate (or party).</p>
+
+    <h2 id="TitleHeading">Loading...</h2>
+    <div> <!-- Decide what data to show -->
+        <input type="checkbox" id="isGroupsColumns" name="isGroupsColumns" checked="true"/><label for="isGroupsColumns">Columns ("major" parties) refer to groups</label>
+        <input type="checkbox" id="isGroupsRows" name="isGroupsRows" checked="true"/><label for="isGroupsRows">Rows (first preference) refer to groups</label>
+        <input type="checkbox" id="useATL" name="useATL" checked="true"/><label for="useATL">Use ATL votes</label>
+        <input type="checkbox" id="useBTL" name="useBTL" checked="true"/><label for="useBTL">Use BTL votes</label>
+    </div>
+    <h4>Who is a "major" party?</h4>
+    <div id="paperDiv"></div>
+    <h4>Where votes went</h4>
+    <table id="resultTable"></table>
+
+</div>
+
+</body>
+</html>

@@ -58,25 +58,25 @@ function process_good_info(info) {
         add(headRow,"th").innerText="Votes";
         add(headRow,"th").innerText="ATL";
         add(headRow,"th").innerText="BTL";
-        const formal = add(statsTable,"tr");
+        const formal = add(statsTable,"tr","Striped");
         add(formal,"th").innerText="Formal";
         add(formal,"td").innerText=info.simple.num_formal;
         add(formal,"td").innerText=info.simple.uses_group_voting_tickets?"*":info.simple.num_atl;
         add(formal,"td").innerText=info.simple.num_btl;
-        const unique = add(statsTable,"tr");
+        const unique = add(statsTable,"tr","Striped");
         add(unique,"th").innerText="Unique";
         add(unique,"td").innerText=info.simple.num_unique_atl+info.simple.num_unique_btl;
         add(unique,"td").innerText=info.simple.uses_group_voting_tickets?"*":info.simple.num_unique_atl;
         add(unique,"td").innerText=info.simple.num_unique_btl;
         if (info.simple.num_informal) {
-            const formal = add(statsTable,"tr");
+            const formal = add(statsTable,"tr","Striped");
             add(formal,"th").innerText="Informal";
             add(formal,"td").innerText=info.simple.num_informal;
             add(formal,"td").innerText="";
             add(formal,"td").innerText="";
         }
         for (const vtype of info.simple.vote_types) {
-            const row = add(statsTable,"tr");
+            const row = add(statsTable,"tr","Striped");
             add(row,"th").innerText=vtype.name;
             add(row,"td").innerText=vtype.num_atl+vtype.num_btl;
             add(row,"td").innerText=vtype.num_atl;
