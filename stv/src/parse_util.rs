@@ -23,6 +23,8 @@ use std::str::FromStr;
 use reqwest::Url;
 use crate::ballot_paper::{RawBallotMarkings};
 use crate::datasource_description::{AssociatedRules, Copyright};
+use crate::errors_btl::ObviousErrorsInBTLVotes;
+use crate::find_vote::{FindMyVoteQuery, FindMyVoteResult};
 
 /// A utility for helping to read a list of candidates and parties.
 #[derive(Default)]
@@ -143,18 +145,27 @@ pub trait RawDataSource : KnowsAboutRawMarkings {
     fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata>;
     fn copyright(&self) -> Copyright;
     fn rules(&self,electorate:&str) -> AssociatedRules;
+    fn can_read_raw_markings(&self) -> bool { false}
 }
 
 pub trait KnowsAboutRawMarkings {
-    fn can_read_raw_markings(&self) -> bool;
+    fn find_my_vote(&self,_electorate:&str,_query:&FindMyVoteQuery) -> anyhow::Result<FindMyVoteResult> { Err(anyhow!("Reading raw markings not supported.")) }
+    fn find_btl_errors(&self,_electorate:&str) -> anyhow::Result<ObviousErrorsInBTLVotes> { Err(anyhow!("Reading raw markings not supported.")) }
+}
+
+impl <T:CanReadRawMarkings+RawDataSource> KnowsAboutRawMarkings for T {
+    fn find_my_vote(&self,electorate:&str,query:&FindMyVoteQuery) -> anyhow::Result<FindMyVoteResult> {
+        FindMyVoteResult::compute(self,electorate,query)
+    }
+    fn find_btl_errors(&self,electorate:&str) -> anyhow::Result<ObviousErrorsInBTLVotes> {
+        ObviousErrorsInBTLVotes::compute(self,electorate)
+    }
 }
 /*
-impl <T:CanReadRawMarkings> KnowsAboutRawMarkings for T {
-    fn can_read_raw_markings(&self) -> bool { true }
-}*/
 impl <T:CantReadRawMarkings> KnowsAboutRawMarkings for T {
     fn can_read_raw_markings(&self) -> bool { false }
 }
+*/
 
 pub trait CantReadRawMarkings {
 

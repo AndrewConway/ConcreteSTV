@@ -22,7 +22,7 @@ use stv::ballot_pile::BallotPaperCount;
 use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
 use stv::official_dop_transcript::{candidate_elem, OfficialDistributionOfPreferencesTranscript};
 use stv::tie_resolution::TieResolutionsMadeByEC;
-use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder, RawDataSource, MissingFile, FileFinder, RawBallotPaperMetadata, CanReadRawMarkings, KnowsAboutRawMarkings};
+use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder, RawDataSource, MissingFile, FileFinder, RawBallotPaperMetadata, CanReadRawMarkings};
 use crate::parse2013::{read_from_senate_group_voting_tickets_download_file2013, read_ticket_votes2013, read_btl_votes2013};
 
 pub fn get_federal_data_loader_2013(finder:&FileFinder) -> FederalDataLoader {
@@ -62,11 +62,6 @@ pub struct FederalDataLoader {
     double_dissolution : bool,
     page_url : String,
     election_number : usize,
-}
-
-
-impl KnowsAboutRawMarkings for FederalDataLoader {
-    fn can_read_raw_markings(&self) -> bool  { self.year!="2013" }
 }
 
 impl RawDataSource for FederalDataLoader {
@@ -196,6 +191,7 @@ impl RawDataSource for FederalDataLoader {
             _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
         }
     }
+    fn can_read_raw_markings(&self) -> bool  { self.year!="2013" }
 }
 
 impl CanReadRawMarkings for FederalDataLoader {

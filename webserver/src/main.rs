@@ -13,10 +13,12 @@ use actix_web::{HttpServer, middleware, web};
 use actix_web::web::Json;
 use actix_web::{get, post};
 use actix_web::http::header::{ContentDisposition, DispositionParam, DispositionType};
+use stv::find_vote::{FindMyVoteQuery, FindMyVoteResult};
 use statistics::intent_table::{IntentTable, IntentTableOptions};
 use statistics::mean_preference::MeanPreferences;
 use statistics::who_got_votes::WhoGotVotes;
 use stv::ballot_metadata::ElectionMetadata;
+use stv::errors_btl::ObviousErrorsInBTLVotes;
 use crate::cache::cache_json;
 use crate::find_election::{ALL_ELECTIONS_AS_LIST, ElectionInfo, ElectionsOfOneType, FoundElection};
 
@@ -65,11 +67,19 @@ async fn get_who_got_votes(election : web::Path<FoundElection>) -> Json<Result<W
     cache_json("WhoGotVotes.json",&election.spec,||get_who_got_votes_uncached(&election)).await
 }
 
+#[get("/{name}/{year}/{electorate}/RepeatedNumbers.json")]
+async fn get_find_btl_errors(election : web::Path<FoundElection>) -> Json<Result<ObviousErrorsInBTLVotes,String>> {
+    async fn get_find_btl_errors_uncached(election : &web::Path<FoundElection>) -> Result<ObviousErrorsInBTLVotes,String> {
+        election.loader.find_btl_errors(election.electorate()).map_err(|e|e.to_string())
+    }
+    cache_json("WhoGotVotes.json",&election.spec,||get_find_btl_errors_uncached(&election)).await
+}
 
-#[post("/find_my_vote")]
-async fn find_my_vote() -> Json<Result<String,String>> {
-    let contests : anyhow::Result<String> = Ok("Federal".to_string());
-    Json(contests.map_err(|e|e.to_string()))
+
+
+#[post("/{name}/{year}/{electorate}/find_my_vote")]
+async fn find_my_vote(election : web::Path<FoundElection>,query:web::Json<FindMyVoteQuery>) -> Json<Result<FindMyVoteResult,String>> {
+    Json(election.loader.find_my_vote(election.electorate(),&query).map_err(|e|e.to_string()))
 }
 
 #[get("/{name}/{year}/{electorate}/data.stv")]
@@ -112,6 +122,7 @@ async fn main() -> anyhow::Result<()> {
             .service(get_mean_preferences)
             .service(get_intent_table)
             .service(get_who_got_votes)
+            .service(get_find_btl_errors)
             .service(find_my_vote)
             .service(get_data)
             .wrap(middleware::Compress::default())

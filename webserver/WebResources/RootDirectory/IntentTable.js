@@ -65,11 +65,4 @@ window.onload = function () {
         document.getElementById("useBTL").addEventListener("input",recomputeTable);
         recomputeTable();
     });
-    getMultipleWebJSONResult(["MeanPreferences.json","metadata.json"],(mean_prefs,meta) => {
-        meanVoteData=mean_prefs;
-        metadata=meta;
-        set_heading_from_metadata(metadata);
-        setupCandidates();
-        setCandidate(-1);
-    })
 }

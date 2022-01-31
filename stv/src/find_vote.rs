@@ -6,11 +6,12 @@
 
 //! Find raw votes in the official results that match your vote - see if it is really there!
 //! Actually, look for similar things as you or the EC may have made an error.
+//! Note that tests for this are in the statistics module (as they require some actual data)
 
 
 use std::collections::HashMap;
-use stv::ballot_paper::{parse_marking, RawBallotMarking, RawBallotMarkings};
-use stv::parse_util::{CanReadRawMarkings, RawDataSource};
+use crate::ballot_paper::{parse_marking, RawBallotMarking, RawBallotMarkings};
+use crate::parse_util::CanReadRawMarkings;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug,Serialize,Deserialize,Clone)]
@@ -23,7 +24,8 @@ pub struct FindVoteHit {
 pub struct SearchMatchesWithSameScore {
     pub score : usize,
     pub hits : Vec<FindVoteHit>,
-    pub truncated : bool,
+    /// the number of hits not mentioned here.
+    pub truncated : usize,
 }
 
 #[derive(Debug,Serialize,Deserialize,Clone)]
@@ -70,20 +72,20 @@ impl FindMyVoteResult {
             if skip_over<self.best.len() && self.best[skip_over].score==score {
                 // found another one.
                 if self.best[skip_over].hits.len()==MAX_HITS_PER_SCORE_WANTED { // already have plenty with this score
-                    self.best[skip_over].truncated=true;
+                    self.best[skip_over].truncated+=1;
                     None
                 } else {
                     Some(&mut self.best[skip_over].hits)
                 }
             } else { // our score is better than this score.
-                self.best.insert(skip_over,SearchMatchesWithSameScore{score,hits:vec![],truncated:false});
+                self.best.insert(skip_over,SearchMatchesWithSameScore{score,hits:vec![],truncated:0});
                 self.best.truncate(MAX_SCORES_WANTED); // get rid of extra
                 Some(&mut self.best[skip_over].hits)
             }
         }
     }
 
-    pub fn compute<S:RawDataSource+CanReadRawMarkings>(loader:&S,electorate:&str,query:FindMyVoteQuery) -> anyhow::Result<Self> {
+    pub fn compute<S:CanReadRawMarkings>(loader:&S,electorate:&str,query:&FindMyVoteQuery) -> anyhow::Result<Self> {
         let mut res = FindMyVoteResult { best: vec![] };
         let my_query = query.parse_query();
         let callback = |markings:&RawBallotMarkings,meta:&[(&str,&str)]| {

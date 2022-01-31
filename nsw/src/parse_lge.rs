@@ -15,7 +15,7 @@ use stv::election_data::ElectionData;
 use anyhow::anyhow;
 use scraper::{ElementRef, Html, Selector};
 use stv::ballot_paper::PreferencesComingOutOfOrderHelper;
-use stv::parse_util::{CantReadRawMarkings, file_to_string, FileFinder, MissingFile, RawDataSource};
+use stv::parse_util::{file_to_string, FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource};
 use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
 use serde::{Serialize,Deserialize};
 use stv::ballot_pile::BallotPaperCount;
@@ -66,7 +66,7 @@ pub struct NSWLGEContest {
     pub vacancies : NumberOfCandidates,
 }
 
-impl CantReadRawMarkings for NSWLGEDataLoader {}
+impl KnowsAboutRawMarkings for NSWLGEDataLoader {}
 
 impl RawDataSource for NSWLGEDataLoader {
     fn name(&self,electorate:&str) -> ElectionName {

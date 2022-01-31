@@ -4,9 +4,11 @@
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
-use stv::ballot_paper::RawBallotMarkings;
-use stv::ballot_pile::BallotPaperCount;
-use stv::parse_util::{CanReadRawMarkings, RawDataSource};
+//! Note that tests for this are in the statistics module (as they require some actual data)
+
+use crate::ballot_paper::RawBallotMarkings;
+use crate::ballot_pile::BallotPaperCount;
+use crate::parse_util::{CanReadRawMarkings, RawDataSource};
 use serde::{Serialize,Deserialize};
 
 #[derive(Debug,Serialize,Deserialize,Clone)]
@@ -23,7 +25,7 @@ pub struct ObviousErrorsInBTLVotes {
 
 
 impl ObviousErrorsInBTLVotes {
-    pub fn compute<S:RawDataSource+CanReadRawMarkings>(loader:S,electorate:&str) -> anyhow::Result<Self> {
+    pub fn compute<S:RawDataSource+CanReadRawMarkings>(loader:&S,electorate:&str) -> anyhow::Result<Self> {
 
         let metadata = loader.read_raw_metadata(electorate)?;
         let num_candidates = metadata.candidates.len();
@@ -46,7 +48,7 @@ impl ObviousErrorsInBTLVotes {
                 }
             }
             // look for missing
-            for i in 0..num_candidates-1 {
+            for i in 0..num_candidates {
                 if found[i]==0 && (i==0 || found[i-1]==1) && (i+1==num_candidates || found[i+1]==1) {
                     res.missing[i]+=BallotPaperCount(1);
                 }

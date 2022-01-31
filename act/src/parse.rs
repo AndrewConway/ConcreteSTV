@@ -11,7 +11,7 @@
 
 
 use std::collections::{HashMap, HashSet};
-use stv::parse_util::{CantReadRawMarkings, FileFinder, MissingFile, RawDataSource};
+use stv::parse_util::{FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource};
 use std::path::PathBuf;
 use stv::ballot_metadata::{Party, CandidateIndex, Candidate, PartyIndex, ElectionMetadata, DataSource, ElectionName, NumberOfCandidates};
 use stv::election_data::ElectionData;
@@ -46,7 +46,7 @@ pub struct ACTDataLoader {
     electorate_to_ecode : HashMap<String,usize>, // convert a human readable electorate to a ecode used in Elections ACT datafiles. An ecode is a small integer.
 }
 
-impl CantReadRawMarkings for ACTDataLoader {}
+impl KnowsAboutRawMarkings for ACTDataLoader {}
 
 impl RawDataSource for ACTDataLoader {
     fn name(&self,electorate:&str) -> ElectionName {

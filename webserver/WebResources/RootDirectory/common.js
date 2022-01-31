@@ -49,7 +49,6 @@ function drawBallotPaper(showCandidates,createX,clickOnName) {
         if (!showCandidates) centralPurpose(ungrouped_box,"");
     }
     if (showCandidates) for (const candidate of metadata.candidates) {
-        const candidateIndex = candidateBoxes.length;
         centralPurpose(candidate.hasOwnProperty("party")?groupBoxes[candidate.party]:ungrouped_box,candidate.name);
     }
     return allXs;

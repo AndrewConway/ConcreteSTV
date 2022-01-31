@@ -163,3 +163,18 @@ a.subtle:visited:hover {
     text-decoration: underline;
 }
 
+span.mismatch {
+    display: inline-block;
+    min-width : 0.5em;
+    border-bottom: 1px dotted red;
+    /* doesn't work for spaces
+    text-decoration-line: underline;
+    text-decoration-style: wavy;
+    text-decoration-color: red;
+    */
+    color:red;
+}
+
+input#preferences {
+    min-width: 30em;
+}
