@@ -13,6 +13,7 @@ use actix_web::{HttpServer, middleware, web};
 use actix_web::web::Json;
 use actix_web::{get, post};
 use actix_web::http::header::{ContentDisposition, DispositionParam, DispositionType};
+use statistics::correlations::{CorrelationDendrogramsAndSVD, CorrelationOptions, SquareMatrix};
 use stv::find_vote::{FindMyVoteQuery, FindMyVoteResult};
 use statistics::intent_table::{IntentTable, IntentTableOptions};
 use statistics::mean_preference::MeanPreferences;
@@ -57,6 +58,15 @@ async fn get_intent_table(election : web::Path<FoundElection>,options : web::Que
         Ok(IntentTable::compute(&election.data().await?,options))
     }
     cache_json("IntentTable.json",&(election.spec.clone(),options.clone()),||get_intent_table_uncached(&election,&options)).await
+}
+
+#[get("/{name}/{year}/{electorate}/Correlation.json")]
+async fn get_correlation(election : web::Path<FoundElection>,options : web::Query<CorrelationOptions>) -> Json<Result<CorrelationDendrogramsAndSVD,String>> {
+    async fn get_correlation_uncached(election : &web::Path<FoundElection>,options : &web::Query<CorrelationOptions>) -> Result<CorrelationDendrogramsAndSVD,String> {
+        let correlation = SquareMatrix::compute_correlation_matrix(&election.data().await?,&options).to_distance_matrix();
+        Ok(CorrelationDendrogramsAndSVD::new(correlation))
+    }
+    cache_json("Correlation.json",&(election.spec.clone(),options.clone()),||get_correlation_uncached(&election,&options)).await
 }
 
 #[get("/{name}/{year}/{electorate}/WhoGotVotes.json")]
@@ -121,6 +131,7 @@ async fn main() -> anyhow::Result<()> {
             .service(get_info)
             .service(get_mean_preferences)
             .service(get_intent_table)
+            .service(get_correlation)
             .service(get_who_got_votes)
             .service(get_find_btl_errors)
             .service(find_my_vote)

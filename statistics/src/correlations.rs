@@ -5,10 +5,12 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
+use nalgebra::{Dynamic, OMatrix, SVD};
 use stv::election_data::ElectionData;
 use serde::{Serialize,Deserialize};
 use stv::ballot_metadata::CandidateIndex;
 use stv::ballot_pile::BallotPaperCount;
+use crate::dendrogram::Dendrogram;
 
 #[derive(Debug,Serialize,Deserialize,Clone)]
 /// Square matrix with some function of (candidate,candidate) or (party,party).
@@ -40,7 +42,7 @@ impl SquareMatrix {
     ///   p_x is subtracted from each element of p_x before the above formula (this is generally recommended).
     ///
     /// It also computes the number of first preference votes for each candidate/group depending upon the options.
-    pub fn compute_correlation_matrix(data:&ElectionData, options:CorrelationOptions) -> SquareMatrix {
+    pub fn compute_correlation_matrix(data:&ElectionData, options:&CorrelationOptions) -> SquareMatrix {
         let n = if options.want_candidates { data.metadata.candidates.len() }  else { data.metadata.parties.len() };
         let mut self_dot_product = vec![0.0;n];
         let mut first_preferences = vec![BallotPaperCount(0);n];
@@ -114,5 +116,37 @@ impl SquareMatrix {
             }
         }
         self
+    }
+}
+
+#[derive(Debug,Serialize,Deserialize,Clone)]
+pub struct CorrelationDendrogramsAndSVD {
+    pub correlation : SquareMatrix,
+    pub dendrogram_single : Dendrogram,
+    pub dendrogram_complete : Dendrogram,
+    pub dendrogram_mean : Dendrogram,
+    pub dendrogram_weighted_mean : Dendrogram,
+    pub svd : SVD<f64,Dynamic,Dynamic>,
+}
+
+impl CorrelationDendrogramsAndSVD {
+    pub fn new(correlation:SquareMatrix) -> Self {
+        let distance_function = |i:usize,j:usize|correlation.matrix[i][j];
+        let num_nodes = correlation.matrix.len();
+        let dendrogram_single = Dendrogram::compute_single_linkage(distance_function,num_nodes);
+        let dendrogram_complete = Dendrogram::compute_complete_linkage_slow(distance_function,num_nodes);
+        let dendrogram_mean = Dendrogram::compute_mean_linkage_slow(distance_function,num_nodes);
+        let dendrogram_weighted_mean = Dendrogram::compute_weighted_mean_linkage_slow(distance_function,num_nodes);
+        let distance_function_undoing_to_distance_matrix = |i:usize,j:usize|1.0-correlation.matrix[i][j];
+        let matrix : OMatrix<f64,Dynamic,Dynamic> = OMatrix::<f64,Dynamic,Dynamic>::from_fn(num_nodes,num_nodes,distance_function_undoing_to_distance_matrix);
+        let svd = SVD::new(matrix,true,true);
+        CorrelationDendrogramsAndSVD{
+            correlation,
+            dendrogram_single,
+            dendrogram_complete,
+            dendrogram_mean,
+            dendrogram_weighted_mean,
+            svd
+        }
     }
 }

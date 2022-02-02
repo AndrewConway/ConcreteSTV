@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/common.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="/util.js"></script>
+    <script src="/common.js"></script>
+    <script src="/Correlations.js"></script>
+
+    <title>Correlations</title>
+    <style>
+        label:checked {
+            background-color : grey;
+        }
+        .ForDendrogram, .ForScatterplot {
+            display: none;
+        }
+        #ShowDendrogram:checked ~ #ShowDendrogramLabel {
+            font-weight: bold;
+        }
+        #ShowScatterplot:checked ~ #ShowScatterplotLabel {
+            font-weight: bold;
+        }
+
+        #ShowDendrogram:checked ~ span.ForDendrogram {
+            display: inline;
+        }
+        #ShowScatterplot:checked ~ span.ForScatterplot {
+            display: inline;
+        }
+    </style>
+</head>
+<body>
+
+<div id="MainBody">
+    <p class="noprint">This lets you compare how voters gave preferences to parties or candidates by doing correlations against the provided preferences.
+        Parties that all voters tended to put close together have high correlation; parties that voters gave very different preferences
+        have low correlation.</p>
+
+    <h2 id="TitleHeading">Loading...</h2>
+    <div> <!-- Decide what data to show -->
+        <input type="checkbox" id="isGroups" name="isGroups" checked="true"/><label for="isGroups">Groups</label>
+        <input type="checkbox" id="useATL" name="useATL"/><label for="useATL">Use ATL votes</label>
+        <input type="checkbox" id="useBTL" name="useBTL" checked="true"/><label for="useBTL">Use BTL votes</label>
+        <input type="checkbox" id="subMeanCorrelation" name="subMeanCorrelation" checked="true"/><label for="subMeanCorrelation">Mean based correlation</label>
+    </div>
+
+    <div>
+        Show as
+        <input type="radio" id="ShowDendrogram" name="ShowAs" value="ShowDendrogram" checked><label for="ShowDendrogram" id="ShowDendrogramLabel">Dendrogram</label>
+        <input type="radio" id="ShowScatterplot" name="ShowAs" value="ShowScatterplot"><label for="ShowScatterplot" id="ShowScatterplotLabel">Scatterplot</label>
+        <span class="ForDendrogram">
+            <select id="linkageType">
+                <option value="slink">Single Linkage</option>
+                <option value="clink">Complete Linkage</option>
+                <option value="maxLink" selected="true">Mean Linkage</option>
+                <option value="meanLink">Weighted Mean Linkage</option>
+            </select>
+            <label for="sortBy">Sort dendrogram by</label><select id="sortBy"></select>
+            <input type="checkbox" id="showSVD" name="showSVD"/><label for="showSVD">Show SVD</label>
+        </span>
+        <span class="ForScatterplot">
+            <label for="xAxisChoice">X Axis : </label><select id="xAxisChoice"></select>
+            <label for="yAxisChoice">Y Axis : </label><select id="yAxisChoice"></select>
+            <span class="hidden"> <!-- Color choice doesn't do anything, so hidden, but the select is tied into the code with events, etc.  -->
+            <label for="colorChoice">Color by : </label><select id="colorChoice"></select>
+            </span>
+        </span>
+    </div>
+    <svg width="1200" height="1000">
+        <style>
+            line {
+                stroke : black;
+                stroke-width : 1;
+            }
+            g.Names text {
+                dominant-baseline : middle;
+                text-anchor: start;
+                font-size:10px;
+            }
+        </style>
+        <g id="canvas"></g>
+    </svg>
+
+</div>
+
+</body>
+</html>

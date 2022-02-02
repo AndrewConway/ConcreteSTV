@@ -146,3 +146,11 @@ function getMultipleWebJSONResult(urls,success,failure) {
         getWebJSONResult(urls[i],partialSuccess,failure);
     }
 }
+
+
+function getMax(a){
+    return Math.max(...a.map(e => Array.isArray(e) ? getMax(e) : e));
+}
+function getMin(a){
+    return Math.min(...a.map(e => Array.isArray(e) ? getMin(e) : e));
+}

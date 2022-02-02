@@ -7,7 +7,7 @@
 
 use federal::FederalRulesUsed2016;
 use federal::parse::get_federal_data_loader_2016;
-use statistics::correlations::{CorrelationOptions, SquareMatrix};
+use statistics::correlations::{CorrelationDendrogramsAndSVD, CorrelationOptions, SquareMatrix};
 use stv::errors_btl::ObviousErrorsInBTLVotes;
 use stv::find_vote::{FindMyVoteQuery, FindMyVoteResult};
 use statistics::intent_table::{IntentTable, IntentTableOptions};
@@ -48,7 +48,12 @@ fn test_tasmanian_statistics_using_just_formal_votes() {
     assert_eq!(72729,who_got_votes.parties[1].mention_btl.0);
 
     // test correlations
-
+    fn expect_similar(actual:f64,expected:f64) {
+        let diff = actual-expected;
+        if diff.abs() > 0.00001 {
+            panic!("actual {} expecting {}",actual,expected);
+        }
+    }
     fn expect(d:&SquareMatrix,i:usize,j:usize,expected:f64) {
         let actual = d.matrix[i][j];
         let diff = actual-expected;
@@ -57,7 +62,7 @@ fn test_tasmanian_statistics_using_just_formal_votes() {
         }
     }
 
-    let d = SquareMatrix::compute_correlation_matrix(&data,CorrelationOptions{
+    let d = SquareMatrix::compute_correlation_matrix(&data,&CorrelationOptions{
         want_candidates: true,
         use_atl: false,
         use_btl: true,
@@ -73,7 +78,7 @@ fn test_tasmanian_statistics_using_just_formal_votes() {
     expect(&d,0,7,0.3907734603844969);
     expect(&d,1,6,0.23348007817716465);
 
-    let d = SquareMatrix::compute_correlation_matrix(&data,CorrelationOptions{
+    let d = SquareMatrix::compute_correlation_matrix(&data,&CorrelationOptions{
         want_candidates: false,
         use_atl: true,
         use_btl: true,
@@ -89,6 +94,24 @@ fn test_tasmanian_statistics_using_just_formal_votes() {
     expect(&d,0,7,1.069077809853819);
     expect(&d,1,6,1.0468502848088126);
 
+    let dd = CorrelationDendrogramsAndSVD::new(d);
+    //println!("{:?}",dd);
+    assert_eq!(dd.dendrogram_single.to_string(),"[0.8934927500357255: [0.7985607354822462: 6 [0.73449242733415: [0.7319477955666771: 8 9] 12]] [0.862364579921466: 4 [0.8535415926694258: [0.6740144281259961: 15 18] [0.8355560916758819: 7 [0.8349342613421635: [0.8342980254904299: 10 [0.7904967624390229: 13 [0.7771952551475794: [0.6172302080989418: 0 3] [0.6172277532626997: 5 19]]]] [0.8208495101092119: [0.7619155996194362: 1 [0.7499216926473367: 2 [0.7490592278756094: 14 [0.7174064997829538: 16 [0.6964081729654136: 11 [0.5921234350176086: 17 20]]]]]] 21]]]]]]");
+    assert_eq!(dd.dendrogram_complete.to_string(),"[1.359818826341058: [1.3016207230516186: [0.9242156553620529: [0.6172302080989418: 0 3] [0.6172277532626997: 5 19]] [1.175398731356519: [0.9382616029138167: 6 [0.8440008986822493: [0.7319477955666771: 8 9] 12]] [1.0816082891575247: [0.8651009227418309: 7 [0.8231433469208616: [0.7350377845831565: 11 [0.5921234350176086: 17 20]] 16]] [0.9900128272545202: [0.9498040548152058: [0.8342980254904299: 10 13] [0.8208495101092119: 14 21]] [0.6740144281259961: 15 18]]]]] [1.0592897654908793: [0.7619155996194362: 1 2] 4]]");
+    assert_eq!(dd.dendrogram_mean.to_string(),"[1.1361565091511905: [1.0650539376876151: [0.8589260515392279: [0.6172302080989418: 0 3] [0.6172277532626997: 5 19]] [1.0135216668739249: [0.9010786141539793: 6 [0.7892466630081996: [0.7319477955666771: 8 9] 12]] [0.9643803620115403: [0.9325419190578291: [0.8886911604761532: [0.8490223640103385: 7 [0.7825978158012028: [0.715722978774285: 11 [0.5921234350176086: 17 20]] 16]] [0.8208495101092119: 14 21]] [0.8342980254904299: 10 13]] [0.6740144281259961: 15 18]]]] [0.9608271727061726: [0.7619155996194362: 1 2] 4]]");
+    println!("S={}",dd.svd.singular_values);
+    println!("U={}",dd.svd.u.as_ref().unwrap());
+    println!("V={}",dd.svd.v_t.as_ref().unwrap());
+    expect_similar(dd.svd.singular_values[0], 3.1258300127600345);
+    expect_similar(dd.svd.singular_values[1], 2.231716850074084);
+    expect_similar(dd.svd.singular_values[2], 1.9879444894231315);
+    expect_similar(dd.svd.singular_values[3], 1.4155257960264707);
+    expect_similar(dd.svd.u.as_ref().unwrap()[0].abs(),0.22865175155120554);
+    expect_similar(dd.svd.u.as_ref().unwrap()[1].abs(),0.10660239874934234);
+    expect_similar(dd.svd.u.as_ref().unwrap()[2].abs(),0.33155040171072736);
+    expect_similar(dd.svd.v_t.as_ref().unwrap()[0].abs(),0.22865175155120546);
+    expect_similar(dd.svd.v_t.as_ref().unwrap()[1].abs(),0.03263840268676327);
+    expect_similar(dd.svd.v_t.as_ref().unwrap()[2].abs(),0.12276714431820211);
     // test intent tables
 
     let intent = IntentTable::compute(&data,&IntentTableOptions{
