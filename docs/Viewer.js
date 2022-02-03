@@ -46,7 +46,7 @@ function effect_to_string(metadata,list) {
 
 function Render() {
     // general purpose clearing up.
-    const render_div = document.getElementById("render");
+    const render_div = document.getElementById("RenderThingToView");
     removeAllChildElements(render_div);
     const heading = document.getElementById("MainHeading");
     heading.innerHTML="";
@@ -321,7 +321,7 @@ function ChooseTranscript() {
     if (files.length>0) files[0].text().then(text=>{document_to_show=JSON.parse(text); Render(); });
 }
 
-window.onload = function () {
+function MainViewerOnLoadFunction() {
     const url = new URL(document.location.href);
     const provided_list_url = url.searchParams.get("list");
     if (provided_list_url) { // fetch a list of options from the list
@@ -337,3 +337,4 @@ window.onload = function () {
     // function got_std(data) { document_to_show=data; Render(); }
     // getWebJSON("../transcript.json",data=>{full_transcript=data; Render();},null);
 }
+

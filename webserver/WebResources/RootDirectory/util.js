@@ -12,6 +12,14 @@ function add(addTo,addWhat,className) {
     return res;
 }
 
+/** Add a new node of type addWhat to DOM element addTo, returning the new element. If the third argument is present, the new object is assigned that class. */
+function addStart(addTo,addWhat,className) {
+    let res = document.createElement(addWhat);
+    addTo.prepend(res);
+    if (className) res.setAttribute("class",className);
+    return res;
+}
+
 
 const svgNS = "http://www.w3.org/2000/svg";
 
@@ -100,11 +108,6 @@ function addMaybeA(div,text,href) {
         a.innerText=text;
         a.href=href;
     } else div.append(text);
-}
-
-function addRules(div,rules) {
-    let span = add(div,"span","rules");
-    span.innerText=rules;
 }
 
 /// Print a message to a div with id "ErrorMessages", creating it if not present

@@ -25,27 +25,7 @@ function process_good_info(info) {
     }
     if (info.rules) {
         const rulesDiv = add(mainDiv,"div");
-        if (info.rules.rules_used) {
-            rulesDiv.append("The rules used for this election appear to be ")
-            addRules(rulesDiv,info.rules.rules_used);
-            rulesDiv.append(". ")
-        }
-        if (info.rules.rules_recommended) {
-            rulesDiv.append("I recommend using ")
-            addRules(rulesDiv,info.rules.rules_recommended);
-            rulesDiv.append(". ")
-        }
-        if (info.rules.comment) {
-            rulesDiv.append(info.rules.comment);
-            rulesDiv.append(" ");
-        }
-        if (info.rules.reports) {
-            for (const report of info.rules.reports) {
-                rulesDiv.append("We have written a ")
-                addMaybeA(rulesDiv,"report",report);
-                rulesDiv.append(" about this election. ");
-            }
-        }
+        rulesDescription(rulesDiv,info);
     }
     const simpleDiv = add(mainDiv,"div")
     if (info.simple) {
@@ -106,13 +86,7 @@ function process_good_metadata(metadata) {
     if (metadata.vacancies) add(metaDiv,"div").innerText="There are "+metadata.vacancies+" vacancies to fill."
     if (metadata.enrolment) add(metaDiv,"div").innerText="There are "+metadata.enrolment+" voters enrolled."
     if (metadata.tie_resolutions) {
-        add(metaDiv,"h4").innerText="Tie resolutions by lot";
-        for (const tie of metadata.tie_resolutions) {
-            if (Array.isArray(tie)) add(metaDiv,"div").innerText=tie.map(n=>metadata.candidates[n].name).join(" was favoured over ");
-            else if (tie.favoured) {
-                add(metaDiv,"div").innerText=tie.favoured.map(n=>metadata.candidates[n].name).join(" and ")+(tie.favoured.length>1?" were ":" was ")+"favoured over "+tie.disfavoured.map(n=>metadata.candidates[n].name).join(" and ")+(tie.came_up_in?" around count "+tie.came_up_in:"")+".";
-            }
-        }
+        tieResolutionDescription(metaDiv,metadata,metadata.tie_resolutions);
     }
 }
 

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/Viewer/Viewer.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="/util.js"></script>
+    <script src="/common.js"></script>
+    <script src="/Viewer/Viewer.js"></script>
+    <script src="/Recount.js"></script>
+
+    <title>Recount</title>
+</head>
+<body>
+
+<div id="MainBody">
+
+    <p class="noprint">This page enables one to recount an election, possibly with some candidates excluded or using
+        a different rule set. </p>
+
+    <h2 id="TitleHeading">Loading...</h2>
+    <fieldset>
+        <legend>Ineligible Candidates</legend>
+        <div id="paperDiv"><img src="/ajax-loader.gif" alt="Loading"/></div>
+    </fieldset>
+    <fieldset>
+        <legend>Vote counting rules</legend>
+        <div id="appropriateRules"><img src="/ajax-loader.gif" alt="Loading"/></div>
+        <label for="RulesChoice">Rules to use</label>: <select id="RulesChoice"></select> <span id="RulesDescription"></span>
+    </fieldset>
+
+    <div id="whyNotCount" class="ErrorMessages"></div>
+
+
+    <button onclick="doRecount();" id="RecountButton" style="font-size: 28pt; display:block; margin-left:auto; margin-right: auto; margin-top: 10px; margin-bottom: 10px; padding: 10px;"><img src="/favicon.svg"/> ⇓ Recount ⇓</button>
+
+    <div id="RecountOptionsDescriptions"></div>
+    <div id="TranscriptViewControls" class="hidden">
+        <select id="heading-orientation">
+            <option value="horiz">Horizontal Candidate Names</option>
+            <option value="vert">Vertical Candidate Names</option>
+            <option value="slanted" selected>Slanted Candidate Names</option>
+        </select>
+
+        <input type="checkbox" id="ShowPapers"> <label for="ShowPapers">Show Papers</label>
+    </div>
+    <div id="RenderThingToView"></div>
+
+</div>
+
+</body>
+</html>

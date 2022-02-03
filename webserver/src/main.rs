@@ -13,16 +13,18 @@ use actix_web::{HttpServer, middleware, web};
 use actix_web::web::Json;
 use actix_web::{get, post};
 use actix_web::http::header::{ContentDisposition, DispositionParam, DispositionType};
+use main_app::rules::{PossibleTranscripts, Rules, RulesDetails};
 use statistics::correlations::{CorrelationDendrogramsAndSVD, CorrelationOptions, SquareMatrix};
 use stv::find_vote::{FindMyVoteQuery, FindMyVoteResult};
 use statistics::intent_table::{IntentTable, IntentTableOptions};
 use statistics::mean_preference::MeanPreferences;
 use statistics::who_got_votes::WhoGotVotes;
-use stv::ballot_metadata::ElectionMetadata;
+use stv::ballot_metadata::{CandidateIndex, ElectionMetadata, NumberOfCandidates};
 use stv::errors_btl::ObviousErrorsInBTLVotes;
+use stv::tie_resolution::TieResolutionsMadeByEC;
 use crate::cache::cache_json;
 use crate::find_election::{ALL_ELECTIONS_AS_LIST, ElectionInfo, ElectionsOfOneType, FoundElection};
-
+use serde::{Serialize,Deserialize};
 
 #[get("/get_all_contests.json")]
 async fn get_all_contests() -> Json<Result<Vec<ElectionsOfOneType>,String>> {
@@ -105,6 +107,31 @@ async fn get_data(election : web::Path<FoundElection>) -> std::io::Result<NamedF
         }))
 }
 
+#[get("/rules.json")]
+async fn get_rules() -> Json<Vec<RulesDetails>> {
+    Json(RulesDetails::list())
+}
+
+#[derive(Serialize,Deserialize,Clone)]
+pub struct RecountQuery {
+    /// Candidates who are usually excluded, e.g. if they died on the election day or were ruled ineligible to stand. Looking at you 2016.
+    #[serde(skip_serializing_if = "Vec::is_empty",default)]
+    pub excluded : Vec<CandidateIndex>,
+    pub candidates_to_be_elected : NumberOfCandidates,
+    #[serde(flatten)]
+    pub tie_resolutions : TieResolutionsMadeByEC,
+    pub rules : Rules,
+}
+
+#[post("/{name}/{year}/{electorate}/recount")]
+async fn recount(election : web::Path<FoundElection>,query:web::Json<RecountQuery>) -> Json<Result<PossibleTranscripts,String>> {
+    async fn recount_uncached(election : &web::Path<FoundElection>,query:&RecountQuery) -> Result<PossibleTranscripts,String> {
+        Ok(query.rules.count(&election.data().await?,query.candidates_to_be_elected,&query.excluded.iter().cloned().collect(),&query.tie_resolutions,false))
+    }
+    cache_json("recount",&(election.spec.clone(),query.clone()),||recount_uncached(&election,&query)).await
+}
+
+
 
 /// find the path containing web resources, static web files that will be served.
 /// This is usually in the directory `WebResources` but the program may be run from
@@ -120,12 +147,25 @@ fn find_web_resources() -> PathBuf {
     panic!("Could not find WebResources. Please run in a directory containing it.")
 }
 
+/// find the path containing the viewer, static web files that will be served.
+/// This is usually in the directory `docs` but the program may be run from
+/// other directories. To be as robust as possible it will try likely possibilities.
+fn find_viewer_resources() -> PathBuf {
+    let rel_here = std::path::Path::new(".").canonicalize().expect("Could not resolve path .");
+    for p in rel_here.ancestors() {
+        let pp = p.join("docs");
+        if pp.is_dir() {return pp;}
+    }
+    panic!("Could not find docs. Please run in a directory containing it.")
+}
+
 #[actix_rt::main]
 async fn main() -> anyhow::Result<()> {
     // check whether everything is working before starting the web server. Don't want to find out in the middle of a transaction.
     println!("Running webserver on http://localhost:8999 stop with control C.");
     HttpServer::new(move|| {
         actix_web::App::new()
+            .wrap(middleware::Compress::default())
             .service(get_all_contests)
             .service(get_metadata)
             .service(get_info)
@@ -136,8 +176,10 @@ async fn main() -> anyhow::Result<()> {
             .service(get_find_btl_errors)
             .service(find_my_vote)
             .service(get_data)
-            .wrap(middleware::Compress::default())
+            .service(get_rules)
+            .service(recount)
             .service(actix_files::Files::new("/{a}/{b}/{c}/", find_web_resources().join("ContestDirectory")).use_last_modified(true).use_etag(true).index_file("index.html"))
+            .service(actix_files::Files::new("/Viewer/", find_viewer_resources()).use_last_modified(true).use_etag(true))
             .service(actix_files::Files::new("/", find_web_resources().join("RootDirectory")).use_last_modified(true).use_etag(true).index_file("index.html"))
     })
         .bind("0.0.0.0:8999")?
