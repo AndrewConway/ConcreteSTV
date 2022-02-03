@@ -28,7 +28,7 @@ in which case ConcreteSTV generally follows the corresponding electoral commissi
 changes over time.
 
 See [ElectionRules.md](ElectionRules.md) for a detailed description of what each of the below options means. 
-- **Federal** Federal Senate, my interpretation of the correct rules.
+- **FederalPre2021** Federal Senate, my interpretation of the correct rules. Formerly named **Federal**
 - **AEC2013** Possibly buggy rules used by AEC in 2013 Federal Senate election
 - **AEC2016** Buggy rules used by AEC in 2016 Federal Senate election
 - **AEC2019** Buggy rules used by AEC in 2019 Federal Senate election

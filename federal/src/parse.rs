@@ -172,19 +172,19 @@ impl RawDataSource for FederalDataLoader {
         match self.year.as_str() {
             "2013" => AssociatedRules{
                 rules_used: Some("AEC2013".into()),
-                rules_recommended: Some("Federal".into()),
+                rules_recommended: Some("FederalPre2021".into()),
                 comment: None,
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
             },
             "2016" => AssociatedRules{
                 rules_used: Some("AEC2016".into()),
-                rules_recommended: Some("Federal".into()),
+                rules_recommended: Some("FederalPre2021".into()),
                 comment: None,
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
             },
             "2019" => AssociatedRules{
                 rules_used: Some("AEC2019".into()),
-                rules_recommended: Some("Federal".into()),
+                rules_recommended: Some("FederalPre2021".into()),
                 comment: None,
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
             },

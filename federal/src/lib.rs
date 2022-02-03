@@ -199,7 +199,7 @@ impl PreferenceDistributionRules for FederalRules {
     /// ```
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { true }
 
-    fn name() -> String { "Federal".to_string() }
+    fn name() -> String { "FederalPre2021".to_string() }
 }
 
 /// The actual rules used by the AEC in 2019, based on reverse engineering their published
@@ -328,22 +328,28 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
 
 
     /// In Queensland 2016, count 830, candidate R. McGarvie was excluded, leaving 2 candidates and 2 seats.
-    /// The exclusion was carried out in full (11 counts), and C Ketter was discovered to have a quota, leaving 1 candidate (M Roberts) and 1 vacancy.
+    /// The exclusion was carried out in full (11 counts), and C Ketter was discovered to have a quota in the first round of the exclusion, leaving 1 candidate (M Roberts) and 1 vacancy.
     /// This candidate was not elected until count 841, when C Ketter's surplus was distributed.
     ///
     /// A very similar thing happened in Victoria 2016, count 814, P. Bain was excluded, leaving 2 candidates and 2 seats.
-    /// The exclusion was carried out in full (11 counts), and J Rice was discovered to have a quota, leaving 1 candidate (J Hume) and 1 vacancy.
+    /// The exclusion was carried out in full (11 counts), and J Rice was discovered to have a quota in the first round of the exclusion, leaving 1 candidate (J Hume) and 1 vacancy.
     /// This candidate was not elected until count 825, when J Rice's surplus was distributed.
     ///
     /// A similar but slightly more complex thing happened in NSW 2016, count 1054. N. Hall was excluded, leaving 3 remaining candidates and 3 vacancies.
-    /// The exclusion was carried out in full (10 counts), and two candidates, J Williams and B Burston were elected on quota.
+    /// The exclusion was carried out in full (10 counts), and two candidates, J Williams and B Burston were elected on quota in the first round of the exclusion.
     /// Two more surplus distributions were carried out, and on the last, D Leyonhjelm was elected.
     ///
     /// A different thing happened in WA 2016 (with Rod Cullerton excluded), ot count 535, K. Muir was excluded, leaving 2 candidates and 2 seats.
     /// The first step of the exclusion was performed, at the end of which the remaining 2 candidates were both declared elected. (both had a quota)
     /// That is in the re-count. The description in the text was "SIEWERT, R, GEORGIOU, P have been elected to the remaining positions."
+    /// This looks as if it short-circuits the exclusion, but there are no continuing candidates for anything to be transferred to.
     /// In the original, a similar thing happened with 2 candidates elected, after 1 round of exclusion, but both had obtained quotas.
-    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists }
+    ///
+    /// So we can't determing whether the AEC would have finished an exclusion if it there were not a candidate over quota or not, so
+    /// we can't distinguish between AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing and AfterCheckingQuotaIfNoUndistributedSurplusExists.
+    /// So choose the same as my interpretation (and the only sane interpretation of 17). Even though there is weak evidence from the 2019
+    /// code (where they do something very strange) that they may do something a little strange in this case.
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking  { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
     fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
 
     /// ACT count 11, TAS count 10, VIC count 13 all trigger rule 13(a) but it is not applied.
@@ -406,7 +412,7 @@ impl PreferenceDistributionRules for FederalRulesUsed2013 {
     fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
 
-    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists }
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
     fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
 
     /// several occasions, e.g ACT.

@@ -21,15 +21,13 @@ details of the differences between the below specific rules.
 The rules actually used in each year are a secret and the AEC has persecuted those
 asking for the source code of the counting algorithm under FOI, so the actual rules are my best guess.
 
-- **Federal** My interpretation of the Australian Federal Senate election system.
+- **FederalPre2021** My interpretation of the Australian Federal Senate election system prior to the 
+  2021 legislation changes. Used to be called **Federal** but renamed as the legislation changed.
 - **AEC2013** This is my interpretation of the rules actually used by the AEC for the 2013 election.
-  It is very similar to *Federal* except
-  - When resolving 3 way ties by looking at prior counts, any difference is used as a discriminator,
+  It is very similar to *FederalPre2021* except when resolving 3 way ties by looking at prior counts, any difference is used as a discriminator,
           instead of requiring that each has a different count. Evidence: NSW 2016, special count
-          with Rod Cullerton excluded, count 49. I assume 2013 same as 2016.
-  - Rule (17) is applied after all exclusions and surplus distributions are finished (same as my interpretation).
-    This can be seen in 2013 SA, count 228. However I believe Rule (18) is applied after all surplus distributions, and the first transfer 
-    of an exclusion are finished. This is assumed  same as 2016, where Qld, WSW, Vic and WA are all evidence.
+          with Rod Cullerton excluded, count 49. I assume 2013 same as 2016, and this is born out
+   by the response below to our report, but is not absolutely clear.
 - **AEC2016** This is my interpretation of the rules actually used by the AEC for the 2016 election.
   It is very similar to *AEC2013*, except the Bulk Exclusion rules are not applied (evidence : this crops
   up frequently)
@@ -60,7 +58,7 @@ had required), and the horrible Bulk Exclusion rules no longer apply when the co
 the AEC's handling of rule 18 is not addressed in the legislation. The legislation does include a 
 clause requiring some checking of the listed votes against the paper ballots, which is a great thing
 as it will encourage the AEC to actually provide some meaningful evidence that the election result is correct.
-I will create new rulesets taking the new legislation into account very soon.
+I will create new rulesets taking the new legislation into account very soon. I have gotten as far as renaming the existing set :-( so far.
 
 ## ACT Legislative Assembly
 

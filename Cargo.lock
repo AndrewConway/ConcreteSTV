@@ -1025,6 +1025,7 @@ dependencies = [
  "cacache",
  "clap",
  "federal",
+ "main-app",
  "margin",
  "nsw",
  "num",
