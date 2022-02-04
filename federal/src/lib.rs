@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -436,7 +436,7 @@ mod tests {
     #[test]
     fn example() -> anyhow::Result<()>{
         let data : ElectionData = serde_json::from_reader(File::open("../examples/MultipleExclusionOrdering.stv")?)?;
-        let comparer = CompareRules{ dir: "tests".to_string() };
+        let comparer = CompareRules{ dir: "tests_output".to_string() };
         let (comparisons,comp) = comparer.compute_dataset::<usize,FederalRulesUsed2013,FederalRulesUsed2016,FederalRulesUsed2019,FederalRules>(&data)?;
 
         for i in 0..comparisons.len() {
@@ -446,7 +446,7 @@ mod tests {
         assert_eq!(comp.results[index("AEC2016","AEC2013")],DifferentCandidatesElected(DifferentCandidateLists{ list1: vec![CandidateIndex(0),CandidateIndex(2),CandidateIndex(3),CandidateIndex(4),CandidateIndex(5),CandidateIndex(6)], list2: vec![CandidateIndex(0),CandidateIndex(1),CandidateIndex(6),CandidateIndex(5),CandidateIndex(4),CandidateIndex(3)] }));
         assert_eq!(comp.results[index("AEC2019","AEC2013")],DifferentCandidatesElected(DifferentCandidateLists{ list1: vec![CandidateIndex(0),CandidateIndex(2),CandidateIndex(6),CandidateIndex(5),CandidateIndex(4),CandidateIndex(3)], list2: vec![CandidateIndex(0),CandidateIndex(1),CandidateIndex(6),CandidateIndex(5),CandidateIndex(4),CandidateIndex(3)] }));
         assert_eq!(comp.results[index("AEC2019","AEC2016")],CandidatesOrderedDifferentWay(DifferentCandidateLists{ list1: vec![CandidateIndex(0),CandidateIndex(2),CandidateIndex(6),CandidateIndex(5),CandidateIndex(4),CandidateIndex(3)], list2: vec![CandidateIndex(0),CandidateIndex(2),CandidateIndex(3),CandidateIndex(4),CandidateIndex(5),CandidateIndex(6)] }));
-        assert_eq!(comp.results[index("Federal","AEC2013")],Same);
+        assert_eq!(comp.results[index("FederalPre2021","AEC2013")],Same);
         Ok(())
     }
 }
