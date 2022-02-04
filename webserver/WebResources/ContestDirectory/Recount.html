@@ -25,6 +25,17 @@
         <div id="paperDiv"><img src="/ajax-loader.gif" alt="Loading"/></div>
     </fieldset>
     <fieldset>
+        <legend>Vacancies.</legend>
+        <label for="NumVacancies">Number of candidates to elect</label>: <input type="number" id="NumVacancies" min="1"/>
+    </fieldset>
+    <fieldset>
+        <legend>Tie resolutions</legend>
+        <div id="TieResolutionsDisplay"></div>
+        <div>
+            <button onclick="addFavour();" id="AddFavour"> Add </button> <select id="FavouredCandidate1"></select> <span id="extraFavourChoices"></span> <button id="RemoveFavourChoiceButton" onclick="removeFavourChoice()" class="hidden">-</button><button id="AddFavourChoiceButton" onclick="addFavourChoice()">+</button> favoured over <select id="DisFavouredCandidate"></select>
+        </div>
+    </fieldset>
+    <fieldset>
         <legend>Vote counting rules</legend>
         <div id="appropriateRules"><img src="/ajax-loader.gif" alt="Loading"/></div>
         <label for="RulesChoice">Rules to use</label>: <select id="RulesChoice"></select> <span id="RulesDescription"></span>

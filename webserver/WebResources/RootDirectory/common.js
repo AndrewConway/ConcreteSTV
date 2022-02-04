@@ -86,11 +86,14 @@ function rulesDescription(rulesDiv,info) {
 function tieResolutionDescription(metaDiv,metadata,tie_resolutions) {
     add(metaDiv,"h4").innerText="Tie resolutions by lot";
     for (const tie of tie_resolutions) {
-        if (Array.isArray(tie)) add(metaDiv,"div").innerText=tie.map(n=>metadata.candidates[n].name).join(" was favoured over ");
-        else if (tie.favoured) {
-            add(metaDiv,"div").innerText=tie.favoured.map(n=>metadata.candidates[n].name).join(" and ")+(tie.favoured.length>1?" were ":" was ")+"favoured over "+tie.disfavoured.map(n=>metadata.candidates[n].name).join(" and ")+(tie.came_up_in?" around count "+tie.came_up_in:"")+".";
-        }
+        add(metaDiv,"div").innerText=descriptionOfSingleTie(metadata,tie);
     }
+}
+
+function descriptionOfSingleTie(metadata,tie) {
+    if (Array.isArray(tie)) return tie.map(n=>metadata.candidates[n].name).join(" was favoured less than ");
+    else if (tie.favoured) return tie.favoured.map(n=>metadata.candidates[n].name).join(" and ")+(tie.favoured.length>1?" were ":" was ")+"favoured over "+tie.disfavoured.map(n=>metadata.candidates[n].name).join(" and ")+(tie.came_up_in?" around count "+tie.came_up_in:"")+".";
+    else return null;
 }
 
 function addRules(div,rules) {
