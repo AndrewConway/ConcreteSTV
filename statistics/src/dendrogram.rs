@@ -182,6 +182,23 @@ impl Display for Dendrogram {
     }
 }
 
+impl Dendrogram {
+    /// convert to a string with a specific precision (number of decimal digits).
+    pub fn to_string_decimals(&self,precision:usize) -> String {
+        match self {
+            Dendrogram::Leaf(id) => format!("{}",id),
+            Dendrogram::Branch(branch) => {
+                let mut res = format!("[{:.*}:",precision,branch.distance);
+                for c in &branch.children {
+                    res+=" ";
+                    res+=&c.to_string_decimals(precision);
+                }
+                res+="]";
+                res
+            }
+        }
+    }
+}
 #[derive(Debug,Serialize,Deserialize,Clone)]
 pub struct DendrogramBranch {
     pub children : Vec<Dendrogram>,
