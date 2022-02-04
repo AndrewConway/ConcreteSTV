@@ -9,7 +9,7 @@ use num_traits::Zero;
 use stv::ballot_metadata::{CandidateIndex};
 use stv::distribution_of_preferences_transcript::{CountIndex, ReasonForCount, SingleCount};
 use stv::election_data::ElectionData;
-use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
+use stv::preference_distribution::PreferenceDistributionRules;
 use crate::choose_votes::{ChooseVotes, ChooseVotesOptions};
 use crate::evaluate_and_optimize_vote_changes::optimise;
 use crate::record_changes::ElectionChanges;
@@ -19,7 +19,7 @@ use crate::vote_changes::{VoteChange, VoteChanges};
 pub fn find_outcome_changes <Rules>(original_data:&ElectionData, vote_choice_options:&ChooseVotesOptions,verbose:bool) -> ElectionChanges<Rules::Tally>
 where Rules : PreferenceDistributionRules {
 
-    let transcript = distribute_preferences::<Rules>(&original_data, original_data.metadata.vacancies.unwrap(), &original_data.metadata.excluded.iter().cloned().collect(), &original_data.metadata.tie_resolutions, false);
+    let transcript = original_data.distribute_preferences::<Rules>();
     let mut not_continuing = HashSet::new();
 
     let mut retroscope = Retroscope::new(&original_data, &original_data.metadata.excluded);

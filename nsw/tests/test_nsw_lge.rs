@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -11,7 +11,6 @@
 
 #[cfg(test)]
 mod tests {
-    use stv::preference_distribution::distribute_preferences;
     use stv::election_data::ElectionData;
     use stv::ballot_metadata::{ElectionMetadata, ElectionName, Candidate, NumberOfCandidates, CandidateIndex};
     use stv::ballot_paper::BTL;
@@ -73,7 +72,7 @@ mod tests {
             btl_types: vec![],
             informal: 0
         };
-        let transcript = distribute_preferences::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(&data, NumberOfCandidates(3), &Default::default(), &Default::default(),true);
+        let transcript = data.distribute_preferences::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>();
         assert_eq!(transcript.quota.papers, BallotPaperCount(40000));
         assert_eq!(transcript.quota.quota, 10001);
         assert_eq!(transcript.elected, vec![CandidateIndex(2), CandidateIndex(1), CandidateIndex(0)]);

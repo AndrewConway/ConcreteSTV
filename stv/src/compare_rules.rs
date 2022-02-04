@@ -1,20 +1,18 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-use crate::preference_distribution::{PreferenceDistributionRules, distribute_preferences, WhenToDoElectCandidateClauseChecking, TransferValueMethod, SurplusTransferMethod};
+use crate::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, SurplusTransferMethod};
 use crate::election_data::ElectionData;
 use crate::distribution_of_preferences_transcript::{Transcript, TranscriptWithMetadata};
-use std::collections::HashSet;
 use std::fs::File;
 use std::path::PathBuf;
 use crate::ballot_metadata::ElectionMetadata;
 use crate::compare_transcripts::{DifferenceBetweenTranscripts, compare_transcripts};
 use serde::{Serialize,Deserialize};
-use std::iter::FromIterator;
 use std::fmt::{Display, Formatter};
 use crate::ballot_pile::BallotPaperCount;
 use crate::transfer_value::{TransferValue};
@@ -69,7 +67,7 @@ impl CompareRules {
     }
 
     fn compute<Rules:PreferenceDistributionRules>(&self,data:&ElectionData) -> anyhow::Result<Transcript<Rules::Tally>> {
-        let transcript = distribute_preferences::<Rules>(&data,data.metadata.vacancies.unwrap(), &HashSet::from_iter(data.metadata.excluded.iter().cloned()), &data.metadata.tie_resolutions,false);
+        let transcript = data.distribute_preferences::<Rules>();
         let transcript = TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript };
         let name = data.metadata.name.identifier()+"_"+&Rules::name()+".transcript";
         self.save(&transcript,&name)?;

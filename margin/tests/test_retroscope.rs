@@ -15,8 +15,6 @@ use stv::ballot_metadata::{Candidate, CandidateIndex, ElectionMetadata, Election
 use stv::ballot_paper::{ATL, BTL};
 use stv::distribution_of_preferences_transcript::CountIndex;
 use stv::election_data::ElectionData;
-use stv::preference_distribution::distribute_preferences;
-use stv::tie_resolution::TieResolutionsMadeByEC;
 use margin::retroscope::{PileStatus, Retroscope, RetroscopeVoteIndex, RetroscopeVoteStatus};
 use margin::vote_changes::{VoteChange, VoteChanges};
 use stv::ballot_pile::BallotPaperCount;
@@ -68,7 +66,7 @@ fn test_retroscope() {
         btl_types: vec![],
         informal: 0
     };
-    let transcript = distribute_preferences::<FederalRules>(&vote_data,NumberOfCandidates(3),&HashSet::new(),&TieResolutionsMadeByEC::default(),false);
+    let transcript = vote_data.distribute_preferences::<FederalRules>();
     println!("{}",serde_json::to_string_pretty(&transcript).unwrap());
     let mut retroscope = Retroscope::new(&vote_data,&[]);
     assert_eq!(false,retroscope.is_highest_continuing_member_party_ticket(CandidateIndex(1),&vote_data.metadata)); // 0 is above
