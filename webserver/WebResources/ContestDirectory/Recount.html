@@ -35,6 +35,18 @@
             <button onclick="addFavour();" id="AddFavour"> Add </button> <select id="FavouredCandidate1"></select> <span id="extraFavourChoices"></span> <button id="RemoveFavourChoiceButton" onclick="removeFavourChoice()" class="hidden">-</button><button id="AddFavourChoiceButton" onclick="addFavourChoice()">+</button> favoured over <select id="DisFavouredCandidate"></select>
         </div>
     </fieldset>
+    <fieldset id="VoteTypes" class="hidden">
+        <legend>Vote Types</legend>
+        <table>
+            <thead>
+                <tr>
+                    <th>Allow</th><th>Type</th><th>ATL</th><th>BTL</th>
+                </tr>
+            </thead>
+            <tbody id="VoteTypeBody">
+            </tbody>
+        </table>
+    </fieldset>
     <fieldset>
         <legend>Vote counting rules</legend>
         <div id="appropriateRules"><img src="/ajax-loader.gif" alt="Loading"/></div>

@@ -52,7 +52,7 @@ impl SquareMatrix {
         let mut vote_vector_by_candidate = vec![f64::NAN;data.metadata.candidates.len()];
         let mut vote_vector_by_group = vec![f64::NAN;data.metadata.parties.len()];
         let arena = typed_arena::Arena::<CandidateIndex>::new();
-        let votes = data.resolve_atl(&arena);
+        let votes = data.resolve_atl(&arena,None);
         for vote in votes {
             if vote.prefs.len()>0 && if vote.is_atl() { options.use_atl } else { options.use_btl } {
                 let w = vote.n.0 as f64;

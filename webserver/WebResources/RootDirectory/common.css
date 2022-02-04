@@ -118,10 +118,6 @@ th, tr.Head td {
     font-weight: bold;
 }
 
-td {
-    text-align: left;
-}
-
 tr.Group { background : #CCCCCC; }
 
 /* Cells in even rows (2,4,6...) are one color */
@@ -177,4 +173,17 @@ span.mismatch {
 
 input#preferences {
     min-width: 30em;
+}
+
+div.ColumnHolder {
+    display: flex;
+}
+
+fieldset.ColumnHolder {
+    display: flex;
+}
+
+div.InColumn {
+    margin-left: 1em;
+    margin-right: 1em;
 }

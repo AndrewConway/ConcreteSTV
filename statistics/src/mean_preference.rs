@@ -72,7 +72,7 @@ impl MeanPreferences {
             btl_by_first_preference: vec![MeanPreferenceByCandidate::zero(num_candidates);num_candidates]
         };
         let arena = typed_arena::Arena::<CandidateIndex>::new();
-        let votes = data.resolve_atl(&arena);
+        let votes = data.resolve_atl(&arena,None);
         for vote in votes {
             res.add_to_unnormalized(vote);
         }

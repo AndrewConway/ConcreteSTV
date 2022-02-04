@@ -10,6 +10,7 @@ use crate::ballot_metadata::{ElectionMetadata, CandidateIndex};
 use crate::ballot_paper::{ATL, BTL, VoteSource};
 use crate::ballot_pile::{PartiallyDistributedVote};
 use std::fs::File;
+use std::ops::Range;
 use serde::{Deserialize,Serialize};
 use crate::distribution_of_preferences_transcript::Transcript;
 use crate::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
@@ -46,6 +47,50 @@ pub struct VoteTypeSpecification {
     pub last_index_exclusive : usize,
 }
 
+impl VoteTypeSpecification {
+    /// Find the indices of votes that pass restrictions on the types used.
+    ///
+    /// If `vote_types` is None, then no restrictions. return just [0..largest_index].
+    /// If `vote_types` is Some(), then only take votes that match something in vote_types. IF the empty string is in the list, then take votes that are not covered by specs.
+    ///
+    /// specs must be in order.
+    /// #Example
+    ///
+    /// ```
+    /// use stv::election_data::VoteTypeSpecification;
+    /// let specA = VoteTypeSpecification{ vote_type : "A".to_string(), first_index_inclusive:5, last_index_exclusive:10 };
+    /// let specB = VoteTypeSpecification{ vote_type : "B".to_string(), first_index_inclusive:10, last_index_exclusive:15 };
+    /// let specs = vec![specA,specB];
+    ///
+    /// assert_eq!(VoteTypeSpecification::restrict(None,&specs,20),vec![0..20]);
+    /// assert_eq!(VoteTypeSpecification::restrict(Some(&["A".to_string(),"".to_string()]),&specs,20)
+    ///                ,vec![0..5,5..10,15..20]);
+    /// assert_eq!(VoteTypeSpecification::restrict(Some(&["A".to_string()]),&specs,20)
+    ///                ,vec![5..10]);
+    /// ```
+    pub fn restrict(vote_types : Option<&[String]>,specs:&[VoteTypeSpecification],largest_index:usize) -> Vec<Range<usize>> {
+        match vote_types {
+            None => vec![ 0..largest_index ],
+            Some(ok_types) => {
+                let mut specs = specs.iter().collect::<Vec<_>>(); // make sure in order.
+                specs.sort_by_key(|s|s.first_index_inclusive);
+                let mut res = vec![];
+                let contains_blank = ok_types.iter().any(|e|e.is_empty());
+                let mut upto = 0;
+                for spec in specs {
+                    if contains_blank && upto<spec.first_index_inclusive { res.push(upto..spec.first_index_inclusive); }
+                    upto=spec.last_index_exclusive;
+                    if ok_types.contains(&spec.vote_type) {
+                        res.push(spec.first_index_inclusive..spec.last_index_exclusive);
+                    }
+                }
+                if contains_blank && upto<largest_index { res.push(upto..largest_index); }
+                res
+            }
+        }
+    }
+}
+
 impl ElectionData {
     /// Number of formal above the line votes
     pub fn num_atl(&self) -> usize {
@@ -65,19 +110,25 @@ impl ElectionData {
     }
     /// Get a list of all votes with ATL votes converted to the corresponding BTL equivalent.
     /// Requires an arena to hold interpreted preference lists. This can be allocated by
+    /// If vote_types is None, use all votes.
+    /// otherwise only use vote types specified in it.
     /// ```
     /// use stv::ballot_metadata::CandidateIndex;
     /// let arena = typed_arena::Arena::<CandidateIndex>::new();
     /// ```
-    pub fn resolve_atl<'a>(&'a self,arena : &'a typed_arena::Arena<CandidateIndex>) -> Vec<PartiallyDistributedVote<'a>> {
+    pub fn resolve_atl<'a>(&'a self,arena : &'a typed_arena::Arena<CandidateIndex>,vote_types : Option<&[String]>) -> Vec<PartiallyDistributedVote<'a>> {
         let mut votes : Vec<PartiallyDistributedVote<'a>> = vec![];
-        for a in & self.atl {
-            let v : Vec<CandidateIndex> = a.parties.iter().flat_map(|p|self.metadata.party(*p).candidates.iter().map(|c|*c)).collect();
-            let slice = arena.alloc_extend(v);
-            votes.push(PartiallyDistributedVote::new(a.n,slice,VoteSource::Atl(a)));
+        for range in VoteTypeSpecification::restrict(vote_types,&self.atl_types,self.atl.len()) {
+            for a in &self.atl[range] {
+                let v : Vec<CandidateIndex> = a.parties.iter().flat_map(|p|self.metadata.party(*p).candidates.iter().map(|c|*c)).collect();
+                let slice = arena.alloc_extend(v);
+                votes.push(PartiallyDistributedVote::new(a.n,slice,VoteSource::Atl(a)));
+            }
         }
-        for b in &self.btl {
-            votes.push(PartiallyDistributedVote::new(b.n,b.candidates.as_slice(),VoteSource::Btl(b)));
+        for range in VoteTypeSpecification::restrict(vote_types,&self.btl_types,self.btl.len()) {
+            for b in &self.btl[range] {
+                votes.push(PartiallyDistributedVote::new(b.n,b.candidates.as_slice(),VoteSource::Btl(b)));
+            }
         }
         votes
     }
@@ -113,7 +164,7 @@ impl ElectionData {
 
     /// run the distribution of preferences with the values given in the metadata for the number of vacancies, who is ineligible, and EC resolutions. Convenience method.
     pub fn distribute_preferences<Rules:PreferenceDistributionRules>(&self) -> Transcript<Rules::Tally> {
-        distribute_preferences::<Rules>(self,self.metadata.vacancies.unwrap(),&self.metadata.excluded.iter().cloned().collect::<HashSet<_>>(),&self.metadata.tie_resolutions,false)
+        distribute_preferences::<Rules>(self,self.metadata.vacancies.unwrap(),&self.metadata.excluded.iter().cloned().collect::<HashSet<_>>(),&self.metadata.tie_resolutions,None,false)
     }
 
 }

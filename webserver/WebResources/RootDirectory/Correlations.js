@@ -6,31 +6,18 @@ let metadata = null;
 let current_options = null;
 let current_data = null;
 
-function partyName(i) {
-    if (i!==undefined && metadata.parties && metadata.parties.length>i) {
-        const party = metadata.parties[i];
-        return party.name || party.column_id;
-    } else return "ungrouped";
-}
+
 /** Name of candidate or group. useGroups is boolean, node is integer */
 function name(useGroups,node) {
-    if (useGroups) return partyName(node);
-    else {
-        const candidate = metadata.candidates[node];
-        let name = candidate.name;
-        if (candidate.party!==undefined) {
-            let groupname = partyName(candidate.party);
-            name = groupname+" "+name;
-        }
-        return name;
-    }
+    if (useGroups) return partyName(metadata,node);
+    else return candidateName(metadata,node);
 }
 
 /// Get an array of values specified by the selection box #id
 function getValuesFromSelectBox(id) {
     const useGroups = !current_options.want_candidates;
     const sortByString = document.getElementById(id).value;
-    if (sortByString==="g") return useGroups?(metadata.parties.map(g=>g.name)):(metadata.candidates.map(c=>partyName(c.party)));
+    if (sortByString==="g") return useGroups?(metadata.parties.map(g=>g.name)):(metadata.candidates.map(c=>partyName(metadata,c.party)));
     if (sortByString.startsWith("s")) {
         const n = current_data.svd.singular_values[0].length;
         const startSlice=n*(+(sortByString.slice(1)));

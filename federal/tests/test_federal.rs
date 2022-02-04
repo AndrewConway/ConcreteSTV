@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -24,7 +24,7 @@ mod tests {
         let loader = get_federal_data_loader_2019(&FileFinder::find_ec_data_repository());
         let data = loader.read_raw_data(state)?;
         data.print_summary();
-        let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),true);
+        let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}2019.json",state))?;
@@ -38,7 +38,7 @@ mod tests {
         let loader = get_federal_data_loader_2016(&FileFinder::find_ec_data_repository());
         let data = loader.read_raw_data(state)?;
         data.print_summary();
-        let transcript = distribute_preferences::<FederalRulesUsed2016>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state),true);
+        let transcript = distribute_preferences::<FederalRulesUsed2016>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state),None,true);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}2016.json",state))?;
@@ -52,7 +52,7 @@ mod tests {
         let loader = get_federal_data_loader_2013(&FileFinder::find_ec_data_repository());
         let data = loader.read_raw_data(state)?;
         data.print_summary();
-        let transcript = distribute_preferences::<FederalRulesUsed2013>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state),true);
+        let transcript = distribute_preferences::<FederalRulesUsed2013>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state),None,true);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}2013.json",state))?;

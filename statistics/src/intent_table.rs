@@ -54,7 +54,7 @@ impl IntentTable {
             }
         }
         let arena = typed_arena::Arena::<CandidateIndex>::new();
-        let votes = data.resolve_atl(&arena);
+        let votes = data.resolve_atl(&arena,None);
         for vote in votes {
             if vote.prefs.len()>0 && if vote.is_atl() { options.use_atl } else { options.use_btl } {
                 let first_preference_candidate = vote.prefs[0];

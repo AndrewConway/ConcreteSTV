@@ -42,7 +42,7 @@ impl WhoGotVotes {
         let mut parties = vec![NumVotesReceived::zero();data.metadata.parties.len()];
         let mut candidates = vec![NumVotesReceived::zero();data.metadata.candidates.len()];
         let arena = typed_arena::Arena::<CandidateIndex>::new();
-        let votes = data.resolve_atl(&arena);
+        let votes = data.resolve_atl(&arena,None);
         let mut seen_someone_else_in_party = vec![usize::MAX;data.metadata.parties.len()];
         for (mention_index,vote) in votes.iter().enumerate() {
             let atl = vote.is_atl();

@@ -121,12 +121,15 @@ pub struct RecountQuery {
     #[serde(flatten)]
     pub tie_resolutions : TieResolutionsMadeByEC,
     pub rules : Rules,
+    /// if none, use all votes. Otherwise only use ones specified in here. "" means votes not assigned a type.
+    pub vote_types : Option<Vec<String>>,
 }
 
 #[post("/{name}/{year}/{electorate}/recount")]
 async fn recount(election : web::Path<FoundElection>,query:web::Json<RecountQuery>) -> Json<Result<PossibleTranscripts,String>> {
     async fn recount_uncached(election : &web::Path<FoundElection>,query:&RecountQuery) -> Result<PossibleTranscripts,String> {
-        Ok(query.rules.count(&election.data().await?,query.candidates_to_be_elected,&query.excluded.iter().cloned().collect(),&query.tie_resolutions,false))
+        let vote_types : Option<&[String]> = if let Some(vt) = &query.vote_types { Some(vt) } else { None };
+        Ok(query.rules.count(&election.data().await?,query.candidates_to_be_elected,&query.excluded.iter().cloned().collect(),&query.tie_resolutions,vote_types,false))
     }
     cache_json("recount",&(election.spec.clone(),query.clone()),||recount_uncached(&election,&query)).await
 }

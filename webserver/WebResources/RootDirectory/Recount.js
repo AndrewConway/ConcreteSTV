@@ -21,7 +21,7 @@ function doRecount() {
         desc_div.append("Recount using ");
         addRules(desc_div,options.rules);
         desc_div.append(" to elect "+options.candidates_to_be_elected+" candidates.")
-        for (const candidate in options.ineligible_candidates) {
+        for (const candidate in options.excluded) {
             desc_div.append(" "+metadata.candidates[candidate].name+" is deemed ineligible.")
         }
         if (options.tie_resolutions && options.tie_resolutions.length>0) {
@@ -36,6 +36,28 @@ function doRecount() {
                 if (recount_result.Ok) {
                     currently_showing_transcript=recount_result.Ok;
                     removeAllChildElements(results);
+                    if (metadata.results) {
+                        const old_elected = metadata.results;
+                        const new_elected = currently_showing_transcript.transcript.elected;
+                        const no_longer_elected = old_elected.filter(c=>!new_elected.includes(c));
+                        const not_previously_elected = new_elected.filter(c=>!old_elected.includes(c));
+                        if (no_longer_elected.length===0 && not_previously_elected.length===0) {
+                            add(desc_div,"h5").innerText="Same people elected";
+                        } else {
+                            let box = add(desc_div,"fieldset","ColumnHolder");
+                            add(box,"legend").innerText="Different candidates elected";
+                            const different_winners_div = box; // TODO remove add(box,"div","ColumnHolder");
+                            function add_block(heading,candidates) {
+                                const div = add(different_winners_div,"div","InColumn");
+                                add(div,"h5").innerText=heading;
+                                for (const c of candidates) {
+                                    add(div,"div").innerText=candidateName(metadata,c);
+                                }
+                            }
+                            add_block("Newly Elected",not_previously_elected);
+                            add_block("No longer Elected",no_longer_elected);
+                        }
+                    }
                     transcriptControls.className = "";
                     RenderTranscript(currently_showing_transcript,results);
                 } else standardFailureFunction(recount_result.Err);
@@ -55,7 +77,8 @@ function getOptions() {
         excluded:ineligible_candidates,
         rules:rules,
         candidates_to_be_elected: +document.getElementById("NumVacancies").value,
-        tie_resolutions:ec_tie_resolutions_being_edited||[], // TODO have a way to choose this.
+        tie_resolutions:ec_tie_resolutions_being_edited||[],
+        vote_types:get_vote_types(),
     }
 }
 
@@ -74,6 +97,12 @@ function changeRules() {
     checkCouldRecompute();
 }
 
+let vote_types = [];
+function get_vote_types() {
+    if (vote_types.length===0) return null;
+    else return vote_types.filter(vt=>vt.check.checked).map(vt=>vt.name);
+}
+
 function process_good_info(info) {
     removeAllChildElements(document.getElementById("appropriateRules"));
     if (info.rules) {
@@ -81,6 +110,28 @@ function process_good_info(info) {
     }
     if (info.simple) {
         voteDataAvailable=true;
+        if (info.simple.vote_types.length>0) {
+            document.getElementById("VoteTypes").className="";
+            const table = document.getElementById("VoteTypeBody");
+            let num_atl_unaccounted_for = info.simple.num_atl;
+            let num_btl_unaccounted_for = info.simple.num_btl;
+            function addVoteType(name,atl,btl) {
+                let tr = add(table,"tr");
+                let check = add(add(tr,"td"),"input");
+                check.type="checkbox";
+                check.checked=true;
+                vote_types.push({name:name,check:check});
+                add(tr,"td").innerText=name||"";
+                add(tr,"td").innerText=atl;
+                add(tr,"td").innerText=btl;
+            }
+            for (const vt of info.simple.vote_types) {
+                addVoteType(vt.name,vt.num_atl,vt.num_btl);
+                num_atl_unaccounted_for-=vt.num_atl;
+                num_btl_unaccounted_for-=vt.num_btl;
+            }
+            if (num_atl_unaccounted_for>0 || num_atl_unaccounted_for>0) addVoteType("",num_atl_unaccounted_for,num_atl_unaccounted_for);
+        }
         checkCouldRecompute();
     } else document.getElementById("whyNotCount").innerText="Vote data not available"
     getWebJSON("/rules.json",rules => {

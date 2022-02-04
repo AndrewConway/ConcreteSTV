@@ -100,3 +100,24 @@ function addRules(div,rules) {
     let span = add(div,"span","rules");
     span.innerText=rules;
 }
+
+/// get the best nane for party i
+function partyName(metadata,i) {
+    if (i!==undefined && metadata.parties && metadata.parties.length>i) {
+        const party = metadata.parties[i];
+        return party.name || party.column_id;
+    } else return "ungrouped";
+}
+/// get the best name for candidate i.
+/// should a party name exist, add it:
+/// if partyNameBefore, then "PARTYNAME CANDIDATENAME" else "CANDIDATENAME (PARTYNAME)"
+function candidateName(metadata,i,partyNameBefore) {
+    const candidate = metadata.candidates[i];
+    let name = candidate.name;
+    if (candidate.party!==undefined) {
+        let groupname = partyName(metadata,candidate.party);
+        if (partyNameBefore) name = groupname+" "+name;
+        else name+=" ("+groupname+")";
+    }
+    return name;
+}
