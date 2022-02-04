@@ -46,9 +46,8 @@ function doRecount() {
                         } else {
                             let box = add(desc_div,"fieldset","ColumnHolder");
                             add(box,"legend").innerText="Different candidates elected";
-                            const different_winners_div = box; // TODO remove add(box,"div","ColumnHolder");
                             function add_block(heading,candidates) {
-                                const div = add(different_winners_div,"div","InColumn");
+                                const div = add(box,"div","InColumn");
                                 add(div,"h5").innerText=heading;
                                 for (const c of candidates) {
                                     add(div,"div").innerText=candidateName(metadata,c);
