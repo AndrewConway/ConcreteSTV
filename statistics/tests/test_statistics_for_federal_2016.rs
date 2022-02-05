@@ -29,8 +29,8 @@ fn test_tasmanian_statistics_using_just_formal_votes() {
     assert_eq!(3767,simple_statistics.num_satl);
     assert_eq!(243774,simple_statistics.num_atl);
     assert_eq!(95385,simple_statistics.num_btl);
-    assert_eq!(174269,simple_statistics.num_unique_atl);
-    assert_eq!(88736,simple_statistics.num_unique_btl);
+    assert_eq!(184249,simple_statistics.num_unique_atl);
+    assert_eq!(89611,simple_statistics.num_unique_btl);
     assert_eq!(339159,simple_statistics.num_formal);
     assert_eq!(0,simple_statistics.num_informal);
     assert_eq!(58,simple_statistics.num_candidates);

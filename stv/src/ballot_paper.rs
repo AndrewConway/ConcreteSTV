@@ -173,6 +173,9 @@ impl UniqueBTLBuilder {
     pub fn add(&mut self,prefs:Vec<CandidateIndex>) {
         *self.btls.entry(prefs).or_insert(0)+=1;
     }
+    pub fn add_vote(&mut self,vote:BTL) {
+        *self.btls.entry(vote.candidates).or_insert(0)+=vote.n;
+    }
     /// Convert to a list of BTL votes.
     pub fn to_btls(self) -> Vec<BTL> {
         self.btls.into_iter().map(|(candidates,n)|BTL{ candidates , n }).collect()
@@ -191,9 +194,76 @@ impl UniqueATLBuilder {
     pub fn add(&mut self,prefs:Vec<PartyIndex>) {
         *self.atls.entry(prefs).or_insert(0)+=1;
     }
+    pub fn add_vote(&mut self,vote:ATL) {
+        *self.atls.entry(vote.parties).or_insert(0)+=vote.n;
+    }
     /// Convert to a list of BTL votes.
     pub fn to_atls(self) -> Vec<ATL> {
         self.atls.into_iter().map(|(parties,n)|ATL{ parties , n }).collect()
+    }
+}
+
+#[derive(Default)]
+/// A utility for building up a list of unique votes given a list of votes.
+pub struct UniqueVoteBuilder {
+    pub atl : UniqueATLBuilder,
+    pub btl : UniqueBTLBuilder,
+    pub informal : usize,
+}
+
+impl UniqueVoteBuilder {
+    pub fn add_vote(&mut self,vote:Option<FormalVote>) {
+        match vote {
+            None => { self.informal+=1 }
+            Some(FormalVote::Btl(btl)) => { self.btl.add_vote(btl) }
+            Some(FormalVote::Atl(atl)) => { self.atl.add_vote(atl) }
+        }
+    }
+}
+
+#[derive(Default)]
+/// A utility for building up a list of unique votes of various types given a list of votes.
+pub struct UniqueVoteBuilderMultipleTypes {
+    pub by_type : HashMap<String,UniqueVoteBuilder>,
+    pub no_type : UniqueVoteBuilder,
+}
+
+impl UniqueVoteBuilderMultipleTypes {
+    pub fn add_vote(&mut self,vote:Option<FormalVote>,vote_type:Option<&str>) {
+        let destination = match vote_type {
+            Some(t) => self.by_type.entry(t.to_string()).or_insert_with(||UniqueVoteBuilder::default()),
+            None => &mut self.no_type,
+        };
+        destination.add_vote(vote);
+    }
+    pub fn into_election_data(self, metadata:ElectionMetadata) -> ElectionData {
+        let mut atl = self.no_type.atl.to_atls();
+        let mut btl = self.no_type.btl.to_btls();
+        let mut atl_types = vec![];
+        let mut btl_types = vec![];
+        let mut informal = self.no_type.informal;
+        for (vote_type,builder) in self.by_type {
+            let mut new_atl = builder.atl.to_atls();
+            let mut new_btl = builder.btl.to_btls();
+            informal+=builder.informal;
+            if !new_atl.is_empty() {
+                atl_types.push(VoteTypeSpecification{
+                    vote_type: vote_type.clone(),
+                    first_index_inclusive: atl.len(),
+                    last_index_exclusive: atl.len()+new_atl.len(),
+                });
+                atl.append(&mut new_atl)
+            }
+            if !new_btl.is_empty() {
+                btl_types.push(VoteTypeSpecification{
+                    vote_type: vote_type.clone(),
+                    first_index_inclusive: btl.len(),
+                    last_index_exclusive: btl.len()+new_btl.len(),
+                });
+                btl.append(&mut new_btl)
+            }
+        }
+        ElectionData{ metadata, atl, atl_types, btl, btl_types, informal }
     }
 }
 

@@ -9,7 +9,7 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use stv::ballot_metadata::{ElectionName, Candidate, CandidateIndex, PartyIndex, ElectionMetadata, DataSource, NumberOfCandidates};
-use stv::ballot_paper::{RawBallotMarking, parse_marking, RawBallotMarkings, FormalVote, ATL, BTL};
+use stv::ballot_paper::{RawBallotMarking, parse_marking, RawBallotMarkings, UniqueVoteBuilderMultipleTypes};
 use std::collections::{HashMap};
 use csv::{StringRecord, StringRecordsIntoIter};
 use zip::ZipArchive;
@@ -121,20 +121,18 @@ impl RawDataSource for FederalDataLoader {
     fn read_raw_data(&self,state:&str) -> anyhow::Result<ElectionData> {
         if self.year=="2013" { return self.read_raw_data2013(state); }
 //        let mut metadata = self.read_raw_metadata(state)?;
-        let mut atls : HashMap<Vec<PartyIndex>,usize> = HashMap::default();
-        let mut btls : HashMap<Vec<CandidateIndex>,usize> = HashMap::default();
-        let mut informal = 0;
+        let mut builder = UniqueVoteBuilderMultipleTypes::default();
         let callback = |markings:&RawBallotMarkings,_meta:&[(&str,&str)]| { // TODO use the metadata to divide votes by source. Collection point meta[1].1 can start with PROVISIONAL, PRE_POLL, POSTAL, ABSENT at the minimum.
-            match markings.interpret_vote(1,6) {
-                None => { informal+=1 }
-                Some(FormalVote::Btl(btl)) => { *btls.entry(btl.candidates).or_insert(0)+=btl.n }
-                Some(FormalVote::Atl(atl)) => { *atls.entry(atl.parties).or_insert(0)+=atl.n }
-            }
+            let collection_point = _meta[1].1;
+            let vote_type = if collection_point.starts_with("PROVISIONAL") { Some("PROVISIONAL") }
+                else if collection_point.starts_with("PRE_POLL") { Some("PRE_POLL") }
+                else if collection_point.starts_with("POSTAL") { Some("POSTAL") }
+                else if collection_point.starts_with("ABSENT") { Some("ABSENT") }
+                else {None};
+            builder.add_vote(markings.interpret_vote(1,6),vote_type);
         };
         let metadata = self.iterate_over_raw_markings(state,callback)?;
-        let atl = atls.into_iter().map(|(parties,n)|ATL{ parties, n }).collect();
-        let btl = btls.into_iter().map(|(candidates,n)|BTL{ candidates , n }).collect();
-        Ok(ElectionData{ metadata, atl, atl_types: vec![], btl, btl_types: vec![], informal })
+        Ok(builder.into_election_data(metadata))
     }
 
     fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> {

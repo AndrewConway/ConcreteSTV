@@ -22,6 +22,7 @@ use std::process::Command;
 use std::str::FromStr;
 use reqwest::Url;
 use crate::ballot_paper::{RawBallotMarkings};
+use crate::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
 use crate::datasource_description::{AssociatedRules, Copyright};
 use crate::distribution_of_preferences_transcript::ReasonForCount;
 use crate::errors_btl::ObviousErrorsInBTLVotes;
@@ -188,6 +189,7 @@ pub trait CanReadRawMarkings {
 
 /// Like read_raw_data, except also try to deduce the tie breaking decisions that were used by the electoral commission.
 /// This is a powerful function, but it will be slow and panic if anything goes even slightly wrong.
+/// Also deduce the offical results, possibly reordering to better match the actual order here.
 pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions<Rules:PreferenceDistributionRules,Source:RawDataSource>(loader:&Source, electorate: &str) -> anyhow::Result<ElectionData>  {
     println!("Trying to deduce ec resolutions for {}",electorate);
     let mut data = loader.read_raw_data(electorate)?;
@@ -227,6 +229,13 @@ pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutio
                 }
             }
             data.metadata.tie_resolutions=initial_ec_decisions; // overwrite to get decisions in count order.
+            // if there is no "winning candidates" section in the metadata, add it.
+            if let Some(official_results) = data.metadata.results.clone() {
+                // check the official results match the actual
+                let diffs : DeltasInCandidateLists = DifferentCandidateLists{list1:official_results,list2:transcript.elected.clone()}.into();
+                if !diffs.is_empty() { return Err(anyhow!("Elected candidates in official transcript differ from in metadata : {}",diffs.pretty_print(&data.metadata))); }
+            }
+            data.metadata.results = Some(transcript.elected); // replace existing even if it matches to get better order.
             return Ok(data);
         }
     }
