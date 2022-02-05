@@ -35,7 +35,6 @@ function doRecount() {
             if (options===currently_wanted_options) {
                 if (recount_result.Ok) {
                     currently_showing_transcript=recount_result.Ok;
-                    removeAllChildElements(results);
                     if (metadata.results) {
                         const old_elected = metadata.results;
                         const new_elected = currently_showing_transcript.transcript.elected;
@@ -58,10 +57,18 @@ function doRecount() {
                         }
                     }
                     transcriptControls.className = "";
-                    RenderTranscript(currently_showing_transcript,results);
+                    redrawTranscript();
                 } else standardFailureFunction(recount_result.Err);
             }
         },standardFailureFunction,JSON.stringify(options),"application/json");
+    }
+}
+
+function redrawTranscript() {
+    if (currently_showing_transcript) {
+        const results = document.getElementById("RenderThingToView");
+        removeAllChildElements(results);
+        RenderTranscript(currently_showing_transcript,results);
     }
 }
 
@@ -242,4 +249,6 @@ function process_good_metadata(_metadata) {
 window.onload = function () {
     addHeaderAndFooter();
     getWebJSONResult("metadata.json",process_good_metadata);
+    document.getElementById("ShowPapers").onchange = redrawTranscript;
+    document.getElementById("heading-orientation").onchange = redrawTranscript;
 }
