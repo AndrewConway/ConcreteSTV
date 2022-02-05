@@ -106,6 +106,8 @@ pub trait PreferenceDistributionRules {
     type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>+RoundUpToUsize+Div<usize,Output=Self::Tally>+CanConvertToF64PossiblyLossily;
     type SplitByNumber : HowSplitByCountNumber;
 
+    /// Whether or not the system has a quota. False for IRV.
+    fn has_quota() -> bool { true }
     /// Whether to transfer all the votes or just the last parcel.
     fn use_last_parcel_for_surplus_distribution() -> bool;
     fn transfer_value_method() -> TransferValueMethod;
@@ -257,11 +259,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             },
             transcript : Transcript {
                 rules : Rules::name(),
-                quota: QuotaInfo { // dummy values
-                    papers: BallotPaperCount(0),
-                    vacancies: NumberOfCandidates(0),
-                    quota: Rules::Tally::zero(),
-                },
+                quota: None,
                 counts: vec![],
                 elected: vec![]
             },
@@ -303,13 +301,17 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
     /// quota = round_down(first_preferences/(1+num_to_elect))+1
     pub fn compute_quota(&mut self,total_first_preferences:BallotPaperCount) {
-        self.quota = Rules::Tally::from(total_first_preferences.0/(1+self.candidates_to_be_elected.0)+1);
-        self.transcript.quota = QuotaInfo{
-            papers: total_first_preferences,
-            vacancies: self.candidates_to_be_elected,
-            quota: self.quota.clone(),
-        };
-        if self.print_progress_to_stdout { println!("Quota = {}", self.quota); }
+        if Rules::has_quota() {
+            self.quota = Rules::Tally::from(total_first_preferences.0/(1+self.candidates_to_be_elected.0)+1);
+            self.transcript.quota = Some(QuotaInfo{
+                papers: total_first_preferences,
+                vacancies: self.candidates_to_be_elected,
+                quota: self.quota.clone(),
+            });
+            if self.print_progress_to_stdout { println!("Quota = {}", self.quota); }
+        } else {
+            self.quota = Rules::Tally::from(total_first_preferences.0+1000); // effectively infinity.
+        }
     }
 
     pub fn tally(&self,candidate:CandidateIndex) -> Rules::Tally { self.tallys[candidate.0].clone() }

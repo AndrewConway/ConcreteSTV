@@ -167,10 +167,13 @@ pub struct QuotaInfo<Tally> {
 pub struct Transcript<Tally:PartialEq+Clone+Display+FromStr> {
     /// The rules that were used to compute this transcript.
     pub rules : String,
-    pub quota : QuotaInfo<Tally>,
+    #[serde(skip_serializing_if = "Option::is_none",default="produce_none")] // can't just have default as there is no default on Tally, which is needed for some reason.
+    pub quota : Option<QuotaInfo<Tally>>,
     pub counts : Vec<SingleCount<Tally>>,
     pub elected : Vec<CandidateIndex>,
 }
+
+fn produce_none<T>() -> Option<T> { None }
 
 impl <Tally:PartialEq+Clone+Display+FromStr> Transcript<Tally> {
     pub fn count(&self,index:CountIndex) -> &SingleCount<Tally> {

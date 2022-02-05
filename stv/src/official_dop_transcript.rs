@@ -78,9 +78,9 @@ impl OfficialDistributionOfPreferencesTranscript {
     pub fn compare_with_transcript_checking_for_ec_decisions<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr+CanConvertToF64PossiblyLossily>(&self,transcript:&Transcript<Tally>,verbose:bool) -> Option<TieResolutionExplicitDecision> {
         fn decode<Tally : CanConvertToF64PossiblyLossily>(tally:Tally) -> f64 { tally.convert_to_f64() }
         if let Some(quota) = &self.quota {
-            assert_eq!(quota.vacancies,transcript.quota.vacancies,"vacancies official vs me");
-            assert_eq!(quota.papers,transcript.quota.papers,"papers with first preferences official vs me");
-            assert_eq!(quota.quota,decode(transcript.quota.quota.clone()),"quota official vs me");
+            assert_eq!(quota.vacancies,transcript.quota.as_ref().unwrap().vacancies,"vacancies official vs me");
+            assert_eq!(quota.papers,transcript.quota.as_ref().unwrap().papers,"papers with first preferences official vs me");
+            assert_eq!(quota.quota,decode(transcript.quota.as_ref().unwrap().quota.clone()),"quota official vs me");
         }
         for i in 0..min(self.counts.len(),transcript.counts.len()) {
             let assert_papers = |official:usize,our:BallotPaperCount,what:&str|{

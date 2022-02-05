@@ -73,8 +73,8 @@ mod tests {
             informal: 0
         };
         let transcript = data.distribute_preferences::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>();
-        assert_eq!(transcript.quota.papers, BallotPaperCount(40000));
-        assert_eq!(transcript.quota.quota, 10001);
+        assert_eq!(transcript.quota.as_ref().unwrap().papers, BallotPaperCount(40000));
+        assert_eq!(transcript.quota.as_ref().unwrap().quota, 10001);
         assert_eq!(transcript.elected, vec![CandidateIndex(2), CandidateIndex(1), CandidateIndex(0)]);
         assert_eq!(transcript.counts.len(), 2);
         Ok(())
