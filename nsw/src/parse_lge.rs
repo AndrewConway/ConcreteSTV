@@ -23,11 +23,11 @@ use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource
 use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use stv::parse_util::parse_xlsx_by_converting_to_csv_using_openoffice;
-use crate::NSWECLocalGov2021;
+use crate::{NSWECLocalGov2021, SimpleIRVAnyDifferenceBreaksTies};
 
 
 pub fn get_nsw_lge_data_loader_2021(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
-    NSWLGEDataLoader::new(finder,"2021","https://vtr.elections.nsw.gov.au/LG2101/results")
+    NSWLGEDataLoader::new(finder,"2021","https://pastvtr.elections.nsw.gov.au/LG2101/results")
 }
 
 pub struct NSWLGEDataSource {}
@@ -103,7 +103,7 @@ impl RawDataSource for NSWLGEDataLoader {
     fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> { self.read_raw_data_possibly_rejecting_some_types(electorate, None) }
 
     fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> {
-        if electorate.ends_with("Mayoral") { self.read_raw_data(electorate) } // TODO implement for mayoral races
+        if electorate.ends_with("Mayoral") { read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<SimpleIRVAnyDifferenceBreaksTies,Self>(self, electorate) }
         else { read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021,Self>(self,electorate) }
     }
 
@@ -131,8 +131,8 @@ impl RawDataSource for NSWLGEDataLoader {
         match self.year.as_str() {
             "2021" if electorate.ends_with("Mayoral") => AssociatedRules {
                 rules_used: Some("IRV".into()),
-                rules_recommended: None,
-                comment: Some("This is not actually a STV election, having only one candidate. It is an IRV election. Almost any STV ruleset is a decent approximation to IRV, modulo tie resolution.".into()),
+                rules_recommended: Some("IRV".into()),
+                comment: Some("This is not actually a STV election, having only one candidate. It is an IRV election. The legislation is ambiguous about tie resolution. The NSWEC transcripts frequently continue far beyond when the mayor is elected; this is harmless if bizarre and confusing and I do not bother emulating this bug.".into()),
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2021Report.pdf".into()],
             },
             "2021" => AssociatedRules {
@@ -146,7 +146,7 @@ impl RawDataSource for NSWLGEDataLoader {
     }
 
     fn read_official_dop_transcript(&self, metadata: &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
-        if metadata.name.electorate.ends_with("Mayoral") { Err(anyhow!("Mayoral races currently cannot read official transcript")) } // TODO implement for mayoral races
+        if metadata.name.electorate.ends_with("Mayoral") { self.read_official_dop_transcript_mayoral(metadata) }
         else { self.read_official_dop_transcript_councillor(metadata) }
     }
 }
@@ -181,7 +181,7 @@ impl NSWLGEDataLoader {
     }
 
     pub fn new(finder:&FileFinder,year:&'static str,page_url:&'static str) -> anyhow::Result<Self> {
-        let archive_location = "NSW/LGE".to_string()+year+"/vtr.elections.nsw.gov.au/LG2101"; // The 2101 should not be hardcoded.
+        let archive_location = "NSW/LGE".to_string()+year+"/pastvtr.elections.nsw.gov.au/LG2101"; // The 2101 should not be hardcoded.
         Ok(NSWLGEDataLoader {
             finder : finder.clone(),
             archive_location,
@@ -318,7 +318,7 @@ impl NSWLGEDataLoader {
                 }
                 vote_delta.exhausted=parse_number_blank_as_nan(&line[col_votes_set_aside]);
                 paper_delta.exhausted=parse_number_blank_as_zero(&line[col_exhausted_bps]);
-                //vote_delta.rounding=parse_number_blank_as_NaN(&line[col_votes_set_aside]).into();// they track a different way. I compute the number of votes represented as a delta for the appropriate candidate, and round down. They don't round down (good, but messy), and don't display (bad, but avoids mess). Their rounding thus takes this into account.  TODO be able to track this.
+                //vote_delta.rounding=parse_number_blank_as_NaN(&line[col_votes_set_aside]).into();// they track a different way. I compute the number of votes represented as a delta for the appropriate candidate, and round down. They don't round down (good, but messy), and don't display (bad, but avoids mess). Their rounding thus takes this into account.  It would be nice to be able to track this.
                 vote_delta.rounding=f64::NAN.into();
                 counts.push(OfficialDOPForOneCount{
                     transfer_value,
@@ -367,6 +367,123 @@ impl NSWLGEDataLoader {
             all_exhausted_go_to_rounding : true,
         })
     }
+
+    const FIX_NSWEC_MAYORAL_TRANSCRIPT_BUG_AT_TRANSCRIPT: bool = true;
+
+    pub fn read_official_dop_transcript_mayoral(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+        let contest = &self.find_contest(&metadata.name.electorate)?.url;
+        let dop_file = self.find_raw_data_file_relative(contest,"mayoral/report","mayoral-dop","mayoral/report/mayoral-dop")?;
+        let html = scraper::Html::parse_document(&std::fs::read_to_string(dop_file)?);
+        let selector_td = Selector::parse("td").unwrap();
+        let mut candidates_in_order_of_exclusion : Vec<CandidateIndex> = vec![];
+        let mut candidates_tallys : Vec<Vec<usize>> = vec![];
+        let mut exhausted = vec![];
+        let mut elected_candidate : Option<CandidateIndex> = None;
+        //let mut elected_round : Option<usize> = None;
+        fn get_candidate_from_name_and_suffix(name:&str,metadata:&ElectionMetadata) -> CandidateIndex {
+            for i in 0..metadata.candidates.len() {
+                if name.starts_with(&metadata.candidates[i].name) { return CandidateIndex(i); }
+            }
+            panic!("Could not find candidate {}",name);
+        }
+        fn parse_number_with_comma(s:&str) -> usize {
+            if s.is_empty() || s=="EXCLUDED" || s=="-" {0}
+            else {s.replace(',',"").parse().unwrap()}
+        }
+        for row in html.select(&Selector::parse("table tbody tr").unwrap()) {
+            let cols = row.select(&selector_td);
+            let mut cols : Vec<String> = cols.map(|c|c.text().map(|s|s.trim()).collect::<Vec<_>>().join("")).collect();
+            if cols[0]=="Candidates" {
+            } else if cols[0].is_empty() { // list of excluded candidates
+                candidates_in_order_of_exclusion = cols[2..cols.len()-1].iter().map(|s|get_candidate_from_name_and_suffix(s,metadata)).collect::<Vec<_>>();
+            } else { // everything else is mostly a set of numbers, possibly with "ELECTED" added. Extract it.
+                let elected_position = cols.len()-2;
+                let elected = if cols[elected_position].starts_with("ELECTED") {
+                    cols[elected_position] = cols[elected_position].trim_start_matches("ELECTED").trim().to_string();
+                    // deal with a bug in NSWEC count, don't stop counting just because a candidate was elected on first round, see https://pastvtr.elections.nsw.gov.au/LG2101/bellingen/mayoral/mayoral-dop
+                    // sometimes to be really special they continue for more than just one extra round : https://pastvtr.elections.nsw.gov.au/LG2101/burwood/mayoral/mayoral-dop
+                    // Or Rina Mercuri shows off a bug again, the first time it occurs when not elected on first round, https://pastvtr.elections.nsw.gov.au/LG2101/griffith/mayoral/mayoral-dop
+                    for i in 1..cols.len() {
+                        if cols[i].starts_with("ELECTED") {
+                            cols[i] = cols[i].trim_start_matches("ELECTED").trim().to_string();
+                            // elected_round=Some((i-1)/2);
+                            if Self::FIX_NSWEC_MAYORAL_TRANSCRIPT_BUG_AT_TRANSCRIPT {
+                                // In this case we will make sure all future rounds are ignored. So we will fix the bug at the transcript rather than emulating the bug.
+                                candidates_in_order_of_exclusion.truncate((i-1)/2);
+                            }
+                        }
+                    }
+                    true
+                } else { false };
+
+                let counts = cols[1..cols.len()-1].iter().map(|s|parse_number_with_comma(s)).collect::<Vec<_>>();
+                if cols[0]=="Total Votes in Count" { // do nothing
+                } else if cols[0]=="Exhausted Votes" {
+                    exhausted=counts;
+                } else if cols[0]=="Informal" {// do nothing
+                } else if cols[0]=="Total Votes / Ballot Papers" {// do nothing
+                } else if cols[0]=="Absolute Majority" { // do nothing
+                } else {
+                    let candidate = get_candidate_from_name_and_suffix(&cols[0],metadata);
+                    if candidate.0 == candidates_tallys.len() {
+                        candidates_tallys.push(counts);
+                        if elected { elected_candidate=Some(candidate); }
+                    } else { panic!("Candidates out of order")}
+                }
+            }
+        }
+        let mut counts:Vec<OfficialDOPForOneCount> = vec![];
+        let column = |col:usize|Some(PerCandidate{
+            candidate: candidates_tallys.iter().map(|v|v[col]).collect(),
+            exhausted: exhausted[col],
+            rounding: 0.into(),
+            set_aside: None
+        });
+        let columnf64 = |col:usize|Some(PerCandidate{
+            candidate: candidates_tallys.iter().map(|v|v[col] as f64).collect(),
+            exhausted: exhausted[col] as f64,
+            rounding: 0.0.into(),
+            set_aside: None
+        });
+        let columnisize = |col:usize|Some(PerCandidate{
+            candidate: candidates_tallys.iter().map(|v|v[col] as isize).collect(),
+            exhausted: exhausted[col] as isize,
+            rounding: 0.into(),
+            set_aside: None
+        });
+        // do first prefs.
+        let mut add_col= |col_delta:usize,col_total:usize,excluded:Option<CandidateIndex>| {
+            let mut count = OfficialDOPForOneCount{
+                transfer_value: None,
+                elected: vec![],
+                excluded: excluded.into_iter().collect(),
+                vote_total: columnf64(col_total),
+                paper_total: column(col_total),
+                vote_delta: columnf64(col_delta),
+                paper_delta: columnisize(col_delta),
+                count_name: None
+            };
+            if let Some(candidate) = excluded {
+                let old_total = counts.last().unwrap().paper_total.as_ref().unwrap().candidate[candidate.0];
+                count.vote_delta.as_mut().unwrap().candidate[candidate.0] = - (old_total as f64);
+                count.paper_delta.as_mut().unwrap().candidate[candidate.0] = - (old_total as isize);
+            }
+            counts.push(count);
+        };
+        add_col(0,0,None);
+        for i in 0..candidates_in_order_of_exclusion.len() {
+            add_col(i*2+1,i*2+2,Some(candidates_in_order_of_exclusion[i]));
+        }
+        counts.last_mut().unwrap().elected.push(elected_candidate.unwrap());
+        Ok(OfficialDistributionOfPreferencesTranscript{
+            quota : None,
+            counts,
+            missing_negatives_in_papers_delta: false,
+            elected_candidates_are_in_order: true,
+            all_exhausted_go_to_rounding : false,
+        })
+    }
+
 }
 
 fn parse_number_blank_as_nan(s:&str) -> f64 {

@@ -17,7 +17,7 @@ pub mod parse_lge;
 
 use std::cmp::Ordering;
 use stv::preference_distribution::{BigRational, CountNamingMethod, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
-use stv::ballot_pile::{BallotPaperCount, FullySplitByCountNumber, HowSplitByCountNumber};
+use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber, FullySplitByCountNumber, HowSplitByCountNumber};
 use stv::distribution_of_preferences_transcript::{CountIndex, Transcript};
 use stv::transfer_value::{convert_usize_to_rational, round_rational_down_to_usize, TransferValue};
 use stv::tie_resolution::MethodOfTieResolution;
@@ -248,4 +248,57 @@ impl NSWECLocalGov2021 {
         let name2 = transcript_so_far.count(count2).count_name.as_ref().unwrap();
         Self::sort_names_as_dotted_number_sequences_numerically_first_3_fields_lexicographically_afterwards(name1,name2,1) // use 1 already done as the current count will be prefixed to this.
     }
+}
+
+
+/// A simple IRV computation.
+pub struct SimpleIRVAnyDifferenceBreaksTies {
+}
+
+impl PreferenceDistributionRules for SimpleIRVAnyDifferenceBreaksTies {
+    type Tally = usize;
+    type SplitByNumber = DoNotSplitByCountNumber;
+
+    /// MAKE IT IRV!
+    fn has_quota() -> bool { false }
+    // a bunch of not applicable functions.
+    fn use_last_parcel_for_surplus_distribution() -> bool { false }
+    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverContinuingBallots }
+    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
+    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }
+    fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue { // NA
+        TransferValue::from_surplus(surplus,ballots)
+    }
+    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
+        transfer_value.mul_rounding_down(ballots)
+    }
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::ScaleTransferValues }
+    fn sort_exclusions_by_transfer_value() -> bool { false }
+
+    /// Legislation is ambiguous - use method there was evidence EC used for similar legislation for STV..
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished }
+    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished }
+    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished }
+    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished }
+
+    // more not applicable functions.
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { false }
+    fn check_elected_if_in_middle_of_exclusion() -> bool { false }
+    fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
+    fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
+    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+
+    // termination condition in case of tie for top.
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfExclusionNotOngoing }
+    // normal termination condition
+    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuota}
+
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
+    fn name() -> String { "IRV".to_string() }
+    fn how_to_name_counts() -> CountNamingMethod { CountNamingMethod::SimpleNumber }
+
+    fn sort_subcounts_by_count() -> Option<Box<dyn FnMut(&Transcript<Self::Tally>,<<Self as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,<<Self as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide) -> Ordering>> {
+        None
+    }
+    fn should_exhausted_votes_count_for_quota_computation() -> bool { false }
 }

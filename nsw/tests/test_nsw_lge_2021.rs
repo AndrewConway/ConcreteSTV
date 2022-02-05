@@ -6,7 +6,7 @@
 
 
 use std::fs::File;
-use nsw::NSWECLocalGov2021;
+use nsw::{NSWECLocalGov2021, SimpleIRVAnyDifferenceBreaksTies};
 use nsw::parse_lge::{get_nsw_lge_data_loader_2021, NSWLGEDataLoader};
 use stv::ballot_metadata::CandidateIndex;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
@@ -57,7 +57,10 @@ fn test_all_council_races() {
     let electorate =&loader.all_electorates()[0];
     assert_eq!(electorate,"City of Albury");
     for electorate in &loader.all_electorates() {
-        if !electorate.ends_with(" Mayoral") {
+        if electorate.ends_with(" Mayoral") {
+            println!("Testing Electorate {}",electorate);
+            test::<SimpleIRVAnyDifferenceBreaksTies>(electorate, &loader);
+        } else {
             println!("Testing Electorate {}",electorate);
             test::<NSWECLocalGov2021>(electorate,&loader);
         }
