@@ -14,6 +14,7 @@ use std::fmt::{Display, Formatter};
 use std::iter::Sum;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use std::str::FromStr;
+use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
 use crate::preference_distribution::RoundUpToUsize;
 
 /// Stores a fixed precision decimal number as an integer scaled by 10^DIGITS
@@ -49,6 +50,11 @@ impl <const DIGITS:usize> FixedPrecisionDecimal<DIGITS> {
 impl <const DIGITS:usize> From<FixedPrecisionDecimal<DIGITS>> for f64 {
     fn from(v: FixedPrecisionDecimal<DIGITS>) -> Self {
         v.scaled_value as f64/((FixedPrecisionDecimal::<DIGITS>::SCALE) as f64)
+    }
+}
+impl <const DIGITS:usize> CanConvertToF64PossiblyLossily for FixedPrecisionDecimal<DIGITS> {
+    fn convert_to_f64(&self) -> f64 {
+        self.scaled_value as f64/((FixedPrecisionDecimal::<DIGITS>::SCALE) as f64)
     }
 }
 

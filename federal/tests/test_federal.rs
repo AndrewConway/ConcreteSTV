@@ -30,7 +30,7 @@ mod tests {
         let file = File::create(format!("test_transcripts/transcript{}2019.json",state))?;
         serde_json::to_writer_pretty(file,&transcript)?;
         let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
-        official_transcript.compare_with_transcript(&transcript.transcript,|tally|tally as f64);
+        official_transcript.compare_with_transcript(&transcript.transcript);
         Ok(())
     }
 
@@ -44,7 +44,7 @@ mod tests {
         let file = File::create(format!("test_transcripts/transcript{}2016.json",state))?;
         serde_json::to_writer_pretty(file,&transcript)?;
         let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
-        official_transcript.compare_with_transcript(&transcript.transcript,|tally|tally as f64);
+        official_transcript.compare_with_transcript(&transcript.transcript);
         Ok(())
     }
 
@@ -58,7 +58,7 @@ mod tests {
         let file = File::create(format!("test_transcripts/transcript{}2013.json",state))?;
         serde_json::to_writer_pretty(file,&transcript)?;
         let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
-        official_transcript.compare_with_transcript(&transcript.transcript,|tally|tally as f64);
+        official_transcript.compare_with_transcript(&transcript.transcript);
         Ok(())
     }
 

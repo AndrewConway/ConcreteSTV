@@ -22,7 +22,8 @@ use stv::ballot_pile::BallotPaperCount;
 use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
 use stv::official_dop_transcript::{candidate_elem, OfficialDistributionOfPreferencesTranscript};
 use stv::tie_resolution::TieResolutionsMadeByEC;
-use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder, RawDataSource, MissingFile, FileFinder, RawBallotPaperMetadata, CanReadRawMarkings};
+use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder, RawDataSource, MissingFile, FileFinder, RawBallotPaperMetadata, CanReadRawMarkings, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
+use crate::{FederalRulesUsed2013, FederalRulesUsed2016, FederalRulesUsed2019};
 use crate::parse2013::{read_from_senate_group_voting_tickets_download_file2013, read_ticket_votes2013, read_btl_votes2013};
 
 pub fn get_federal_data_loader_2013(finder:&FileFinder) -> FederalDataLoader {
@@ -136,6 +137,14 @@ impl RawDataSource for FederalDataLoader {
         Ok(ElectionData{ metadata, atl, atl_types: vec![], btl, btl_types: vec![], informal })
     }
 
+    fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> {
+        match self.year.as_str() {
+            "2013" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2013,Self>(self,electorate),
+            "2016" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2016,Self>(self,electorate),
+            "2019" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
+            _ => Err(anyhow!("Invalid year {}",self.year)),
+        }
+    }
 
     fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata> {
         let mut builder = CandidateAndGroupInformationBuilder::default();
@@ -192,6 +201,24 @@ impl RawDataSource for FederalDataLoader {
         }
     }
     fn can_read_raw_markings(&self) -> bool  { self.year!="2013" }
+
+
+    fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+        let filename = self.name_of_official_transcript_zip_file();
+        let preferences_zip_file = self.find_raw_data_file(&filename)?;
+        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
+        let mut zipfile = zip::ZipArchive::new(File::open(preferences_zip_file)?)?;
+        {
+            for i in 0..zipfile.len() {
+                let file = zipfile.by_index(i)?;
+                if file.name().contains(&metadata.name.electorate) {
+                    return read_official_dop_transcript_work(file,metadata);
+                }
+            }
+            Err(anyhow!("Could not find file in zipfile for {}",&metadata.name.electorate))
+        }
+    }
+
 }
 
 impl CanReadRawMarkings for FederalDataLoader {
@@ -261,26 +288,6 @@ impl FederalDataLoader {
         let (mut btl,informal) = read_btl_votes2013(&metadata, &preferences_zip_file, 1)?; // The 2013 formality rules are quite complex. I am assuming the AEC has applied them already to all with a 1 vote. This is a dubious assumption as there are some without a 1 vote. However since we don't get all the informal votes, it is hard to check formality properly.
         btl.extend_from_slice(&ticket_votes);
         Ok(ElectionData{ metadata, atl:vec![], atl_types: vec![], btl, btl_types: vec![], informal })
-    }
-
-    pub fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
-        let filename = self.name_of_official_transcript_zip_file();
-        let preferences_zip_file = self.find_raw_data_file(&filename)?;
-        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
-        let mut zipfile = zip::ZipArchive::new(File::open(preferences_zip_file)?)?;
-        {
-            for i in 0..zipfile.len() {
-                let file = zipfile.by_index(i)?;
-                if file.name().contains(&metadata.name.electorate) {
-                    return read_official_dop_transcript_work(file,metadata);
-                }
-            }
-            Err(anyhow!("Could not find file in zipfile for {}",&metadata.name.electorate))
-/*
-            if let Some(file_name) = zipfile.file_names().find(|&n|n.contains(&data.metadata.name.electorate)).map(|file_name|zipfile.by_name(file_name)) {
-                let zip_contents = file_name?; //zipfile.by_name(file_name)?;
-            } else {}*/
-        }
     }
 
     pub fn all_states_data<'a>(&'a self) -> impl Iterator<Item=anyhow::Result<ElectionData>> + 'a {

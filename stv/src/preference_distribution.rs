@@ -26,6 +26,7 @@ use std::iter::Sum;
 use std::cmp::{min, Ordering};
 use serde::{Serialize,Deserialize};
 use std::str::FromStr;
+use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
 use crate::signed_version::SignedVersion;
 
 
@@ -102,7 +103,7 @@ impl RoundUpToUsize for usize {
 
 pub trait PreferenceDistributionRules {
     /// The type for the number of votes. Usually an integer.
-    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>+RoundUpToUsize+Div<usize,Output=Self::Tally>;
+    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>+RoundUpToUsize+Div<usize,Output=Self::Tally>+CanConvertToF64PossiblyLossily;
     type SplitByNumber : HowSplitByCountNumber;
 
     /// Whether to transfer all the votes or just the last parcel.

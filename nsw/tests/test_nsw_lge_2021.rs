@@ -17,7 +17,7 @@ use stv::tie_resolution::{TieResolutionAtom, TieResolutionsMadeByEC};
 mod test_nsw_lge;
 
 
-fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&str,loader:&NSWLGEDataLoader,decode:F) {
+fn test<Rules:PreferenceDistributionRules>(electorate:&str,loader:&NSWLGEDataLoader) {
     let data = loader.read_raw_data(electorate).unwrap();
     data.print_summary();
     let mut tie_resolutions = TieResolutionsMadeByEC::default();
@@ -30,7 +30,7 @@ fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&s
             let file = File::create(format!("test_transcripts/NSW LG{} {}.transcript",transcript.metadata.name.year,electorate)).unwrap();
             serde_json::to_writer_pretty(file,&transcript).unwrap();
         }
-        if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,&decode,true) {
+        if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,true) {
             println!("Observed tie resolution favouring {:?} over {:?}", decision.favoured, decision.disfavoured);
             assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
             tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
@@ -39,8 +39,6 @@ fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&s
         }
     }
 }
-
-fn decode(tally:usize) -> f64 { tally as f64 }
 
 #[test]
 fn test_ineligible() {
@@ -61,7 +59,7 @@ fn test_all_council_races() {
     for electorate in &loader.all_electorates() {
         if !electorate.ends_with(" Mayoral") {
             println!("Testing Electorate {}",electorate);
-            test::<NSWECLocalGov2021,_>(electorate,&loader,decode);
+            test::<NSWECLocalGov2021>(electorate,&loader);
         }
     }
 }

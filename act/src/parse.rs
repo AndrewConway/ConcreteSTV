@@ -11,7 +11,7 @@
 
 
 use std::collections::{HashMap, HashSet};
-use stv::parse_util::{FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource};
+use stv::parse_util::{FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
 use std::path::PathBuf;
 use stv::ballot_metadata::{Party, CandidateIndex, Candidate, PartyIndex, ElectionMetadata, DataSource, ElectionName, NumberOfCandidates};
 use stv::election_data::ElectionData;
@@ -23,6 +23,7 @@ use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, 
 use calamine::{open_workbook_auto, DataType};
 use stv::datasource_description::{AssociatedRules, Copyright};
 use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
+use crate::{ACT2021, ACTPre2020};
 
 pub fn get_act_data_loader_2020(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
     ACTDataLoader::new(finder,"2020","https://www.elections.act.gov.au/elections_and_voting/2020_legislative_assembly_election/ballot-paper-preference-data-2020-election")
@@ -116,6 +117,14 @@ impl RawDataSource for ACTDataLoader {
         Ok(ElectionData{ metadata, atl:vec![], atl_types: vec![], btl:btl.to_btls(), btl_types: vec![], informal:0 })
     }
 
+    fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> {
+        match self.year.as_str() {
+            "2008"|"2012"|"2016" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<ACTPre2020,Self>(self,electorate),
+            "2020" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<ACT2021,Self>(self,electorate),
+            _ => Err(anyhow!("Invalid year {}",self.year)),
+        }
+    }
+
     fn find_raw_data_file(&self,filename:&str) -> Result<PathBuf,MissingFile> {
         self.finder.find_raw_data_file(filename,&self.archive_location,&self.page_url)
     }
@@ -172,6 +181,14 @@ impl RawDataSource for ACTDataLoader {
             },
             _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
         }
+    }
+
+    fn read_official_dop_transcript(&self, metadata: &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+        let subfolder = match self.year.as_str() {
+            "2020" => Some("D of P as at 26 Mar 2021"),
+            _ => None
+        };
+        self.read_official_dop_transcript_with_subfolder(metadata,subfolder)
     }
 }
 
@@ -251,7 +268,7 @@ impl ACTDataLoader {
 
     /// Read the official distribution of prefererences, which are excel files in a folder "Distribution Of Preferences".
     /// There may be a sub folder such as in the case of 2020 when Elections ACT redid their distribution after fixing some bugs we pointed out.
-    pub fn read_official_dop_transcript(&self,metadata:&ElectionMetadata,sub_folder:Option<&str>) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+    pub fn read_official_dop_transcript_with_subfolder(&self,metadata:&ElectionMetadata,sub_folder:Option<&str>) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let dop_folder = self.finder.find_raw_data_file("Distribution Of Preferences",&self.archive_location,"Just folder")?;
         let dop_folder = if let Some(sub) = sub_folder { dop_folder.join(sub) } else { dop_folder };
         let mut table1 : Option<PathBuf> = None;

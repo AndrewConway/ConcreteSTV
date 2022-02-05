@@ -50,6 +50,16 @@ impl OfficialDOPForOneCount {
     pub fn paper_delta(&mut self) -> &mut PerCandidate<isize> { self.paper_delta.get_or_insert_with(Default::default) }
 }
 
+// like From<X> but implemented for usize (if there are more than 2^53 votes, the official transcript checking will have problems).
+
+pub trait CanConvertToF64PossiblyLossily {
+    fn convert_to_f64(&self) -> f64;
+}
+
+impl CanConvertToF64PossiblyLossily for usize {
+    fn convert_to_f64(&self) -> f64 { *self as f64 }
+}
+
 impl OfficialDistributionOfPreferencesTranscript {
     /// Initialize a new count
     pub fn finished_count(&mut self) { self.counts.push(OfficialDOPForOneCount::default())}
@@ -58,14 +68,15 @@ impl OfficialDistributionOfPreferencesTranscript {
 
     /// Compare the results from the official transcript to our transcript.
     /// panic if there are differences.
-    pub fn compare_with_transcript<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F) {
-        let ec_decision = self.compare_with_transcript_checking_for_ec_decisions(transcript,decode,true);
+    pub fn compare_with_transcript<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr+CanConvertToF64PossiblyLossily>(&self,transcript:&Transcript<Tally>) {
+        let ec_decision = self.compare_with_transcript_checking_for_ec_decisions(transcript,true);
         if let Some(decision) = ec_decision {
             panic!("An EC decision was not made the way we expected: {:?} was favoured over {:?}",decision.favoured,decision.disfavoured);
         }
     }
     /// like compare_with_transcript but don't panic if the first difference is caused by a difference in EC decision making. If so, return the decision.
-    pub fn compare_with_transcript_checking_for_ec_decisions<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr,F:Fn(Tally)->f64>(&self,transcript:&Transcript<Tally>,decode:F,verbose:bool) -> Option<TieResolutionExplicitDecision> {
+    pub fn compare_with_transcript_checking_for_ec_decisions<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr+CanConvertToF64PossiblyLossily>(&self,transcript:&Transcript<Tally>,verbose:bool) -> Option<TieResolutionExplicitDecision> {
+        fn decode<Tally : CanConvertToF64PossiblyLossily>(tally:Tally) -> f64 { tally.convert_to_f64() }
         if let Some(quota) = &self.quota {
             assert_eq!(quota.vacancies,transcript.quota.vacancies,"vacancies official vs me");
             assert_eq!(quota.papers,transcript.quota.papers,"papers with first preferences official vs me");
@@ -171,7 +182,7 @@ impl OfficialDistributionOfPreferencesTranscript {
             if let Some(vote_delta) = &official_count.vote_delta {
                 if verbose { println!("Checking tally delta count {}",i+1); }
                 assert_close_delta(vote_delta.exhausted,my_count.status.tallies.exhausted.clone(),if i>0 { transcript.counts[i-1].status.tallies.exhausted.clone()} else {Tally::zero()},"exhausted delta tally");
-                assert_close_delta_signed(vote_delta.rounding.clone().into(),my_count.status.tallies.rounding.clone(),if i>0 { transcript.counts[i-1].status.tallies.rounding.clone()} else {Tally::zero().into()},"rounding delta tally");
+                assert_close_delta_signed(vote_delta.rounding.clone().into(),my_count.status.tallies.rounding.clone(),if i>0 { transcript.counts[i-1].status.tallies.rounding.clone()} else {SignedVersion::from(Tally::zero())},"rounding delta tally");
                 for candidate in 0..vote_delta.candidate.len() {
                     assert_close_candidate_delta(vote_delta.candidate[candidate],my_count.status.tallies.candidate[candidate].clone(),if i>0 { transcript.counts[i-1].status.tallies.candidate[candidate].clone()} else {Tally::zero()},"tally delta",CandidateIndex(candidate));
                 }

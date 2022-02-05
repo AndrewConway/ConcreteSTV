@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{BufReader, Seek, BufRead, SeekFrom, Read};
 use crate::election_data::ElectionData;
-use crate::tie_resolution::TieResolutionsMadeByEC;
+use crate::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
 use anyhow::anyhow;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -23,8 +23,11 @@ use std::str::FromStr;
 use reqwest::Url;
 use crate::ballot_paper::{RawBallotMarkings};
 use crate::datasource_description::{AssociatedRules, Copyright};
+use crate::distribution_of_preferences_transcript::ReasonForCount;
 use crate::errors_btl::ObviousErrorsInBTLVotes;
 use crate::find_vote::{FindMyVoteQuery, FindMyVoteResult};
+use crate::official_dop_transcript::OfficialDistributionOfPreferencesTranscript;
+use crate::preference_distribution::PreferenceDistributionRules;
 
 /// A utility for helping to read a list of candidates and parties.
 #[derive(Default)]
@@ -146,6 +149,9 @@ pub trait RawDataSource : KnowsAboutRawMarkings {
     fn copyright(&self) -> Copyright;
     fn rules(&self,electorate:&str) -> AssociatedRules;
     fn can_read_raw_markings(&self) -> bool { false}
+    /// Get the official transcript for the election. May not be available for all electorates.
+    fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript>;
+
 }
 
 pub trait KnowsAboutRawMarkings {
@@ -175,6 +181,54 @@ pub trait CanReadRawMarkings {
         where F:FnMut(&RawBallotMarkings,RawBallotPaperMetadata)
     {
         Err(anyhow!("Iterating over raw btl preferences not supported."))
+    }
+}
+
+
+
+/// Like read_raw_data, except also try to deduce the tie breaking decisions that were used by the electoral commission.
+/// This is a powerful function, but it will be slow and panic if anything goes even slightly wrong.
+pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions<Rules:PreferenceDistributionRules,Source:RawDataSource>(loader:&Source, electorate: &str) -> anyhow::Result<ElectionData>  {
+    println!("Trying to deduce ec resolutions for {}",electorate);
+    let mut data = loader.read_raw_data(electorate)?;
+    if electorate.ends_with("Mayoral") { return Ok(data); } // don't have DOP file for mayoral elections. Besides, STV is not necessarily exactly a generalization of IRV... e.g. early termination conditions.
+    // let mut tie_resolutions = TieResolutionsMadeByEC::default();
+    let official_transcript = loader.read_official_dop_transcript(&data.metadata)?;
+    data.metadata.tie_resolutions=TieResolutionsMadeByEC::default(); // Get rid of less fine grained decisions that may be entered.
+    let mut initial_ec_decisions = data.metadata.tie_resolutions.clone(); // should be empty, unless we set it up some way else.
+    loop {
+        println!("Looping...");
+        let transcript = data.distribute_preferences::<Rules>();
+        if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript,false) {
+            println!("Observed tie resolution favouring {:?} over {:?}", decision.favoured, decision.disfavoured);
+            assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
+            data.metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
+        } else {
+            // now check for EC decisions that were compatible with my default assumption of reverse-donkey-vote.
+            for (count_index,count) in transcript.counts.iter().enumerate() {
+                for decision in &count.decisions {
+                    match &count.reason {
+                        ReasonForCount::Elimination(disfavoured) => {
+                            if disfavoured.iter().all(|c|decision.affected.contains(c)) {
+                                let disfavoured = disfavoured.clone();
+                                let favoured = decision.affected.iter().filter(|&c|!disfavoured.contains(c)).cloned().collect();
+                                let ecdecision = TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{favoured,disfavoured,came_up_in:count.count_name.clone().or_else(||Some((count_index+1).to_string()))});
+                                initial_ec_decisions.tie_resolutions.push(ecdecision);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            // check the newly deduced list contains every decision previously deduced.
+            for decision in &data.metadata.tie_resolutions.tie_resolutions {
+                if !initial_ec_decisions.tie_resolutions.contains(decision) {
+                    panic!("EC decision {:?} was not in the re-deduced set",decision);
+                }
+            }
+            data.metadata.tie_resolutions=initial_ec_decisions; // overwrite to get decisions in count order.
+            return Ok(data);
+        }
     }
 }
 

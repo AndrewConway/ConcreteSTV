@@ -15,15 +15,14 @@ use stv::election_data::ElectionData;
 use anyhow::anyhow;
 use scraper::{ElementRef, Html, Selector};
 use stv::ballot_paper::PreferencesComingOutOfOrderHelper;
-use stv::parse_util::{file_to_string, FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource};
-use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
+use stv::parse_util::{file_to_string, FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
+use stv::tie_resolution::{TieResolutionsMadeByEC};
 use serde::{Serialize,Deserialize};
 use stv::ballot_pile::BallotPaperCount;
 use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
-use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo, ReasonForCount};
+use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use stv::parse_util::parse_xlsx_by_converting_to_csv_using_openoffice;
-use stv::preference_distribution::PreferenceDistributionRules;
 use crate::NSWECLocalGov2021;
 
 
@@ -69,7 +68,7 @@ pub struct NSWLGEContest {
 impl KnowsAboutRawMarkings for NSWLGEDataLoader {}
 
 impl RawDataSource for NSWLGEDataLoader {
-    fn name(&self,electorate:&str) -> ElectionName {
+    fn name(&self, electorate: &str) -> ElectionName {
         ElectionName {
             year: self.year.clone(),
             authority: "NSW Electoral Commission".to_string(),
@@ -80,44 +79,47 @@ impl RawDataSource for NSWLGEDataLoader {
         }
     }
 
-    fn candidates_to_be_elected(&self,region:&str) -> NumberOfCandidates {
+    fn candidates_to_be_elected(&self, region: &str) -> NumberOfCandidates {
         self.find_contest(region).unwrap().vacancies
     }
 
     /// These are deduced by looking at the actual transcript of results.
     /// I have not included anything if all decisions are handled by the fallback "earlier on the ballot paper candidates are listed in worse positions.
-    fn ec_decisions(&self,_electorate:&str) -> TieResolutionsMadeByEC {
-            Default::default()
-    }
-
-    /// These are due to a variety of events.
-    fn excluded_candidates(&self,_electorate:&str) -> Vec<CandidateIndex> {
+    fn ec_decisions(&self, _electorate: &str) -> TieResolutionsMadeByEC {
         Default::default()
     }
 
-    fn find_raw_data_file(&self,filename:&str) -> Result<PathBuf,MissingFile> {
-        self.finder.find_raw_data_file(filename,&self.archive_location,&self.page_url)
+    /// These are due to a variety of events.
+    fn excluded_candidates(&self, _electorate: &str) -> Vec<CandidateIndex> {
+        Default::default()
+    }
+
+    fn find_raw_data_file(&self, filename: &str) -> Result<PathBuf, MissingFile> {
+        self.finder.find_raw_data_file(filename, &self.archive_location, &self.page_url)
     }
     fn all_electorates(&self) -> Vec<String> {
-        self.contests.iter().map(|c|c.name.clone()).collect()
+        self.contests.iter().map(|c| c.name.clone()).collect()
     }
-    fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> { self.read_raw_data_possibly_rejecting_some_types(electorate,None) }
+    fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> { self.read_raw_data_possibly_rejecting_some_types(electorate, None) }
 
-    fn read_raw_data_best_quality(&self,electorate:&str) -> anyhow::Result<ElectionData> { self.read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021>(electorate) }
+    fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> {
+        if electorate.ends_with("Mayoral") { self.read_raw_data(electorate) } // TODO implement for mayoral races
+        else { read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021,Self>(self,electorate) }
+    }
 
     fn read_raw_metadata(&self, electorate: &str) -> anyhow::Result<ElectionMetadata> {
         let contest = &self.find_contest(electorate)?.url;
         let mayoral = electorate.ends_with(" Mayoral");
         let metadata_data_file = self.find_raw_data_file_relative(contest,
-                                                                  if mayoral {"mayoral/report"} else {"councillor/report"},
-                                                                  if mayoral {"mayoral-fp-by-candidate.html"} else {"fp-by-grp-and-candidate-by-vote-type.html"},
-                                                                  if mayoral {"mayoral/report/fp-by-grp-and-candidate-by-vote-type"} else {"councillor/report/fp-by-grp-and-candidate-by-vote-type"})?;
-        let metadata = self.parse_candidate_list(File::open(metadata_data_file)?,mayoral,electorate)?;
+                                                                  if mayoral { "mayoral/report" } else { "councillor/report" },
+                                                                  if mayoral { "mayoral-fp-by-candidate.html" } else { "fp-by-grp-and-candidate-by-vote-type.html" },
+                                                                  if mayoral { "mayoral/report/fp-by-grp-and-candidate-by-vote-type" } else { "councillor/report/fp-by-grp-and-candidate-by-vote-type" })?;
+        let metadata = self.parse_candidate_list(File::open(metadata_data_file)?, mayoral, electorate)?;
         Ok(metadata)
     }
 
     fn copyright(&self) -> Copyright {
-        Copyright{
+        Copyright {
             statement: Some("© State of New South Wales through the NSW Electoral Commission".into()),
             url: Some("https://www.elections.nsw.gov.au/Copyright".into()),
             license_name: Some("Creative Commons Attribution 4.0 License".into()),
@@ -127,70 +129,29 @@ impl RawDataSource for NSWLGEDataLoader {
 
     fn rules(&self, electorate: &str) -> AssociatedRules {
         match self.year.as_str() {
-            "2021" if electorate.ends_with("Mayoral") => AssociatedRules{
+            "2021" if electorate.ends_with("Mayoral") => AssociatedRules {
                 rules_used: Some("IRV".into()),
                 rules_recommended: None,
                 comment: Some("This is not actually a STV election, having only one candidate. It is an IRV election. Almost any STV ruleset is a decent approximation to IRV, modulo tie resolution.".into()),
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2021Report.pdf".into()],
             },
-            "2021" => AssociatedRules{
+            "2021" => AssociatedRules {
                 rules_used: Some("NSWECLocalGov2021".into()),
                 rules_recommended: None,
                 comment: Some("The legislation is very ambiguous. My interpretation of the rules is NSWLocalGov2021 but NSWECLocalGov2021 seems a plausible interpretation.".into()),
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2021Report.pdf".into()],
             },
-            _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
+            _ => AssociatedRules { rules_used: None, rules_recommended: None, comment: None, reports: vec![] },
         }
+    }
+
+    fn read_official_dop_transcript(&self, metadata: &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+        if metadata.name.electorate.ends_with("Mayoral") { Err(anyhow!("Mayoral races currently cannot read official transcript")) } // TODO implement for mayoral races
+        else { self.read_official_dop_transcript_councillor(metadata) }
     }
 }
 
-fn decode(tally:usize) -> f64 { tally as f64 }
 impl NSWLGEDataLoader {
-
-    /// Like read_raw_data, except also try to deduce the tie breaking decisions that were used by NSWEC.
-    /// This is a powerful function, but it will be slow and panic if anything goes even slightly wrong.
-    pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions<Rules:PreferenceDistributionRules<Tally=usize>>(&self, electorate: &str) -> anyhow::Result<ElectionData>  {
-        println!("Trying to deduce ec resolutions for {}",electorate);
-        let mut data = self.read_raw_data(electorate)?;
-        if electorate.ends_with("Mayoral") { return Ok(data); } // don't have DOP file for mayoral elections. Besides, STV is not necessarily exactly a generalization of IRV... e.g. early termination conditions.
-        // let mut tie_resolutions = TieResolutionsMadeByEC::default();
-        let official_transcript = self.read_official_dop_transcript(&data.metadata)?;
-        let mut initial_ec_decisions = data.metadata.tie_resolutions.clone(); // should be empty, unless we set it up some way else.
-        loop {
-            println!("Looping...");
-            let transcript = data.distribute_preferences::<Rules>();
-            if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript, decode,false) {
-                println!("Observed tie resolution favouring {:?} over {:?}", decision.favoured, decision.disfavoured);
-                assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
-                data.metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
-            } else {
-                // now check for EC decisions that were compatible with my default assumption of reverse-donkey-vote.
-                for (count_index,count) in transcript.counts.iter().enumerate() {
-                    for decision in &count.decisions {
-                        match &count.reason {
-                            ReasonForCount::Elimination(disfavoured) => {
-                                if disfavoured.iter().all(|c|decision.affected.contains(c)) {
-                                    let disfavoured = disfavoured.clone();
-                                    let favoured = decision.affected.iter().filter(|&c|!disfavoured.contains(c)).cloned().collect();
-                                    let ecdecision = TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{favoured,disfavoured,came_up_in:count.count_name.clone().or_else(||Some((count_index+1).to_string()))});
-                                    initial_ec_decisions.tie_resolutions.push(ecdecision);
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                // check the newly deduced list contains every decision previously deduced.
-                for decision in &data.metadata.tie_resolutions.tie_resolutions {
-                    if !initial_ec_decisions.tie_resolutions.contains(decision) {
-                        panic!("EC decision {:?} was not in the re-deduced set",decision);
-                    }
-                }
-                data.metadata.tie_resolutions=initial_ec_decisions; // overwrite to get decisions in count order.
-                return Ok(data);
-            }
-        }
-    }
 
     pub fn read_raw_data_possibly_rejecting_some_types(&self, electorate: &str, reject_vote_type : Option<HashSet<String>>) -> anyhow::Result<ElectionData> {
         let contest = &self.find_contest(electorate)?.url;
@@ -311,7 +272,7 @@ impl NSWLGEDataLoader {
         })
     }
 
-    pub fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+    pub fn read_official_dop_transcript_councillor(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let contest = &self.find_contest(&metadata.name.electorate)?.url;
         let dop_file = self.find_raw_data_file_relative(contest,"download","dopfulldetails.xlsx","download/dopfulldetails.xlsx")?;
         let table = parse_xlsx_by_converting_to_csv_using_openoffice(&dop_file)?; // do it this way as calamine does not read this file properly.
