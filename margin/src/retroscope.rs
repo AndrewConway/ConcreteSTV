@@ -114,7 +114,7 @@ impl Retroscope {
                 pile_status: PileStatus::InPile,
                 count_arrived: CountIndex(0),
                 upto: 0,
-                prefs: v.parties.iter().flat_map(|p|data.metadata.party(*p).candidates.iter().map(|c|*c)).collect(),
+                prefs: v.resolve_to_candidates(&data.metadata),
             });
         }
         let mut btl = vec![];

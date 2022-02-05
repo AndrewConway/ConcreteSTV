@@ -230,7 +230,7 @@ impl ACTDataLoader {
                     abbreviation: Some(record.pabbrev),
                     atl_allowed: false,
                     candidates: vec![],
-                    tickets: vec![]
+                    tickets: vec![],
                 })
             }
         }

@@ -207,7 +207,7 @@ impl <Tally> BallotChanges<Tally> {
                                 if verbose {
                                     println!("Changed {} ATL from [{}] to [{}]", wv.n, data.metadata.party_list_to_string(&data.atl[wv.from.0].parties), data.metadata.party_list_to_string(&new_parties));
                                 }
-                                data.atl.push(ATL { parties: new_parties, n: wv.n })
+                                data.atl.push(ATL { parties: new_parties, n: wv.n, ticket_index: if data.atl[wv.from.0].ticket_index.is_some() { Some(0)} else {None} }) // the ticket index is a hack, and is not accurate. The margin computation is not designed for ticket ATL modifications.
                             } else {
                                 panic!("Candidate {} got ATL vote but doesn't have a party.", election_data.metadata.candidate(from.candidate).name);
                             }

@@ -124,7 +124,9 @@ impl <'a> ChooseVotesUpTo<'a> {
             let is_atl = v.0 < num_atl;
             if is_atl {
                 if options.allow_atl {
-                    if options.allow_first_pref || retroscope.votes.btl[v.0-num_atl].upto>=election_data.metadata.party(election_data.atl[v.0].parties[0]).candidates.len() {
+                    if options.allow_first_pref || {
+                        let party = election_data.metadata.party(election_data.atl[v.0].first_party());
+                        party.tickets.is_empty() && ( retroscope.votes.atl[v.0].upto>=party.candidates.len())} {
                         if options.allow_verifiable || options.ballot_types_considered_unverifiable.is_empty() || !election_data.is_atl_verifiable(v.0, &options.ballot_types_considered_unverifiable) {
                             res.atl.current_votes.push(v);
                             res.atl.ballots_remaining+=BallotPaperCount(election_data.atl[v.0].n);

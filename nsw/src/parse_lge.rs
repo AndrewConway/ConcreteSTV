@@ -238,7 +238,7 @@ impl NSWLGEDataLoader {
                         abbreviation: None,
                         atl_allowed: !col1_text.is_empty(),
                         candidates: vec![],
-                        tickets: vec![]
+                        tickets: vec![],
                     });
                     current_position = 0;
                 }

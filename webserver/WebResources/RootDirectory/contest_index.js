@@ -30,7 +30,10 @@ function process_good_info(info) {
     const simpleDiv = add(mainDiv,"div")
     if (info.simple) {
         document.getElementById("ElectionDataAvailableSection").className="";
-        if (!info.can_read_raw_markings) document.getElementById("NeedsRawAccess").className="hidden";
+        if (!info.can_read_raw_markings) {
+            document.getElementById("NeedsRawAccess1").className="hidden";
+            document.getElementById("NeedsRawAccess2").className="hidden";
+        }
         add(mainDiv,"h4").innerText="The results are available";
         const statsTable = add(mainDiv,"table","rightalign");
         const headRow = add(add(statsTable,"thead"),"tr");
@@ -41,12 +44,12 @@ function process_good_info(info) {
         const formal = add(statsTable,"tr","Striped");
         add(formal,"th").innerText="Formal";
         add(formal,"td").innerText=info.simple.num_formal;
-        add(formal,"td").innerText=info.simple.uses_group_voting_tickets?"*":info.simple.num_atl;
+        add(formal,"td").innerText=info.simple.num_atl;
         add(formal,"td").innerText=info.simple.num_btl;
         const unique = add(statsTable,"tr","Striped");
         add(unique,"th").innerText="Unique";
         add(unique,"td").innerText=info.simple.num_unique_atl+info.simple.num_unique_btl;
-        add(unique,"td").innerText=info.simple.uses_group_voting_tickets?"*":info.simple.num_unique_atl;
+        add(unique,"td").innerText=info.simple.num_unique_atl;
         add(unique,"td").innerText=info.simple.num_unique_btl;
         if (info.simple.num_informal) {
             const formal = add(statsTable,"tr","Striped");
@@ -63,7 +66,7 @@ function process_good_info(info) {
             add(row,"td").innerText=vtype.num_btl;
         }
         if (info.simple.uses_group_voting_tickets) {
-            add(mainDiv,"div").innerText="* Note that group voting tickets were used, and ATL ticket votes have been converted into BTL equivalents."
+            add(mainDiv,"div").innerText="* Note that group voting tickets were used, and ATL votes for a party with multiple tickets counts as one unique vote for each ticket type (usually 1, sometimes 2 or 3)."
         }
         if (info.simple.download_locations) {
             for (const location of info.simple.download_locations) {
@@ -72,7 +75,9 @@ function process_good_info(info) {
                 locDiv.append(" : "+location.files.join(", "));
             }
         }
-    } else simpleDiv.append("Election data is not currently available.")
+    } else {
+        document.getElementById("ElectionDataNotAvailableSection").className="";
+    }
 }
 
 function process_good_metadata(metadata) {

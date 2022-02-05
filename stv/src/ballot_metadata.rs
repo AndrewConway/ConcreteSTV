@@ -242,7 +242,7 @@ pub struct Party {
     pub candidates : Vec<CandidateIndex>,
     /// the group voting tickets for this party, if any.
     #[serde(skip_serializing_if = "Vec::is_empty",default)]
-    pub tickets : Vec<Vec<CandidateIndex>>
+    pub tickets : Vec<Vec<CandidateIndex>>,
 }
 
 impl Party {

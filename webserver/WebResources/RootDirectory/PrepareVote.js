@@ -46,7 +46,7 @@ function doSearch() {
         add(resultsDiv,"p").innerText=message;
     }
     function success(json) {
-        if (json.Err) failure(json.errorMessage);
+        if (json.Err) failure(json.Err);
         else {
             const entered = searchString.split(",");
             resultsDiv.innerHTML="<h5>Search for "+searchString+(blanksMatchAnything?" (blanks wild)":"")+"</h5>";

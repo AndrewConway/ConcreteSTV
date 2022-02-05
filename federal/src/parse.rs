@@ -283,9 +283,8 @@ impl FederalDataLoader {
         let preferences_zip_file = self.find_raw_data_file(&filename)?;
         println!("Parsing {}",&preferences_zip_file.to_string_lossy());
         metadata.source[0].files.push(filename);
-        let (mut btl,informal) = read_btl_votes2013(&metadata, &preferences_zip_file, 1)?; // The 2013 formality rules are quite complex. I am assuming the AEC has applied them already to all with a 1 vote. This is a dubious assumption as there are some without a 1 vote. However since we don't get all the informal votes, it is hard to check formality properly.
-        btl.extend_from_slice(&ticket_votes);
-        Ok(ElectionData{ metadata, atl:vec![], atl_types: vec![], btl, btl_types: vec![], informal })
+        let (btl,informal) = read_btl_votes2013(&metadata, &preferences_zip_file, 1)?; // The 2013 formality rules are quite complex. I am assuming the AEC has applied them already to all with a 1 vote. This is a dubious assumption as there are some without a 1 vote. However since we don't get all the informal votes, it is hard to check formality properly.
+        Ok(ElectionData{ metadata, atl:ticket_votes, atl_types: vec![], btl, btl_types: vec![], informal })
     }
 
     pub fn all_states_data<'a>(&'a self) -> impl Iterator<Item=anyhow::Result<ElectionData>> + 'a {
@@ -387,7 +386,7 @@ fn read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(builder: 
             if candidate_id!="0" {
                 let position_in_ticket = record[3].parse::<usize>()?; // 0, 1, .. 0 means a dummy id for the group ticket.
                 if builder.parties.len()==0 || &builder.parties[builder.parties.len()-1].group_id != group_id {
-                    builder.parties.push(GroupBuilder{name:record[5].to_string(), abbreviation:None, group_id:group_id.to_string(),ticket_id:if position_in_ticket==0 {Some(candidate_id.to_string())} else {None}, tickets: vec![] });
+                    builder.parties.push(GroupBuilder{name:record[5].to_string(), abbreviation:None, group_id:group_id.to_string(),ticket_id:if position_in_ticket==0 {Some(candidate_id.to_string())} else {None}, tickets: vec![]});
                 }
                 if position_in_ticket!=0 { // real candidate.
                     // self.candidate_by_id.insert(candidate_id.to_string(),CandidateIndex(self.candidates.len()));

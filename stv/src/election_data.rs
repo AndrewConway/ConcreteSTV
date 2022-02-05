@@ -120,7 +120,7 @@ impl ElectionData {
         let mut votes : Vec<PartiallyDistributedVote<'a>> = vec![];
         for range in VoteTypeSpecification::restrict(vote_types,&self.atl_types,self.atl.len()) {
             for a in &self.atl[range] {
-                let v : Vec<CandidateIndex> = a.parties.iter().flat_map(|p|self.metadata.party(*p).candidates.iter().map(|c|*c)).collect();
+                let v : Vec<CandidateIndex> = a.resolve_to_candidates(&self.metadata);
                 let slice = arena.alloc_extend(v);
                 votes.push(PartiallyDistributedVote::new(a.n,slice,VoteSource::Atl(a)));
             }

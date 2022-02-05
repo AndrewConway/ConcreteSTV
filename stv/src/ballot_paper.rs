@@ -98,9 +98,21 @@ pub struct ATL {
     pub parties : Vec<PartyIndex>,
     /// Number of people who voted in this way.
     pub n : usize,
+    /// if tickets are being used, which one these votes apply to. If a party has 3 tickets, their ATL vote will be divided into 3 ATL structures.
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub ticket_index : Option<usize>
 }
 
-
+impl ATL {
+    pub fn first_party(&self) -> PartyIndex { self.parties[0] }
+    pub fn resolve_to_candidates(&self,metadata:&ElectionMetadata) -> Vec<CandidateIndex> {
+        if let Some(ticket_index) = self.ticket_index {
+            metadata.party(self.first_party()).tickets[ticket_index].clone()
+        } else {
+            self.parties.iter().flat_map(|p|metadata.party(*p).candidates.iter().cloned()).collect()
+        }
+    }
+}
 
 impl<'a> RawBallotMarkings<'a> {
 
@@ -154,7 +166,7 @@ impl<'a> RawBallotMarkings<'a> {
 
     fn interpret_vote_as_atl(&'a self,min_atl_prefs_needed:usize) -> Option<ATL> {
         let prefs = RawBallotMarkings::look_for_continuous_streams(self.atl,|i|self.atl_parties[i],true);
-        if prefs.len()>=min_atl_prefs_needed { Some(ATL{ parties: prefs, n: 1 })} else { None }
+        if prefs.len()>=min_atl_prefs_needed { Some(ATL{ parties: prefs, n: 1, ticket_index: None })} else { None }
     }
     pub fn interpret_vote_as_btl(&'a self, min_btl_prefs_needed:usize) -> Option<BTL> {
         let prefs = RawBallotMarkings::look_for_continuous_streams(self.btl,|i|CandidateIndex(i),true);
@@ -199,7 +211,7 @@ impl UniqueATLBuilder {
     }
     /// Convert to a list of BTL votes.
     pub fn to_atls(self) -> Vec<ATL> {
-        self.atls.into_iter().map(|(parties,n)|ATL{ parties , n }).collect()
+        self.atls.into_iter().map(|(parties,n)|ATL{ parties , n, ticket_index: None }).collect()
     }
 }
 

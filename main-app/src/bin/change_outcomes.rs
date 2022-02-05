@@ -21,6 +21,8 @@ use main_app::rules::Rules;
 /// This program basically takes a .stv file as input, and produces a .vchange file
 /// as output. It is possible to use a .vchange file as input instead of a .stv file;
 /// this allows searching for manipulations on top of manipulations.
+///
+/// This will not reliably work with ticket elections (e.g. Federal 2013 and earlier) if ATL modifications are allowed.
 struct Opts {
     /// The counting rules to use.
     /// Currently supported AEC2013, AEC2016, AEC2019, Federal, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021

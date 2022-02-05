@@ -52,8 +52,8 @@ fn test_retroscope() {
             tie_resolutions: Default::default()
         },
         atl: vec![
-            ATL{ parties : vec![PartyIndex(0)], n:100},
-            ATL{ parties : vec![PartyIndex(1)], n:100},
+            ATL{ parties : vec![PartyIndex(0)], n:100, ticket_index: None },
+            ATL{ parties : vec![PartyIndex(1)], n:100, ticket_index: None },
         ],
         atl_types: vec![],
         btl: vec![
