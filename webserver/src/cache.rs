@@ -15,7 +15,7 @@ use actix_web::web::Json;
 use serde::{Serialize,Deserialize};
 use serde::de::DeserializeOwned;
 
-const CACHE_DIR: &str = "./CacheWebJSON";
+const CACHE_DIR: &str = "./Cache/WebJSON";
 
 /*
 /// Return f(), or a previously cached copy of it, stored with a key based on name and the Json serialization of args.
