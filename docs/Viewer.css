@@ -80,6 +80,10 @@ td.Eliminated {
     background: #ffe0e0;
 }
 
+td.TransferValue, td.CountAction, td.ECDecisions,td.FromCount {
+    text-align: left;
+}
+
 td.Continuing,td.Elected,td.Eliminated {
     text-align: right;
     padding : 0 2px 0 0;

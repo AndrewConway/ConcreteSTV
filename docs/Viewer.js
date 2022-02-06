@@ -270,7 +270,7 @@ function RenderTranscript(full_transcript,render_div) {
             if (deltarow) add(deltarow,"td","Continuing").innerText=delta(count.status.tallies.rounding,last_count.status.tallies.rounding);
             add(row,"td","Continuing").innerText=zero_is_blank(count.status.tallies.rounding);
         }
-        const tv_td = fullSpanTD();
+        const tv_td = fullSpanTD("TransferValue");
         tv_td.innerText=format_transfer_value(count.created_transfer_value&&count.created_transfer_value.transfer_value || count.portion.transfer_value,count.created_transfer_value?null:format_from(count.portion.when_tv_created));
         if (count.created_transfer_value) {
             let title = "Surplus : "+count.created_transfer_value.surplus+" Ballots considered : "+count.created_transfer_value.ballots_considered+" continuing : "+count.created_transfer_value.continuing_ballots;
@@ -279,9 +279,9 @@ function RenderTranscript(full_transcript,render_div) {
             if (count.created_transfer_value.excluded_exhausted_tally) title+=" exhausted tally "+count.created_transfer_value.excluded_exhausted_tally;
             tv_td.title=title;
         }
-        fullSpanTD().innerText=count.reason==="FirstPreferenceCount"?"First Preference Count":count.reason.hasOwnProperty("ExcessDistribution")?"Surplus distribution for "+cname(count.reason.ExcessDistribution):"Exclusion of "+count.reason.Elimination.map(cname).join(" & "); // TODO prettify
-        fullSpanTD().innerText=count.decisions.map(a=>a.affected.map(candidate=>metadata.candidates[candidate].name+" ("+candidate+")").join(",")).join(" and ");
-        fullSpanTD().innerText=count.portion.papers_came_from_counts.map(format_from).join(", ");
+        fullSpanTD("CountAction").innerText=count.reason==="FirstPreferenceCount"?"First Preference Count":count.reason.hasOwnProperty("ExcessDistribution")?"Surplus distribution for "+cname(count.reason.ExcessDistribution):"Exclusion of "+count.reason.Elimination.map(cname).join(" & "); // TODO prettify
+        fullSpanTD("ECDecisions").innerText=count.decisions.map(a=>a.affected.map(candidate=>metadata.candidates[candidate].name+" ("+candidate+")").join(",")).join(" and ");
+        fullSpanTD("FromCount").innerText=count.portion.papers_came_from_counts.map(format_from).join(", ");
         count_number+=1;
         last_count=count;
     }
