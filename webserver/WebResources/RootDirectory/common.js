@@ -121,3 +121,17 @@ function candidateName(metadata,i,partyNameBefore) {
     }
     return name;
 }
+
+function groupsAreMeaningfulConcept(metadata) {
+    return metadata.parties && metadata.parties.length>1;
+}
+
+function checkGroupsCheckboxForMeaning(id,metadata,shouldBeCheckedIfNoGroups) {
+    if (!groupsAreMeaningfulConcept(metadata)) {
+        let box = document.getElementById(id);
+        box.disabled = true;
+        box.checked = shouldBeCheckedIfNoGroups;
+        let label = document.querySelector("label[for='"+id+"']");
+        if (label) label.className="disabled";
+    }
+}

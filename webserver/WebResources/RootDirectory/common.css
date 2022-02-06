@@ -187,3 +187,16 @@ div.InColumn {
     margin-left: 1em;
     margin-right: 1em;
 }
+
+label.disabled {
+    color: grey;
+}
+
+span.MulticolumnListOfLinks {
+    column-count: 4;
+    display: block;
+}
+
+span.MulticolumnListOfLinks a {
+    display: block;
+}

@@ -34,38 +34,89 @@
 <body>
 
 <div id="MainBody">
+    <h1>Correlations</h1>
     <p class="noprint">This lets you compare how voters gave preferences to parties or candidates by doing correlations against the provided preferences.
         Parties that all voters tended to put close together have high correlation; parties that voters gave very different preferences
         have low correlation.</p>
 
     <h2 id="TitleHeading">Loading...</h2>
     <div> <!-- Decide what data to show -->
-        <input type="checkbox" id="isGroups" name="isGroups" checked="true"/><label for="isGroups">Groups</label>
-        <input type="checkbox" id="useATL" name="useATL"/><label for="useATL">Use ATL votes</label>
-        <input type="checkbox" id="useBTL" name="useBTL" checked="true"/><label for="useBTL">Use BTL votes</label>
-        <input type="checkbox" id="subMeanCorrelation" name="subMeanCorrelation" checked="true"/><label for="subMeanCorrelation">Mean based correlation</label>
+        <input type="checkbox" id="isGroups" name="isGroups" checked="true"/><label for="isGroups" title="If checked, compare groups/parties. Otherwise, compare individual candidates">Groups</label>
+        <input type="checkbox" id="useATL" name="useATL"/><label for="useATL" title="If checked, then above the line votes will be included in the analysis.">Use ATL votes</label>
+        <input type="checkbox" id="useBTL" name="useBTL" checked="true"/><label for="useBTL" title="If checked, then below the line votes will be included in the analysis.">Use BTL votes</label>
+        <input type="checkbox" id="subMeanCorrelation" name="subMeanCorrelation" checked="true"/><label for="subMeanCorrelation" title="Subtract mean before computing correlation. You almost certainly want this.">Mean based correlation</label>
     </div>
 
     <div>
         Show as
-        <input type="radio" id="ShowDendrogram" name="ShowAs" value="ShowDendrogram" checked><label for="ShowDendrogram" id="ShowDendrogramLabel">Dendrogram</label>
-        <input type="radio" id="ShowScatterplot" name="ShowAs" value="ShowScatterplot"><label for="ShowScatterplot" id="ShowScatterplotLabel">Scatterplot</label>
+        <input type="radio" id="ShowDendrogram" name="ShowAs" value="ShowDendrogram" checked><label for="ShowDendrogram" id="ShowDendrogramLabel" title="Classify parties/candidates by how similarly voters voted for them, as if they were species in a phylogenetic tree">Dendrogram</label>
+        <input type="radio" id="ShowScatterplot" name="ShowAs" value="ShowScatterplot"><label for="ShowScatterplot" id="ShowScatterplotLabel" title="Plot parties depending on the dominant patterns that come out of voters' preferences for them.">Scatterplot</label>
         <span class="ForDendrogram">
-            <select id="linkageType">
+            <select id="linkageType" label="Algorithm for determining how the dendrogram is constructed. Mean Linkage typically works well.">
                 <option value="slink">Single Linkage</option>
                 <option value="clink">Complete Linkage</option>
                 <option value="maxLink" selected="true">Mean Linkage</option>
                 <option value="meanLink">Weighted Mean Linkage</option>
             </select>
-            <label for="sortBy">Sort dendrogram by</label><select id="sortBy"></select>
-            <input type="checkbox" id="showSVD" name="showSVD"/><label for="showSVD">Show SVD</label>
+            <label for="sortBy" title="There is some flexibility in arranging the nodes of the dendrogram. This allows specifying how ambiguities are resolved. SVD 1 is a good choice.">Sort dendrogram by</label><select id="sortBy" title="There is some flexibility in arranging the nodes of the dendrogram. This allows specifying how ambiguities are resolved. SVD 1 is a good choice."></select>
+            <input type="checkbox" id="showSVD" name="showSVD"/><label for="showSVD" title="Show a heat map for the singular value decomposition. Each column of this represents a pattern that falls out of the data, the most significant being leftmost.">Show SVD</label>
+            <details><summary>Help</summary>
+                <h4>What you are looking at</h4>
+                <p>A dendrogram is a way of arranging parties or candidates into a tree like a phylogenetic tree of species such that those that get placed near by on voter's preferences get placed near by on the tree. This tree is displayed on the left of the screen. There will be one line on the left of the
+                tree which broadly means the average of all parties. On the right of the tree, each line represents one candidate or party. When two parties or candidates are joined, the place they are joined represents how close they are. The further left this join is, the less similar they are.</p>
+                <p>Close means how voters give preferences. If, as an extreme case, half the voters put party A first, B second, and Z last, while the other half put Z first, and A and B last, then A and B would be considered very similar, and both would be considered very different to Z. </p>
+                <p>More concretely, it is very common (but certainly not a rule) for Labor and the Greens to get similar preferences, and Liberal and One Nation to get similar preferences for any given voter. So Labor and the Greens would tend to be linked together in one branch
+                of the tree, and Liberal and One Nation linked together on a different branch. Of course this is an over simplification... may voters, for instance put major parties before minor parties, and others vice versa.</p>
+                <p>To the right of the tree, and to the left of the names of the corresponding candidate/party is the colored rectangle composed of smaller colored rectangles. This is called a <em>Heat Map</em>. Each colored rectangle has a color that corresponds to how similarly
+                voters gave preferences to the candidate/party corresponding to that row and column. The names of the parties/candidates for each row are given to the right of each row. The columns are in exactly the same order, but are unlabeled. This means that the diagonal from top left
+                to bottom right represents how close one party/candidate is to itself... by definition, perfectly. These are thus a bright color. Lower correlations become darker colors, becoming black for parties that are antithetical to voters.</p>
+                <p>SVD means the singular value decomposition, which is a mathematical tool that more or less identifies the biggest pattern in voting patterns, and extracts it (SVD 1). Then it removes that pattern from the correlations, and looks for the
+                biggest pattern remaining (SVD 2). This continues for many more patterns (up to the number of parties/candidates being compared), but the significance of the patterns drops rapidly. The colored blocks shown to the right of the candidate/party
+                names represents this pattern - each column represents one pattern, with the left most the most significant. The number below each column is a representation of how significant this pattern seems (mathematically it is the <em>singular value</em>. </p>
+                <p>It is important to realise that there is no manual assertion here about similarity of parties on policies, my perception, conventional wisdom, etc. - this is all automatically extracted from how people voted
+                and is really a visualization of how voters perceive, or at least vote for, parties and candidates. There is no "good" or "bad" represented in the patterns, only voters' actions.</p>
+                <h4>Options</h4>
+                <p>There are a variety of different algorithms for generating these dendrograms, determined by the way <em>linkage</em> is done. <em>Mean Linkage</em> tends to work well. That roughly means that when two parties are merged together, the resulting branch links to
+                other branches like something half way between the two parties.</p>
+                <p>Once two parties or candidates are joined, there is still an arbitrary decision about whether to place one above the other or vice versa. The tree makes much more sense if they are arranged so that the one more similar to ones below it is placed
+                    below the ones higher. You can choose a variety of ways of arranging this with the "sort dendrogram by" choice. SVD 1 means sort by the most signficant pattern in votes, and this is usually a good choice. In practice it is usually political "leftness" or "rightness".
+                    Note that the sign of the pattern
+                    that comes out of the SVD is arbitrary - it could equally likely be upside down and the particular choice of whether "leftness" or "rightness" is on top is meaningless. You may also choose a particular candidate or party
+                    in which case candidates will be arranged by similarity to that particular party, most similar being lower down.</p>
+                <p>Show SVD determines whether to show the visualization of the SVD.</p>
+            </details>
         </span>
         <span class="ForScatterplot">
-            <label for="xAxisChoice">X Axis : </label><select id="xAxisChoice"></select>
-            <label for="yAxisChoice">Y Axis : </label><select id="yAxisChoice"></select>
+            <label for="xAxisChoice" title="What determines the position of a party or candidate on the x-axis. SVD 1 is the biggest pattern that appears in votes">X Axis : </label><select id="xAxisChoice" title="What determines the position of a party or candidate on the x-axis. SVD 1 is the biggest pattern that appears in votes"></select>
+            <label for="yAxisChoice" title="What determines the position of a party or candidate on the y-axis. SVD 2 is the second biggest pattern that appears in votes">Y Axis : </label><select id="yAxisChoice" title="What determines the position of a party or candidate on the y-axis. SVD 2 is the second biggest pattern that appears in votes"></select>
             <span class="hidden"> <!-- Color choice doesn't do anything, so hidden, but the select is tied into the code with events, etc.  -->
             <label for="colorChoice">Color by : </label><select id="colorChoice"></select>
             </span>
+            <details><summary>Help</summary>
+                <h4>What you are looking at</h4>
+                <p>A scatterplot is a way of arranging parties or candidates on a page such that some number associated with each party/candidate determines how far left or right (x-axis) it is drawn,
+                    and some other number determines how far up or down (y-axis) it is drawn. In this screen, the axis choices you have are all based upon how closely voters' preferences for
+                parties are.</p>
+                <p>Close means how voters give preferences. If, as an extreme case, half the voters put party A first, B second, and Z last, while the other half put Z first, and A and B last, then A and B would be considered very similar, and would tend to be close by
+                    on the scatterplot. </p>
+                <p>More concretely, it is very common (but certainly not a rule) for Labor and the Greens to get similar preferences, and Liberal and One Nation to get similar preferences for any given voter. So Labor and the Greens would tend to be linked together in one branch
+                of the tree, and Liberal and One Nation linked together on a different branch. Of course this is an over simplification... may voters, for instance put major parties before minor parties, and others vice versa.</p>
+                <p>SVD means the singular value decomposition, which is a mathematical tool that more or less identifies the biggest pattern in voting patterns, and extracts it (SVD 1). Then it removes that pattern from the correlations, and looks for the
+                biggest pattern remaining (SVD 2). This continues for many more patterns (up to the number of parties/candidates being compared), but the significance of the patterns drops rapidly. </p>
+                <p>It is important to realise that there is no manual assertion here about similarity of parties on policies, my perception, conventional wisdom, etc. - this is all automatically extracted from how people voted
+                and is really a visualization of how voters perceive, or at least vote for, parties and candidates. There is no "good" or "bad" represented in the patterns, only voters' actions.</p>
+                <h4>Options</h4>
+                <p>You can choose what is used to choose the positions on the x and y axes.</p>
+                <p>The default for x-axis is SVD 1. This is the dominant pattern that drops out of the mathematical analysis of similarity of voting patterns. Frequently this ends up being closely tied to conventional notions
+                of political "leftness" or "rightness". However the sign on this pattern is totally arbitrary - it is equally likely for the "left" parties to be on the right of the picture and the "right" parties
+                    to be on the left of the picture. <em>There is no value judgement associated with the sign</em>. Negative does not mean disliked by voters, it means has the opposite role in the pattern to positive. </p>
+                <p>The default for y-axis is SVD 2. This is the largest remaining pattern in the voting data when the SVD 1 pattern is removed. Frequently this is associated with "major" or "minor" party status.
+                Again the sign of the pattern is arbitrary and has no associated value judgement - it is equally likely for the major parties to (all) get a positive, or all get a negative sign for this pattern.</p>
+                <p>There is no a priori reason for these two patterns to be the ones I described above; it just happens in practice to often be a broad explanation of the patterns that fall out of the mathematics
+                    for many of the elections I have looked at in this screen.</p>
+                <p>One can also, instead of choosing a SVD pattern, choose similarity to a particular party as the x or y axis.
+                    As before, this is not my opinion of how similar the parties are; it is how similarly voters gave preferences to these parties in this election.</p>
+            </details>
         </span>
     </div>
     <svg width="1200" height="1000">

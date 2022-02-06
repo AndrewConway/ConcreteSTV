@@ -411,7 +411,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     ///     (3)  When more than one vacancy remains unfilled and the votes of the candidate who (if all the vacancies were filled by the successive election of the continuing candidates with the largest number of votes) would be the last to be elected exceed the total of any surplus not transferred plus the votes of all the continuing candidates with fewer votes than that candidate, that candidate and all the other continuing candidates who do not have fewer votes than that candidate are elected.
     /// ```
     pub fn check_if_top_few_have_overwhelming_votes(&mut self) {
-        if self.remaining_to_elect().0>0 {
+        if self.remaining_to_elect().0>0 && self.continuing_candidates_sorted_by_tally.len()>=self.remaining_to_elect().0 {
             let num_candidates_below_potential_winners = self.continuing_candidates_sorted_by_tally.len()-self.remaining_to_elect().0;
             let possibly_overwhelming_tally = self.tally(self.continuing_candidates_sorted_by_tally[num_candidates_below_potential_winners]);
             let mut others : Rules::Tally = Rules::Tally::zero();
@@ -971,7 +971,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn go(&mut self) {
         if self.print_progress_to_stdout { self.print_candidates_names(); }
         self.distribute_first_preferences();
-        while self.remaining_to_elect()>NumberOfCandidates(0) || (Rules::finish_all_surplus_distributions_when_all_elected() && (!self.continuing_candidates_sorted_by_tally.is_empty()) && !self.pending_surplus_distribution.is_empty()) {
+        while (self.remaining_to_elect()>NumberOfCandidates(0) && self.continuing_candidates.len()>0) || (Rules::finish_all_surplus_distributions_when_all_elected() && (!self.continuing_candidates_sorted_by_tally.is_empty()) && !self.pending_surplus_distribution.is_empty()) {
             if let Some(candidate) = self.pending_surplus_distribution.pop_front() {
                 self.distribute_surplus(candidate);
             } else {

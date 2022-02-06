@@ -13,8 +13,9 @@
 <body>
 
 <div id="MainBody">
+    <h1>Mean Preferences</h1>
     <p class="noprint">This site enables one to see the mean (average) preference given for each candidate, possibly restricted to below the line votes and/or
-        votes with a particular candidate as the first preference.</p>
+        votes with a particular candidate as the first preference. Above the line votes are converted first to the equivalent below the line vote.</p>
     <div class="noprint"><p><em>Usage:</em></p>
         <ul>
             <li>The box on the left of a name shows the mean vote.</li>
@@ -27,7 +28,7 @@
     <h2 id="TitleHeading">Loading...</h2>
 
     <div id="tools">
-        <p><input type="checkbox" id="showATL" name="showATL"/><label for="showATL">Include above the line votes</label></p>
+        <p><input type="checkbox" id="showATL" name="showATL"/><label for="showATL" title="If checked, then above the line votes will be included in the analysis.">Include above the line votes</label></p>
         <p>Showing only people whose first preference was for candidate: <span id="showingCandidate">???</span></p>
         <p>Number of votes: <span id="numBTL">???</span> below the line and <span id="numATL">???</span> above the line.</p>
     </div>

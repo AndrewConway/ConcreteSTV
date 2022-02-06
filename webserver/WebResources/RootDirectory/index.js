@@ -17,9 +17,11 @@ window.onload = function () {
             ecA.href=source.ec_url;
             for (const year of source.years) {
                 const yearDiv = add(mainDiv,"div");
+                const multiColumn = year.electorates.length>10;
                 add(yearDiv,"span","year").innerText=year.year;
+                const electoratesHolder = add(yearDiv,"span",multiColumn?"MulticolumnListOfLinks":"");
                 for (const electorate of year.electorates) {
-                    const electorateA = add(yearDiv,"a","electorate");
+                    const electorateA = add(electoratesHolder,"a","electorate");
                     electorateA.innerText=electorate;
                     electorateA.href=source.name+"/"+year.year+"/"+electorate+"/";
                 }

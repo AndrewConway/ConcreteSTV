@@ -58,6 +58,10 @@ window.onload = function () {
     getWebJSONResult("metadata.json",meta=> {
         metadata=meta;
         set_heading_from_metadata(metadata);
+        checkGroupsCheckboxForMeaning("isGroupsColumns",metadata,false);
+        checkGroupsCheckboxForMeaning("isGroupsRows",metadata,false);
+        checkGroupsCheckboxForMeaning("useATL",metadata,false);
+        checkGroupsCheckboxForMeaning("useBTL",metadata,true);
         redrawMajorPartiesList();
         document.getElementById("isGroupsColumns").addEventListener("input",function() { redrawMajorPartiesList(); recomputeTable(); }) ;
         document.getElementById("isGroupsRows").addEventListener("input",recomputeTable) ;

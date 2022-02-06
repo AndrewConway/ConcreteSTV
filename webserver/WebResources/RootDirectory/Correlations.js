@@ -563,6 +563,9 @@ window.onload = function () {
     getWebJSONResult("metadata.json",meta=> {
         metadata=meta;
         set_heading_from_metadata(metadata);
+        checkGroupsCheckboxForMeaning("isGroups",metadata,false);
+        checkGroupsCheckboxForMeaning("useATL",metadata,false);
+        checkGroupsCheckboxForMeaning("useBTL",metadata,true);
         document.getElementById("subMeanCorrelation").addEventListener("input",getCorrelations) ;
         document.getElementById("isGroups").addEventListener("input",getCorrelations) ;
         document.getElementById("useATL").addEventListener("input",getCorrelations);

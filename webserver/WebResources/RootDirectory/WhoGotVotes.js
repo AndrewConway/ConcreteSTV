@@ -59,6 +59,7 @@ window.onload = function () {
     getMultipleWebJSONResult(["WhoGotVotes.json","metadata.json"],(data,meta)=> {
         who_got_votes=data;
         metadata=meta;
+        checkGroupsCheckboxForMeaning("isParties",metadata,false);
         set_heading_from_metadata(metadata);
         document.getElementById("isParties").addEventListener("input",showTable) ;
         showTable();

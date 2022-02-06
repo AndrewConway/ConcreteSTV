@@ -41,7 +41,7 @@ function doRecount() {
                         const no_longer_elected = old_elected.filter(c=>!new_elected.includes(c));
                         const not_previously_elected = new_elected.filter(c=>!old_elected.includes(c));
                         if (no_longer_elected.length===0 && not_previously_elected.length===0) {
-                            add(desc_div,"h5").innerText="Same people elected";
+                            add(desc_div,"h3").innerText="The same people were elected as in the official outcome";
                         } else {
                             let box = add(desc_div,"fieldset","ColumnHolder");
                             add(box,"legend").innerText="Different candidates elected";
