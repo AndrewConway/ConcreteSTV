@@ -140,7 +140,7 @@ impl TieResolutionsMadeByEC {
     }
     /// Sort tied_candidates appropriately (low to high)
     pub fn resolve(&self, tied_candidates: &mut [CandidateIndex], granularity: TieResolutionGranularityNeeded) {
-        println!("Trying to resolve {:?}",tied_candidates);
+        // println!("Trying to resolve {:?}",tied_candidates);
         for atom in &self.tie_resolutions {
             match atom {
                 TieResolutionAtom::IncreasingFavour(decision) => {
