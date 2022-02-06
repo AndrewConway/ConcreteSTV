@@ -1084,6 +1084,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "csv",
+ "rand 0.8.4",
+ "rand_chacha 0.3.1",
  "serde",
  "serde_json",
  "stv",
