@@ -130,9 +130,10 @@ pub struct CorrelationDendrogramsAndSVD {
 }
 
 impl CorrelationDendrogramsAndSVD {
-    pub fn new(correlation:SquareMatrix) -> Self {
-        let distance_function = |i:usize,j:usize|correlation.matrix[i][j];
+    pub fn new(correlation:SquareMatrix) -> Result<Self,String> {
         let num_nodes = correlation.matrix.len();
+        if num_nodes==0 { return Err("No data available".to_string()); }
+        let distance_function = |i:usize,j:usize|correlation.matrix[i][j];
         let dendrogram_single = Dendrogram::compute_single_linkage(distance_function,num_nodes);
         let dendrogram_complete = Dendrogram::compute_complete_linkage_slow(distance_function,num_nodes);
         let dendrogram_mean = Dendrogram::compute_mean_linkage_slow(distance_function,num_nodes);
@@ -140,13 +141,13 @@ impl CorrelationDendrogramsAndSVD {
         let distance_function_undoing_to_distance_matrix = |i:usize,j:usize|1.0-correlation.matrix[i][j];
         let matrix : OMatrix<f64,Dynamic,Dynamic> = OMatrix::<f64,Dynamic,Dynamic>::from_fn(num_nodes,num_nodes,distance_function_undoing_to_distance_matrix);
         let svd = SVD::new(matrix,true,true);
-        CorrelationDendrogramsAndSVD{
+        Ok(CorrelationDendrogramsAndSVD{
             correlation,
             dendrogram_single,
             dendrogram_complete,
             dendrogram_mean,
             dendrogram_weighted_mean,
             svd
-        }
+        })
     }
 }

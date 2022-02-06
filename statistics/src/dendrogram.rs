@@ -209,6 +209,7 @@ impl Dendrogram {
     /// Efficiently create a single linkage dendrogram. O(n^2).
     /// Only call the distance function d(i,j) with i>j.
     pub fn compute_single_linkage<F:Fn(NodeIndex,NodeIndex)->LinkageDistance>(distance:F, num_nodes:usize) -> Dendrogram {
+        if num_nodes==0 { return Dendrogram::Branch(Box::new(DendrogramBranch{ children: vec![], distance: 0.0 }))};
         PointerRepresentation::s_link_dendrogram_create_pointer_representation(distance,num_nodes).to_dendrogram()
     }
     /// Efficiently create a complete linkage dendrogram. O(n^2).
@@ -216,6 +217,7 @@ impl Dendrogram {
     ///
     /// NOTE THIS IS BUGGY DO NOT USE
     pub fn compute_complete_linkage<F:Fn(NodeIndex,NodeIndex)->LinkageDistance>(distance:F, num_nodes:usize) -> Dendrogram {
+        if num_nodes==0 { return Dendrogram::Branch(Box::new(DendrogramBranch{ children: vec![], distance: 0.0 }))};
         PointerRepresentation::c_link_dendrogram_create_pointer_representation(distance,num_nodes).to_dendrogram()
     }
     /// Inefficiently create a single linkage dendrogram. O(n^3).
@@ -245,6 +247,7 @@ impl Dendrogram {
     /// Only call the distance function d(i,j) with i>j.
     /// The linkage function takes the size of node1, the distance to node 1, the size of node 2, the distance to node 2, and returns the distance to the node comprised of nodes 1 and 2.
     fn slow_compute_dendrogram<F:Fn(NodeIndex,NodeIndex)->LinkageDistance,L:Fn(usize,LinkageDistance,usize,LinkageDistance)->LinkageDistance>(distance:F, num_nodes:usize,update_linkage:L) -> Dendrogram {
+        if num_nodes==0 { return Dendrogram::Branch(Box::new(DendrogramBranch{ children: vec![], distance: 0.0 }))};
         let mut nodes : Vec<Dendrogram> = (0..num_nodes).map(|n|Dendrogram::Leaf(n)).collect();
         let mut node_size : Vec<usize> = vec![1;num_nodes];
         // nodes[i] contains node_size[i] leaves.

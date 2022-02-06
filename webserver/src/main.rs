@@ -66,7 +66,7 @@ async fn get_intent_table(election : web::Path<FoundElection>,options : web::Que
 async fn get_correlation(election : web::Path<FoundElection>,options : web::Query<CorrelationOptions>) -> Json<Result<CorrelationDendrogramsAndSVD,String>> {
     async fn get_correlation_uncached(election : &web::Path<FoundElection>,options : &web::Query<CorrelationOptions>) -> Result<CorrelationDendrogramsAndSVD,String> {
         let correlation = SquareMatrix::compute_correlation_matrix(&election.data().await?,&options).to_distance_matrix();
-        Ok(CorrelationDendrogramsAndSVD::new(correlation))
+        Ok(CorrelationDendrogramsAndSVD::new(correlation)?)
     }
     cache_json("Correlation.json",&(election.spec.clone(),options.clone()),||get_correlation_uncached(&election,&options)).await
 }
