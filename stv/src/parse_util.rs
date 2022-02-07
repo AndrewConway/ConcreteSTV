@@ -15,7 +15,7 @@ use std::fs::File;
 use std::io::{BufReader, Seek, BufRead, SeekFrom, Read};
 use crate::election_data::ElectionData;
 use crate::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::process::Command;
@@ -354,7 +354,7 @@ pub fn parse_xlsx_by_converting_to_csv_using_openoffice(path:&PathBuf) -> anyhow
     // run open office
 //    println!("Converting {:?}",path);
     let temp_path = temp_dir();
-    Command::new("libreoffice").arg("--headless").arg("--convert-to").arg("csv").arg(path).arg("--outdir").arg(&temp_path).output()?;
+    Command::new("libreoffice").arg("--headless").arg("--convert-to").arg("csv").arg(path).arg("--outdir").arg(&temp_path).output().context("Problem running libreoffice")?;
     let filename = path.file_name().ok_or_else(||anyhow!("Provided path {:?} doesn't seem to have a file name",&path))?;
     let mut output_path = temp_path.join(filename);
     output_path.set_extension("csv");
