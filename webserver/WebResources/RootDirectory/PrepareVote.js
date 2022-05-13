@@ -143,4 +143,9 @@ window.onload = function () {
         set_heading_from_metadata(metadata);
         setupCandidates();
     });
+    getWebJSONResult("info.json",info=> {
+        if (!info.simple) {
+            document.getElementById("SearchDiv").innerText="Election result data is not available yet. Searching is not available yet."
+        }
+    });
 }

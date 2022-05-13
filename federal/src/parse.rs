@@ -38,18 +38,25 @@ pub fn get_federal_data_loader_2019(finder:&FileFinder) -> FederalDataLoader {
     FederalDataLoader::new(finder,"2019",false,"https://results.aec.gov.au/24310/Website/SenateDownloadsMenu-24310-Csv.htm",24310)
 }
 
+pub fn get_federal_data_loader_2022(finder:&FileFinder) -> FederalDataLoader {
+    FederalDataLoader::new(finder,"2022",false,"https://www.aec.gov.au/election/downloads.htm",0) // TODO update post election.
+}
+
+
+
 pub struct FederalDataSource {}
 
 impl ElectionDataSource for FederalDataSource {
     fn name(&self) -> Cow<'static, str> { "Federal Senate".into() }
     fn ec_name(&self) -> Cow<'static, str> { "Australian Electoral Commission (AEC)".into() }
     fn ec_url(&self) -> Cow<'static, str> { "https://www.aec.gov.au/".into() }
-    fn years(&self) -> Vec<String> { vec!["2013".to_string(),"2016".to_string(),"2019".to_string()] }
+    fn years(&self) -> Vec<String> { vec!["2013".to_string(),"2016".to_string(),"2019".to_string(),"2022".to_string()] }
     fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
         match year {
             "2013" => Ok(Box::new(get_federal_data_loader_2013(finder))),
             "2016" => Ok(Box::new(get_federal_data_loader_2016(finder))),
             "2019" => Ok(Box::new(get_federal_data_loader_2019(finder))),
+            "2022" => Ok(Box::new(get_federal_data_loader_2022(finder))),
             _ => Err(anyhow!("Not a valid year")),
         }
     }
@@ -147,6 +154,7 @@ impl RawDataSource for FederalDataLoader {
     fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata> {
         let mut builder = CandidateAndGroupInformationBuilder::default();
         if self.year=="2013" { read_from_senate_group_voting_tickets_download_file2013(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
+        else if self.year=="2022" { read_candidate_list_file_available_before_election2022(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_pre_election()?)?.as_path(),state)?; }
         else { read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
         let vacancies = self.candidates_to_be_elected(state);
         Ok(ElectionMetadata{
@@ -195,11 +203,17 @@ impl RawDataSource for FederalDataLoader {
                 comment: None,
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
             },
+            "2022" => AssociatedRules{
+                rules_used: Some("AEC2022".into()), // TODO update post 2022 election
+                rules_recommended: Some("Federal2021".into()),
+                comment: None,
+                reports: vec![]
+            },
             _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
         }
     }
-    fn can_read_raw_markings(&self) -> bool  { self.year!="2013" }
-
+    fn can_read_raw_markings(&self) -> bool  { self.year=="2016" || self.year=="2019" } // TODO update post 2022 election
+    fn can_load_full_data(&self) -> bool { self.year!="2022" } // TODO update post 2022 election
 
     fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let filename = self.name_of_official_transcript_zip_file();
@@ -264,6 +278,13 @@ impl FederalDataLoader {
             format!("SenateFirstPrefsByStateByVoteTypeDownload-{}.csv",self.election_number)
         }
     }
+    fn name_of_candidate_source_pre_election(&self) -> anyhow::Result<String> {
+        match self.year.as_str() {
+            "2022" => Ok("senate-candidates.csv".to_string()),
+            _ => Err(anyhow!("No pre election formats for year {}",self.year))
+        }
+    }
+
     fn name_of_vote_source(&self,state:&str) -> String {
         format!("aec-senate-formalpreferences-{}-{}.zip",self.election_number,state)
     }
@@ -398,6 +419,30 @@ fn read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(builder: 
                     })
                 }
             }
+        }
+    }
+    Ok(())
+}
+
+/// This reads the file format available before the election.
+/// This is the format used in 2022.
+/// A similar format was used in 2016 and 2019
+fn read_candidate_list_file_available_before_election2022(builder: &mut CandidateAndGroupInformationBuilder,path:&Path,state:&str) -> anyhow::Result<()> {
+    let mut rdr = csv::Reader::from_reader(skip_first_line_of_file(path)?);
+    for result in rdr.records() {
+        let record = result?;
+        if state==&record[0] { // right state
+            let group_id = &record[1]; // something like A, B, or UG
+            let position_in_ticket = record[2].parse::<usize>()?; // 1,2.,,,
+            if builder.parties.len()==0 || &builder.parties[builder.parties.len()-1].group_id != group_id {
+                builder.parties.push(GroupBuilder{name:record[5].to_string(), abbreviation:None, group_id:group_id.to_string(),ticket_id:None, tickets: vec![]});
+            }
+            builder.candidates.push(Candidate{
+                name: record[3].to_string()+", "+&record[4],
+                party: Some(PartyIndex(builder.parties.len()-1)),
+                position: Some(position_in_ticket),
+                ec_id: None,
+            });
         }
     }
     Ok(())
