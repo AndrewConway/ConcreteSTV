@@ -14,6 +14,8 @@ For the latest information on Australian Government law please go to https://www
 
 I have changed the formatting and have a subset of the legislation that I consider relevent to ConcreteSTV.
 I have inserted headings breaking the changes up by what they affect, and some comments in boxes.
+Note that I am not a lawyer; these are my personal opinions and interpretations only and are
+it should not be assumed that any organisation endorses these opinions.
 
 Nothing is intended to in any way imply an endorsement of this project by the Federal Register of Legislation.
 
