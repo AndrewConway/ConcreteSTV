@@ -11,7 +11,7 @@ use stv::tie_resolution::TieResolutionsMadeByEC;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use std::collections::HashSet;
-use federal::{FederalRulesUsed2013, FederalRulesUsed2019, FederalRulesUsed2016, FederalRules};
+use federal::{FederalRulesUsed2013, FederalRulesUsed2019, FederalRulesUsed2016, FederalRulesPre2021, FederalRulesPost2021};
 use stv::preference_distribution::distribute_preferences;
 use std::fmt::{Display, Formatter};
 use anyhow::anyhow;
@@ -28,6 +28,7 @@ pub enum Rules {
     AEC2016,
     AEC2019,
     FederalPre2021,
+    FederalPost2021,
     ACTPre2020,
     ACT2020,
     ACT2021,
@@ -46,6 +47,7 @@ impl FromStr for Rules {
             "AEC2019" => Ok(Rules::AEC2019),
             "Federal" => Ok(Rules::FederalPre2021), // this is a backwards compatability alias as the Federal rules changed in 2021. It can be deleted, and should be at some time.
             "FederalPre2021" => Ok(Rules::FederalPre2021),
+            "FederalPost2021" => Ok(Rules::FederalPost2021),
             "ACTPre2020" => Ok(Rules::ACTPre2020),
             "ACT2020" => Ok(Rules::ACT2020),
             "ACT2021" => Ok(Rules::ACT2021),
@@ -64,6 +66,7 @@ impl Display for Rules {
             Rules::AEC2016 => "AEC2016",
             Rules::AEC2019 => "AEC2019",
             Rules::FederalPre2021 => "FederalPre2021",
+            Rules::FederalPost2021 => "FederalPost2021",
             Rules::ACTPre2020 => "ACTPre2020",
             Rules::ACT2020 => "ACT2020",
             Rules::ACT2021 => "ACT2021",
@@ -86,7 +89,8 @@ impl Rules {
             Rules::AEC2013 => distribute_preferences::<FederalRulesUsed2013>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
             Rules::AEC2016 => distribute_preferences::<FederalRulesUsed2016>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
             Rules::AEC2019 => distribute_preferences::<FederalRulesUsed2019>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
-            Rules::FederalPre2021 => distribute_preferences::<FederalRules>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
+            Rules::FederalPre2021 => distribute_preferences::<FederalRulesPre2021>(data, candidates_to_be_elected, excluded_candidates, ec_resolutions, vote_types, print_progress_to_stdout),
+            Rules::FederalPost2021 => distribute_preferences::<FederalRulesPost2021>(data, candidates_to_be_elected, excluded_candidates, ec_resolutions, vote_types, print_progress_to_stdout),
             Rules::ACTPre2020 => distribute_preferences::<ACTPre2020>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
             Rules::NSWLocalGov2021 => distribute_preferences::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
             Rules::NSWECLocalGov2021 => distribute_preferences::<NSWECLocalGov2021>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
@@ -108,7 +112,8 @@ impl Rules {
             Rules::AEC2013 => PossibleChanges::Integers(options.find_changes::<FederalRulesUsed2013>(data,verbose)?),
             Rules::AEC2016 => PossibleChanges::Integers(options.find_changes::<FederalRulesUsed2016>(data,verbose)?),
             Rules::AEC2019 => PossibleChanges::Integers(options.find_changes::<FederalRulesUsed2019>(data,verbose)?),
-            Rules::FederalPre2021 => PossibleChanges::Integers(options.find_changes::<FederalRules>(data,verbose)?),
+            Rules::FederalPre2021 => PossibleChanges::Integers(options.find_changes::<FederalRulesPre2021>(data, verbose)?),
+            Rules::FederalPost2021 => PossibleChanges::Integers(options.find_changes::<FederalRulesPost2021>(data, verbose)?),
             Rules::ACTPre2020 => PossibleChanges::Integers(options.find_changes::<ACTPre2020>(data,verbose)?),
             Rules::ACT2020 => PossibleChanges::SixDigitDecimals(options.find_changes::<ACT2020>(data,verbose)?),
             Rules::ACT2021 => PossibleChanges::SixDigitDecimals(options.find_changes::<ACT2021>(data,verbose)?),
@@ -133,6 +138,7 @@ impl RulesDetails {
             RulesDetails{ name: "AEC2016".to_string(), description: "My interpretation of the rules actually but incorrectly used by the AEC in 2016. Same as AEC2013, except multiple elimination rules are ignored.".to_string() },
             RulesDetails{ name: "AEC2019".to_string(), description: "My interpretation of the rules actually but incorrectly used by the AEC in 2019. Same as AEC2016, except rule (18) is applied before any votes are transferred in the last elimination.".to_string() },
             RulesDetails{ name: "FederalPre2021".to_string(), description: "My interpretation of the rules that should have been used by the AEC in 2013, 2016 and 2019.".to_string() },
+            RulesDetails{ name: "FederalPost2021".to_string(), description: "My interpretation of the rules that should have been used by the AEC in 2022.".to_string() },
             RulesDetails{ name: "ACTPre2020".to_string(), description: "My interpretation of the rules that should have been, and indeed were, used by Elections ACT prior to the rule changes in 2020.".to_string() },
             RulesDetails{ name: "ACT2020".to_string(), description: "My interpretation of the rules actually but incorrectly used by Elections ACT in 2020.".to_string() },
             RulesDetails{ name: "ACT2021".to_string(), description: "My interpretation of the rules that should have been used by Elections ACT in 2020, and were actually used in 2021 to recount the 2020 election after we pointed out errors.".to_string() },

@@ -14,10 +14,11 @@ use stv::tie_resolution::MethodOfTieResolution;
 pub mod parse;
 pub mod parse2013;
 
-pub struct FederalRules {
+/// Federal rules prior to the 2021 changes.
+pub struct FederalRulesPre2021 {
 }
 
-impl PreferenceDistributionRules for FederalRules {
+impl PreferenceDistributionRules for FederalRulesPre2021 {
     type Tally = usize;
     type SplitByNumber = DoNotSplitByCountNumber;
 
@@ -70,11 +71,22 @@ impl PreferenceDistributionRules for FederalRules {
     /// State shall determine the order in which the surpluses shall be dealt
     /// with.
     ///```
-    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-    /// same as [resolve_ties_elected_one_of_last_two]
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-    /// same as [resolve_ties_elected_one_of_last_two]
+    /// Also covered by section 20.
     fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+    /// This is not actually covered by section 20.
+    /// ```text
+    /// (17) In respect of the last vacancy for which two continuing candidates
+    /// remain, the continuing candidate who has the larger number of
+    /// votes shall be elected notwithstanding that that number is below
+    /// the quota, and if those candidates have an equal number of votes
+    /// the Australian Electoral Officer for the State shall have a casting
+    /// vote but shall not otherwise vote at the election.
+    /// ```
+    ///
+    /// I incorrectly counted this as MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent
+    /// in an earlier version.
+    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
 
     /// Commonwealth Electoral Act 1918, Section 273, 13(a)
     /// ```text
@@ -201,6 +213,78 @@ impl PreferenceDistributionRules for FederalRules {
 
     fn name() -> String { "FederalPre2021".to_string() }
 }
+
+/// Federal rules after the 2021 changes.
+/// Most of the documentation for choices of interoretation are listed above
+/// for FederalRulesPre2021 except for the changes.
+/// See [federal/legislation/AssuranceOfSenateCountingAct2021.md] for details
+/// of the changes.
+pub struct FederalRulesPost2021 {
+}
+
+impl PreferenceDistributionRules for FederalRulesPost2021 {
+    type Tally = usize;
+    type SplitByNumber = DoNotSplitByCountNumber;
+
+    fn use_last_parcel_for_surplus_distribution() -> bool { false }
+    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
+
+    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
+    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }
+
+    fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
+        TransferValue::from_surplus(surplus,ballots)
+    }
+
+    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
+        transfer_value.mul_rounding_down(ballots)
+    }
+
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
+    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
+    fn sort_exclusions_by_transfer_value() -> bool { true }
+
+    /// 20 and 22 of Commonwealth Electoral Act 1918, Section 273
+    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+    /// 20 of Commonwealth Electoral Act 1918, Section 273
+    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+    /// 17 of Commonwealth Electoral Act 1918, Section 273
+    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
+
+    /// Commonwealth Electoral Act 1918, Section 273, 13(a)
+    /// ```text
+    /// (a) the candidate who stands lowest in the poll must be excluded;
+    /// ```
+    /// This was changed significantly in the new legislation, see the discussion page
+    /// and
+    /// Commonwealth Electoral Act 1918, Section 273, 31
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
+
+
+    fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
+    /// Commonwealth Electoral Act 1918, Section 273, (9)
+    /// Similarly (10) and (14) have the crucial "Unless all the vacancies have been filled"
+    fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
+
+
+    /// Commonwealth Electoral Act 1918, Section 273, (17)
+    /// See discussion for [FederalPre2021::when_to_check_if_just_two_standing_for_shortcut_election()].
+    /// This seems ambiguous, I am not claiming that this is what the legislation says.
+    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+
+    /// See discussion for [FederalPre2021::when_to_check_if_all_remaining_should_get_elected()].
+    /// This seems ambiguous, I am not claiming that this is what the legislation says.
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+
+    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
+
+    /// Changed in new legislation for electronic counting. Different for manual counting.
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
+
+    fn name() -> String { "FederalPost2021".to_string() }
+}
+
 
 /// The actual rules used by the AEC in 2019, based on reverse engineering their published
 /// distribution of preferences transcripts.
@@ -428,7 +512,7 @@ mod tests {
     use std::fs::File;
     use stv::election_data::ElectionData;
     use stv::compare_rules::CompareRules;
-    use crate::{FederalRulesUsed2013, FederalRulesUsed2016, FederalRules, FederalRulesUsed2019};
+    use crate::{FederalRulesUsed2013, FederalRulesUsed2016, FederalRulesPre2021, FederalRulesUsed2019};
     use stv::compare_transcripts::DifferenceBetweenTranscripts::{DifferentCandidatesElected, CandidatesOrderedDifferentWay,Same};
     use stv::compare_transcripts::DifferentCandidateLists;
     use stv::ballot_metadata::CandidateIndex;
@@ -437,7 +521,7 @@ mod tests {
     fn example() -> anyhow::Result<()>{
         let data : ElectionData = serde_json::from_reader(File::open("../examples/MultipleExclusionOrdering.stv")?)?;
         let comparer = CompareRules{ dir: "tests_output".to_string() };
-        let (comparisons,comp) = comparer.compute_dataset::<usize,FederalRulesUsed2013,FederalRulesUsed2016,FederalRulesUsed2019,FederalRules>(&data)?;
+        let (comparisons,comp) = comparer.compute_dataset::<usize,FederalRulesUsed2013,FederalRulesUsed2016,FederalRulesUsed2019, FederalRulesPre2021>(&data)?;
 
         for i in 0..comparisons.len() {
             println!("{} : {}",comparisons[i],comp.results[i]);

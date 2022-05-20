@@ -6,7 +6,7 @@
 
 //! Utility program to test file parsing. Useful only for development.
 
-use federal::FederalRules;
+use federal::FederalRulesPre2021;
 use std::fs::File;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::parse_util::{FileFinder, RawDataSource};
@@ -19,7 +19,7 @@ fn main()  -> anyhow::Result<()> {
 
     let data = loader.load_cached_data("ACT")?;
     data.print_summary();
-    let transcript = data.distribute_preferences::<FederalRules>();
+    let transcript = data.distribute_preferences::<FederalRulesPre2021>();
     let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
     let file = File::create("transcript.json")?;
     serde_json::to_writer_pretty(file,&transcript)?;

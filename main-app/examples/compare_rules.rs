@@ -8,7 +8,7 @@
 
 use act::ACTPre2020;
 use stv::compare_rules::CompareRules;
-use federal::FederalRules;
+use federal::FederalRulesPre2021;
 use nsw::{NSWECLocalGov2021, NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation};
 use nsw::parse_lge::get_nsw_lge_data_loader_2021;
 use stv::parse_util::{FileFinder, RawDataSource};
@@ -21,7 +21,7 @@ fn main()  -> anyhow::Result<()> {
     let iterator = electorates.iter().filter(|e|!e.ends_with(" Mayoral")).map(|e|loader.load_cached_data(e));
 
     let comparer = CompareRules{ dir: "Comparison/NSW2021".to_string() };
-    comparer.compare_datasets::<usize,NSWECLocalGov2021,NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation,ACTPre2020,FederalRules,_>(iterator)?;
+    comparer.compare_datasets::<usize,NSWECLocalGov2021,NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation,ACTPre2020, FederalRulesPre2021,_>(iterator)?;
 
     Ok(())
 }

@@ -28,7 +28,8 @@ in which case ConcreteSTV generally follows the corresponding electoral commissi
 changes over time.
 
 See [ElectionRules.md](ElectionRules.md) for a detailed description of what each of the below options means. 
-- **FederalPre2021** Federal Senate, my interpretation of the correct rules. Formerly named **Federal**
+- **FederalPre2021** Federal Senate, my interpretation of the correct rules prior to the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md). Formerly named **Federal**.
+- **FederalPost2021** Federal Senate, my interpretation of the correct rules for electronic counting after the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md).
 - **AEC2013** Possibly buggy rules used by AEC in 2013 Federal Senate election
 - **AEC2016** Buggy rules used by AEC in 2016 Federal Senate election
 - **AEC2019** Buggy rules used by AEC in 2019 Federal Senate election
@@ -277,8 +278,11 @@ extent.
 * The gh-pages branch of the git repository contains companion data for some papers
   associated with this project. They may contain data derived from other copyrighted information.
   See the copyright section in the index.html describing the companion page for details (these will be in the docs folder).
+* The federal/legislation folder contains legislation taken from the Federal Register of Legislation
+  and is covered by a [Creative Commons Attribution 4.0 International (the CC BY 4.0 licence)](http://creativecommons.org/licenses/by/4.0/).
+  See the [copyright notice](federal/legislation/Copyright.md) for details.
 
-Kudos to the State of New South Wales for the use of such a license. 
+Kudos to the State of New South Wales and the Federal Register of Legislation for the use of such a license. 
 
 This should not be taken as an endorsement of ConcreteSTV by any organisation listed here.
 

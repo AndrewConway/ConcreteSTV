@@ -7,7 +7,7 @@
 //! Compare the effects of different rules on federal elections.
 
 use stv::compare_rules::CompareRules;
-use federal::{FederalRulesUsed2013, FederalRulesUsed2016, FederalRulesUsed2019, FederalRules};
+use federal::{FederalRulesUsed2013, FederalRulesUsed2016, FederalRulesUsed2019, FederalRulesPre2021};
 use stv::parse_util::FileFinder;
 
 
@@ -20,7 +20,7 @@ fn main()  -> anyhow::Result<()> {
     let comparer = CompareRules{ dir: "Comparison/Federal".to_string() };
     // comparer.compute_dataset::<usize,FederalRulesUsed2013,FederalRulesUsed2016,FederalRulesUsed2019,FederalRules>(&data)?;
 
-    comparer.compare_datasets::<usize,FederalRulesUsed2013,FederalRulesUsed2016,FederalRulesUsed2019,FederalRules,_>(iterator)?;
+    comparer.compare_datasets::<usize,FederalRulesUsed2013,FederalRulesUsed2016,FederalRulesUsed2019, FederalRulesPre2021,_>(iterator)?;
 
 
     Ok(())

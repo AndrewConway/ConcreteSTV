@@ -21,8 +21,10 @@ details of the differences between the below specific rules.
 The rules actually used in each year are a secret and the AEC has persecuted those
 asking for the source code of the counting algorithm under FOI, so the actual rules are my best guess.
 
-- **FederalPre2021** My interpretation of the Australian Federal Senate election system prior to the 
+- **FederalPre2021** My interpretation of the Australian Federal Senate election system prior to the
   2021 legislation changes. Used to be called **Federal** but renamed as the legislation changed.
+- **FederalPost2021** My interpretation of the Australian Federal Senate election system post the
+  2021 legislation changes. Changes are to tie resolution and bulk exclusion, making it close to **AEC2016**.
 - **AEC2013** This is my interpretation of the rules actually used by the AEC for the 2013 election.
   It is very similar to *FederalPre2021* except when resolving 3 way ties by looking at prior counts, any difference is used as a discriminator,
           instead of requiring that each has a different count. Evidence: NSW 2016, special count
@@ -52,13 +54,14 @@ any of these would be fixed for the next election, or whether they would adopt a
 seeking clarification. 
 
 Update 2: The resolution has largely been to change the legislation (Dec 2021) to match what the AEC did.
-The tie breaking has been changed to what the AEC did (which is arguably better than what the legislation
+The tie breaking for exclusions has been changed to what the AEC did (which is arguably better than what the legislation
 had required), and the horrible Bulk Exclusion rules no longer apply when the count is done by computer
 (but do apply when the count is done by hand, which could produce different results). The error in
 the AEC's handling of rule 18 is not addressed in the legislation. The legislation does include a 
 clause requiring some checking of the listed votes against the paper ballots, which is a great thing
 as it will encourage the AEC to actually provide some meaningful evidence that the election result is correct.
-I will create new rulesets taking the new legislation into account very soon. I have gotten as far as renaming the existing set :-( so far.
+A more detailed discussion is [available](federal/legislation/AssuranceOfSenateCountingAct2021.md).
+This has cause the creation of ruleset **FederalPost2021**.
 
 ## ACT Legislative Assembly
 
