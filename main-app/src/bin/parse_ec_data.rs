@@ -35,7 +35,7 @@ struct Opts {
 
     /// An optional list of candidate numbers (starting counting at 0) to mark as to be excluded (ineligible).
     /// Separate with commas.
-    #[clap(short, long,use_delimiter=true,require_delimiter=true)]
+    #[clap(short, long,use_value_delimiter=true,require_value_delimiter=true)]
     exclude : Option<Vec<CandidateIndex>>,
 
     /// An optional directory to use for finding raw data files.

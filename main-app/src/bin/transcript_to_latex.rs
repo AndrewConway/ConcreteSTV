@@ -32,7 +32,7 @@ struct Opts {
     deltas : bool,
 
     /// An optional list of candidate numbers (starting counting at 0) to restrict the table to.
-    #[clap(short, long,use_delimiter=true,require_delimiter=true)]
+    #[clap(short, long,use_value_delimiter=true,require_value_delimiter=true)]
     candidates : Option<Vec<usize>>,
 }
 

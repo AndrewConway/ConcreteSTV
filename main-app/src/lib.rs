@@ -45,30 +45,30 @@ pub fn try_parse_candidate_list(s:&str) -> Result<TieResolutionAtom,ParseIntErro
 
 /// Options that pertain to what ballots are to be considered for changing
 #[derive(Args)]
-#[clap(help_heading="Options for which ballots to consider changing")]
+#[clap(next_help_heading="Options for which ballots to consider changing")]
 pub struct ChangeOptions {
     /// Should be followed by true, false, or both (separated by commas)
     /// Whether above the line votes should be allowed. Default true.
     /// If both true and false are specified, changes will be searched for both with an without above the line votes (slower).
-    #[clap(long,use_delimiter=true,require_delimiter=true,default_value="true")]
+    #[clap(long,use_value_delimiter=true,require_value_delimiter=true,default_value="true")]
     allow_atl : Vec<bool>,
 
     /// Should be followed by true, false, or both (separated by commas)
     /// Whether changes to the first preferences votes should be allowed. Default true.
     /// If both true and false are specified, changes will be searched for both with an without first preference modifications (slower).
-    #[clap(long,use_delimiter=true,require_delimiter=true,default_value="true")]
+    #[clap(long,use_value_delimiter=true,require_value_delimiter=true,default_value="true")]
     allow_first : Vec<bool>,
 
     /// Should be followed by true, false, or both (separated by commas)
     /// Whether changes to ballots that are in principle verifiable. Default true.
     /// This option only makes sense if the `--unverifiable` flag is also used.
     /// If both true and false are specified, changes will be searched for both with an without this restriction (slower).
-    #[clap(long,use_delimiter=true,require_delimiter=true,default_value="true")]
+    #[clap(long,use_value_delimiter=true,require_value_delimiter=true,default_value="true")]
     allow_verifiable : Vec<bool>,
 
     /// What types of votes are considered unverifiable for the purposes of allow_verifiable.
     /// The string (or strings separated by commas) following this are election specific, and correspond to types specified by the electoral commission.
-    #[clap(long,use_delimiter=true,require_delimiter=true)]
+    #[clap(long,use_value_delimiter=true,require_value_delimiter=true)]
     unverifiable : Vec<String>,
 }
 
@@ -94,7 +94,7 @@ impl ChangeOptions {
 
 /// Options that pertain to modifications to a vote data file
 #[derive(Args)]
-#[clap(help_heading="Options for overriding the input .stv file")]
+#[clap(next_help_heading="Options for overriding the input .stv file")]
 pub struct ModifyStvFileOptions {
     /// The number of people to elect. If used, overrides the value in the .stv file.
     #[clap(short, long)]
@@ -104,7 +104,7 @@ pub struct ModifyStvFileOptions {
     /// starting counting at zero. E.g. --exclude=5,6 would do the count assuming the candidates
     /// with 5 and 6 other candidates listed before them are ineligible. If specified, this overrides
     /// any candidates specified as excluded in the .stv file.
-    #[clap(short, long,use_delimiter=true,require_delimiter=true)]
+    #[clap(short, long,use_value_delimiter=true,require_value_delimiter=true)]
     exclude : Option<Vec<CandidateIndex>>,
 
     /// If a .vchange file is used for input instead of a .stv file, one of the vote manipulations in it can be applied first, specified here. 1 means the first one in the file, 2 the second, etc.

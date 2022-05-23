@@ -59,7 +59,7 @@ async fn get_intent_table(election : web::Path<FoundElection>,options : web::Que
     async fn get_intent_table_uncached(election : &web::Path<FoundElection>,options : &web::Query<IntentTableOptions>) -> Result<IntentTable,String> {
         Ok(IntentTable::compute(&election.data().await?,options))
     }
-    cache_json("IntentTable.json",&(election.spec.clone(),options.clone()),||get_intent_table_uncached(&election,&options)).await
+    cache_json("IntentTable.json",&(election.spec.clone(),options.0.clone()),||get_intent_table_uncached(&election,&options)).await
 }
 
 #[get("/{name}/{year}/{electorate}/Correlation.json")]
@@ -68,7 +68,7 @@ async fn get_correlation(election : web::Path<FoundElection>,options : web::Quer
         let correlation = SquareMatrix::compute_correlation_matrix(&election.data().await?,&options).to_distance_matrix();
         Ok(CorrelationDendrogramsAndSVD::new(correlation)?)
     }
-    cache_json("Correlation.json",&(election.spec.clone(),options.clone()),||get_correlation_uncached(&election,&options)).await
+    cache_json("Correlation.json",&(election.spec.clone(),options.0.clone()),||get_correlation_uncached(&election,&options)).await
 }
 
 #[get("/{name}/{year}/{electorate}/WhoGotVotes.json")]
@@ -162,7 +162,7 @@ fn find_viewer_resources() -> PathBuf {
     panic!("Could not find docs. Please run in a directory containing it.")
 }
 
-#[actix_rt::main]
+#[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     // check whether everything is working before starting the web server. Don't want to find out in the middle of a transaction.
     println!("Running webserver on http://localhost:8999 stop with control C.");
