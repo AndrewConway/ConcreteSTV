@@ -16,3 +16,9 @@ members= [
 
 [profile.dev]
 opt-level = 1
+
+[profile.bench]
+lto="thin"
+
+[profile.release]
+lto="thin"
