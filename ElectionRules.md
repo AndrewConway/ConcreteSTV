@@ -24,7 +24,9 @@ asking for the source code of the counting algorithm under FOI, so the actual ru
 - **FederalPre2021** My interpretation of the Australian Federal Senate election system prior to the
   2021 legislation changes. Used to be called **Federal** but renamed as the legislation changed.
 - **FederalPost2021** My interpretation of the Australian Federal Senate election system post the
-  2021 legislation changes. Changes are to tie resolution and bulk exclusion, making it close to **AEC2016**.
+  2021 legislation changes. Changes are to tie resolution and the removal of bulk exclusion, making it close to **AEC2016**.
+- **FederalPost2021Manual** My interpretation of the Australian Federal Senate election system for manual counting post the
+  2021 legislation changes. Same as **FederalPost2021** except bulk exclusion is still included, making it close to **AEC2013**.
 - **AEC2013** This is my interpretation of the rules actually used by the AEC for the 2013 election.
   It is very similar to *FederalPre2021* except when resolving 3 way ties by looking at prior counts, any difference is used as a discriminator,
           instead of requiring that each has a different count. Evidence: NSW 2016, special count
@@ -61,7 +63,7 @@ the AEC's handling of rule 18 is not addressed in the legislation. The legislati
 clause requiring some checking of the listed votes against the paper ballots, which is a great thing
 as it will encourage the AEC to actually provide some meaningful evidence that the election result is correct.
 A more detailed discussion is [available](federal/legislation/AssuranceOfSenateCountingAct2021.md).
-This has cause the creation of ruleset **FederalPost2021**.
+This has cause the creation of ruleset **FederalPost2021** and **FederalPost2021Manual**.
 
 ## ACT Legislative Assembly
 

@@ -6,6 +6,7 @@
 
 //! Describe the rules used for Federal elections, as best I can tell.
 
+use std::marker::PhantomData;
 use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational, SurplusTransferMethod};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber};
 use stv::transfer_value::{TransferValue, round_rational_down_to_usize, convert_usize_to_rational};
@@ -14,11 +15,22 @@ use stv::tie_resolution::MethodOfTieResolution;
 pub mod parse;
 pub mod parse2013;
 
-/// Federal rules prior to the 2021 changes.
-pub struct FederalRulesPre2021 {
+/// Many variants on the federal rules are used, partly due to legislation changes
+/// and partly due to deviations between what the AEC did and the legislation.
+/// But most things stay the same. This just captures the things that may differ.
+pub trait FederalVariations {
+    // Note that it is assumed that surplus distribution is done in the same order as election. True for AEC.
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution;
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking;
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool;
+    fn name() -> String;
 }
 
-impl PreferenceDistributionRules for FederalRulesPre2021 {
+pub struct FederalVariant<V:FederalVariations> {
+    phantom : PhantomData<V>
+}
+
+impl <V:FederalVariations> PreferenceDistributionRules for FederalVariant<V> {
     type Tally = usize;
     type SplitByNumber = DoNotSplitByCountNumber;
 
@@ -88,25 +100,8 @@ impl PreferenceDistributionRules for FederalRulesPre2021 {
     /// in an earlier version.
     fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
 
-    /// Commonwealth Electoral Act 1918, Section 273, 13(a)
-    /// ```text
-    /// (a) the candidate who stands lowest in the poll must be excluded;
-    /// ```
-    /// Commonwealth Electoral Act 1918, Section 273, 31(b)
-    /// ```text
-    /// if 2 or more continuing candidates have the same number of
-    /// votes, those candidates shall stand in the poll in the order of
-    /// the relative number of votes of each of those candidates at the
-    /// last count at which each of them had a different number of
-    /// votes, with the continuing candidate with the greater or
-    /// greatest number of votes at that count standing higher in the
-    /// poll and the continuing candidate with the fewer or fewest
-    /// number of votes at that count standing lower in the poll, but
-    /// if there has been no such count the Australian Electoral
-    /// Officer for the State shall determine the order of standing of
-    /// those candidates in the poll.
-    /// ```
-    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+    /// This was changed in legislation in 2021, to what the AEC had been doing prior.
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { V::resolve_ties_choose_lowest_candidate_for_exclusion() }
 
 
 
@@ -200,9 +195,45 @@ impl PreferenceDistributionRules for FederalRulesPre2021 {
     ///
     /// I am assigning it to require everything else to be finished first,
     /// as I have done the same for section 17, although this is debatable.
-    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { V::when_to_check_if_all_remaining_should_get_elected() }
 
     fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
+
+    /// Commonwealth Electoral Act 1918, Section 273, subsection (13)(b)
+    /// ```text
+    /// (b) if a bulk exclusion of candidates may be effected under
+    ///     subsection (13A), those candidates must be excluded;
+    /// ```
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { V::should_eliminate_multiple_candidates_federal_rule_13a() }
+
+    fn name() -> String { V::name() }
+
+}
+
+pub struct FederalVariationsPre2021 {}
+
+impl FederalVariations for FederalVariationsPre2021 {
+    /// Commonwealth Electoral Act 1918, Section 273, 13(a)
+    /// ```text
+    /// (a) the candidate who stands lowest in the poll must be excluded;
+    /// ```
+    /// Commonwealth Electoral Act 1918, Section 273, 31(b)
+    /// ```text
+    /// if 2 or more continuing candidates have the same number of
+    /// votes, those candidates shall stand in the poll in the order of
+    /// the relative number of votes of each of those candidates at the
+    /// last count at which each of them had a different number of
+    /// votes, with the continuing candidate with the greater or
+    /// greatest number of votes at that count standing higher in the
+    /// poll and the continuing candidate with the fewer or fewest
+    /// number of votes at that count standing lower in the poll, but
+    /// if there has been no such count the Australian Electoral
+    /// Officer for the State shall determine the order of standing of
+    /// those candidates in the poll.
+    /// ```
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
     /// Commonwealth Electoral Act 1918, Section 273, subsection (13)(b)
     /// ```text
@@ -214,44 +245,16 @@ impl PreferenceDistributionRules for FederalRulesPre2021 {
     fn name() -> String { "FederalPre2021".to_string() }
 }
 
+pub type FederalRulesPre2021 = FederalVariant<FederalVariationsPre2021>;
+
 /// Federal rules after the 2021 changes.
-/// Most of the documentation for choices of interoretation are listed above
+/// Most of the documentation for choices of interpretation are listed above
 /// for FederalRulesPre2021 except for the changes.
 /// See [federal/legislation/AssuranceOfSenateCountingAct2021.md] for details
 /// of the changes.
-pub struct FederalRulesPost2021 {
-}
+pub struct FederalVariationsPost2021 {}
 
-impl PreferenceDistributionRules for FederalRulesPost2021 {
-    type Tally = usize;
-    type SplitByNumber = DoNotSplitByCountNumber;
-
-    fn use_last_parcel_for_surplus_distribution() -> bool { false }
-    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
-
-    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
-    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }
-
-    fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
-        TransferValue::from_surplus(surplus,ballots)
-    }
-
-    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
-        transfer_value.mul_rounding_down(ballots)
-    }
-
-    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
-    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
-    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
-    fn sort_exclusions_by_transfer_value() -> bool { true }
-
-    /// 20 and 22 of Commonwealth Electoral Act 1918, Section 273
-    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-    /// 20 of Commonwealth Electoral Act 1918, Section 273
-    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-    /// 17 of Commonwealth Electoral Act 1918, Section 273
-    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
-
+impl FederalVariations for FederalVariationsPost2021 {
     /// Commonwealth Electoral Act 1918, Section 273, 13(a)
     /// ```text
     /// (a) the candidate who stands lowest in the poll must be excluded;
@@ -261,23 +264,7 @@ impl PreferenceDistributionRules for FederalRulesPost2021 {
     /// Commonwealth Electoral Act 1918, Section 273, 31
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
 
-
-    fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
-    /// Commonwealth Electoral Act 1918, Section 273, (9)
-    /// Similarly (10) and (14) have the crucial "Unless all the vacancies have been filled"
-    fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
-
-
-    /// Commonwealth Electoral Act 1918, Section 273, (17)
-    /// See discussion for [FederalPre2021::when_to_check_if_just_two_standing_for_shortcut_election()].
-    /// This seems ambiguous, I am not claiming that this is what the legislation says.
-    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
-
-    /// See discussion for [FederalPre2021::when_to_check_if_all_remaining_should_get_elected()].
-    /// This seems ambiguous, I am not claiming that this is what the legislation says.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
-
-    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
 
     /// Changed in new legislation for electronic counting. Different for manual counting.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
@@ -285,131 +272,85 @@ impl PreferenceDistributionRules for FederalRulesPost2021 {
     fn name() -> String { "FederalPost2021".to_string() }
 }
 
-
-/// The actual rules used by the AEC in 2019, based on reverse engineering their published
-/// distribution of preferences transcripts.
-///
-/// Note that this is not possible to specify perfectly as the AEC considers their source
-/// code secret and have persecuted people who requested it under FOI. There are often
-/// multiple interpretations compatible with the actual outcome. I have tried to guess
-/// the most plausible rules used, as close as possible to my interpretation of the legislation.
-pub struct FederalRulesUsed2019 { }
-
-impl PreferenceDistributionRules for FederalRulesUsed2019 {
-    type Tally = usize ;
-    type SplitByNumber = DoNotSplitByCountNumber;
-
-    fn use_last_parcel_for_surplus_distribution() -> bool { false }
-    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
-    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
-    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }
-
-    fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
-        TransferValue::from_surplus(surplus,ballots)
-    }
-
-    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
-        transfer_value.mul_rounding_down(ballots)
-    }
+pub type FederalRulesPost2021 = FederalVariant<FederalVariationsPost2021>;
 
 
-    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+/// Federal rules after the 2021 changes, ended up being slightly different depending
+/// upon whether the count was done manually or by computer - rule 13a was required
+/// for manual counting and not allowed for computer counting. This can change
+/// who is elected.
+pub struct ManualFederalVariationsPost2021 {}
 
+impl FederalVariations for ManualFederalVariationsPost2021 {
+    /// Commonwealth Electoral Act 1918, Section 273, 13(a)
+    /// ```text
+    /// (a) the candidate who stands lowest in the poll must be excluded;
+    /// ```
+    /// This was changed significantly in the new legislation, see the discussion page
+    /// and
+    /// Commonwealth Electoral Act 1918, Section 273, 31
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
 
-    fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
-    fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
-    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
-    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
-    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
-    fn sort_exclusions_by_transfer_value() -> bool { true }
+    /// Different for manual counting.
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { true }
 
-    /// In 2019 QLD, in count 287, a surplus distribution, G. Rennick gets elected for achieving a quota.
-    /// This leaves 2 candidates, and 1 vacancy. The 2 standing rules is not applied until
-    /// count 288 when G. Rennick's excess is distributed.
-    ///
-    /// In 2019 VIC, J Hallam is eliminated, starting on count 362, leaving 2 candidates and
-    /// 1 vacancy. The rule is not applied until count 367 when  the elimination is finished.
-    ///
-    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
-
-    /// In 2019 NSW, count 429, K. McCulloch is excluded. This leaves 2 candidates, 2 vacancies.
-    /// The elimination is aborted and no ballots are transferred in this count.
-    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers }
-    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
-
-    /// Not done in ACT count 3, SA count 80, Vic count 6.
-    /// Details ACT count 3: 13(A) should exclude 5 candidates, only 1 excluded.
-    /// At the end of count 2, quota=90,078, remaining seats=1, SESELJA is on 84,666, vacancy shortfall and leading shortfall both 5412.
-    /// Candidate   Votes    Notional Votes
-    /// BIRKETT      80        80
-    /// HODGSON     181       261
-    /// KENT        219       480
-    /// COWTON      308       788
-    /// ANGEL       309      1097
-    /// KIM        1251      2348
-    /// HOUSTON    1378      3726
-    /// DAVIDSON   2126      5852
-    /// 13(A)(a) Candidate A is DAVIDSON
-    /// 13(A)(b) Candidate B is ANGEL (1097 notional votes < KIM's 1251 votes)
-    /// 13(A)(c) Applies, and BIRKETT, HODGSON, KENT, COWTON, ANGEL should all be excluded.
-    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
-
-    fn name() -> String { "AEC2019".to_string() }
+    fn name() -> String { "FederalPost2021Manual".to_string() }
 }
 
-/// the actual rules used by the AEC in 2016, based on reverse engineering their published
+pub type FederalRulesPost2021Manual = FederalVariant<ManualFederalVariationsPost2021>;
+
+//
+//
+//  Code below here corresponds to the the actual rules used in recent Federal elections.
+//  (at least as far as I can guess by looking at the published transcripts of distribution of preferences).
+//
+
+
+
+
+
+
+/// The actual rules used by the AEC in 2013, based on reverse engineering their published
 /// distribution of preferences transcripts.
 ///
 /// Note that this is not possible to specify perfectly as the AEC considers their source
 /// code secret and have persecuted people who requested it under FOI. There are often
 /// multiple interpretations compatible with the actual outcome. I have tried to guess
 /// the most plausible rules used, as close as possible to my interpretation of the legislation.
-pub struct FederalRulesUsed2016 { }
+pub struct AECVariations2013 {}
+/// Rules used by the AEC for the 2016 election
+pub struct AECVariations2016 {}
+/// Rules used by the AEC for the 2019 election
+pub struct AECVariations2019 {}
 
-impl PreferenceDistributionRules for FederalRulesUsed2016 {
-    type Tally = usize ;
-    type SplitByNumber = DoNotSplitByCountNumber;
-
-    fn use_last_parcel_for_surplus_distribution() -> bool { false }
-    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
-    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
-    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }
-
-    fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
-        TransferValue::from_surplus(surplus,ballots)
-    }
-
-    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
-        transfer_value.mul_rounding_down(ballots)
-    }
+impl FederalVariations for AECVariations2013 {
+    /// In 2013 NSW, count 25, T. Dean was eliminated in a 4 way tie for 17. All candidates had 17 since count 1 other than T. Dean who had 16.
+    /// This may be coincidence - the EC could have then decided it with MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent , or it could have been an application of MethodOfTieResolution::AnyDifferenceIsADiscriminator
+    /// I am choosing this based on assuming it is the same as 2016.
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
 
 
-    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+    /// In SA, count 228, B. Day is elected on quota, leaving 2 candidates 1 seat. S. Birmingham is not elected until the next count, 229.
+    // fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
+
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+
+    /// several occasions, e.g ACT.
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { true }
+
+    fn name() -> String { "AEC2013".to_string() }
+}
+
+impl FederalVariations for AECVariations2016 {
     /// In 2016, WA (with Rod Cullerton excluded because of bankruptcy and larceny), on count 49, there was a 3 way tie for elimination.
     /// M. Hercock, S. Fargher and H HENG all had 66 votes.
     /// The latest turn that they all had different tallies was turn 4, with 65, 61 and 63 respectively.
     /// So MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent means that S. Fargher should have been eliminated.
     /// Actually M. Hercock was eliminated. This may be because on round 41, they had tallies 65, 66 and 66 respectively.
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
-
-
-    fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
-    fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
-
-    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
-    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
-    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
-    fn sort_exclusions_by_transfer_value() -> bool { true }
-
-    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
-
 
     /// In Queensland 2016, count 830, candidate R. McGarvie was excluded, leaving 2 candidates and 2 seats.
     /// The exclusion was carried out in full (11 counts), and C Ketter was discovered to have a quota in the first round of the exclusion, leaving 1 candidate (M Roberts) and 1 vacancy.
@@ -434,7 +375,6 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
     /// So choose the same as my interpretation (and the only sane interpretation of 17). Even though there is weak evidence from the 2019
     /// code (where they do something very strange) that they may do something a little strange in this case.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking  { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
-    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
 
     /// ACT count 11, TAS count 10, VIC count 13 all trigger rule 13(a) but it is not applied.
     /// Details for ACT count 11: 13(a) should exclude MONTAGNE, Jessica and TYE, Martin, but only MONTAGNE, Jessica was excluded.
@@ -446,64 +386,54 @@ impl PreferenceDistributionRules for FederalRulesUsed2016 {
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
 
     fn name() -> String { "AEC2016".to_string() }
+
 }
 
-/// the actual rules used by the AEC in 2013, based on reverse engineering their published
-/// distribution of preferences transcripts.
-///
-/// Note that this is not possible to specify perfectly as the AEC considers their source
-/// code secret and have persecuted people who requested it under FOI. There are often
-/// multiple interpretations compatible with the actual outcome. I have tried to guess
-/// the most plausible rules used, as close as possible to my interpretation of the legislation.
-pub struct FederalRulesUsed2013 { }
+impl FederalVariations for AECVariations2019 {
+    /// Can't tell if it is like 2016 or like the legislation. Randomly guessing the legislation.
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
+    /*
+    /// In 2019 QLD, in count 287, a surplus distribution, G. Rennick gets elected for achieving a quota.
+    /// This leaves 2 candidates, and 1 vacancy. The 2 standing rules is not applied until
+    /// count 288 when G. Rennick's excess is distributed.
+    ///
+    /// In 2019 VIC, J Hallam is eliminated, starting on count 362, leaving 2 candidates and
+    /// 1 vacancy. The rule is not applied until count 367 when  the elimination is finished.
+    ///
+    ///fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+*/
 
-impl PreferenceDistributionRules for FederalRulesUsed2013 {
-    type Tally = usize ;
-    type SplitByNumber = DoNotSplitByCountNumber;
+    /// In 2019 NSW, count 429, K. McCulloch is excluded. This leaves 2 candidates, 2 vacancies.
+    /// The elimination is aborted and no ballots are transferred in this count.
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers }
 
-    fn use_last_parcel_for_surplus_distribution() -> bool { false }
-    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
-    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
-    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }
+    /// Not done in ACT count 3, SA count 80, Vic count 6.
+    /// Details ACT count 3: 13(A) should exclude 5 candidates, only 1 excluded.
+    /// At the end of count 2, quota=90,078, remaining seats=1, SESELJA is on 84,666, vacancy shortfall and leading shortfall both 5412.
+    /// Candidate   Votes    Notional Votes
+    /// BIRKETT      80        80
+    /// HODGSON     181       261
+    /// KENT        219       480
+    /// COWTON      308       788
+    /// ANGEL       309      1097
+    /// KIM        1251      2348
+    /// HOUSTON    1378      3726
+    /// DAVIDSON   2126      5852
+    /// 13(A)(a) Candidate A is DAVIDSON
+    /// 13(A)(b) Candidate B is ANGEL (1097 notional votes < KIM's 1251 votes)
+    /// 13(A)(c) Applies, and BIRKETT, HODGSON, KENT, COWTON, ANGEL should all be excluded.
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
 
-    fn make_transfer_value(surplus: usize, ballots: BallotPaperCount) -> TransferValue {
-        TransferValue::from_surplus(surplus,ballots)
-    }
-
-    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> usize {
-        transfer_value.mul_rounding_down(ballots)
-    }
-
-
-    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent }
-
-    /// In 2013 NSW, count 25, T. Dean was eliminated in a 4 way tie for 17. All candidates had 17 since count 1 other than T. Dean who had 16.
-    /// This may be coincidence - the EC could have then decided it with MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent , or it could have been an application of MethodOfTieResolution::AnyDifferenceIsADiscriminator
-    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
-
-
-    fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
-    fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
-
-    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
-    fn check_elected_if_in_middle_of_exclusion() -> bool { true }
-    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
-    fn sort_exclusions_by_transfer_value() -> bool { true }
-
-    /// In SA, count 228, B. Day is elected on quota, leaving 2 candidates 1 seat. S. Birmingham is not elected until the next count, 229.
-    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
-
-
-    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
-    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
-
-    /// several occasions, e.g ACT.
-    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { true }
-
-    fn name() -> String { "AEC2013".to_string() }
+    fn name() -> String { "AEC2019".to_string() }
 }
+pub type FederalRulesUsed2013 = FederalVariant<AECVariations2013>;
+pub type FederalRulesUsed2016 = FederalVariant<AECVariations2016>;
+pub type FederalRulesUsed2019 = FederalVariant<AECVariations2019>;
+
+
+
+
+
 
 
 

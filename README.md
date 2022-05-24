@@ -30,6 +30,7 @@ changes over time.
 See [ElectionRules.md](ElectionRules.md) for a detailed description of what each of the below options means. 
 - **FederalPre2021** Federal Senate, my interpretation of the correct rules prior to the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md). Formerly named **Federal**.
 - **FederalPost2021** Federal Senate, my interpretation of the correct rules for electronic counting after the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md).
+- **FederalPost2021Manual** Federal Senate, my interpretation of the correct rules for manual counting after the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md).
 - **AEC2013** Possibly buggy rules used by AEC in 2013 Federal Senate election
 - **AEC2016** Buggy rules used by AEC in 2016 Federal Senate election
 - **AEC2019** Buggy rules used by AEC in 2019 Federal Senate election
