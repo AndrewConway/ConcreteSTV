@@ -10,7 +10,7 @@
 
 #[cfg(test)]
 mod tests {
-    use federal::parse::{get_federal_data_loader_2016, get_federal_data_loader_2019, get_federal_data_loader_2013};
+    use federal::parse::{get_federal_data_loader_2016, get_federal_data_loader_2019, get_federal_data_loader_2013, get_federal_data_loader_2022};
     use stv::preference_distribution::distribute_preferences;
     use federal::{FederalRulesUsed2019, FederalRulesUsed2016, FederalRulesUsed2013};
     use std::collections::HashSet;
@@ -19,6 +19,24 @@ mod tests {
     use std::fs::File;
     use std::iter::FromIterator;
     use stv::parse_util::{RawDataSource, FileFinder};
+
+
+    fn test2022(state:&str) -> anyhow::Result<()> {
+        let loader = get_federal_data_loader_2022(&FileFinder::find_ec_data_repository());
+        let data = loader.read_raw_data(state)?;
+        data.print_summary();
+        //use stv::ballot_metadata::CandidateIndex;
+        //let mut excluded = HashSet::default();
+        //excluded.insert(CandidateIndex(8));
+        let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true);
+        let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
+        std::fs::create_dir_all("test_transcripts")?;
+        let file = File::create(format!("test_transcripts/transcript{}2019.json",state))?;
+        serde_json::to_writer_pretty(file,&transcript)?;
+        //let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
+        //official_transcript.compare_with_transcript(&transcript.transcript);
+        Ok(())
+    }
 
     fn test2019(state:&str) -> anyhow::Result<()> {
         let loader = get_federal_data_loader_2019(&FileFinder::find_ec_data_repository());
@@ -138,6 +156,13 @@ mod tests {
     #[test]
     #[allow(non_snake_case)]
     fn test_TAS2019() { test2019("TAS").unwrap() }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_ACT2022() { test2022("ACT").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_NT2022() { test2022("NT").unwrap() }
 
 
 }

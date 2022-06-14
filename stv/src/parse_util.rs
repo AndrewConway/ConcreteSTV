@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -72,6 +72,7 @@ impl CandidateAndGroupInformationBuilder {
         }).collect();
         for candidate_index in 0..self.candidates.len() {
             let candidate = & self.candidates[candidate_index];
+            // println!("Candidate index {} name {} party {:?} position {:?}",candidate_index,candidate.name,candidate.party,candidate.position);
             if let Some(party) = candidate.party {
                 res[party.0].candidates.push(CandidateIndex(candidate_index));
                 assert_eq!(Some(res[party.0].candidates.len()),candidate.position);
@@ -145,7 +146,7 @@ pub trait RawDataSource : KnowsAboutRawMarkings {
     /// if it is possible to run the iterate_over_raw_markings function
     fn can_iterate_over_raw_btl_preferences(&self) -> bool { false }
     /// if it is possible to run the read_raw_data function
-    fn can_load_full_data(&self) -> bool { true }
+    fn can_load_full_data(&self,_state:&str) -> bool { true }
     fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata>;
     fn copyright(&self) -> Copyright;
     fn rules(&self,electorate:&str) -> AssociatedRules;

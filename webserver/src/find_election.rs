@@ -117,11 +117,11 @@ impl FoundElection {
         // self.loader.load_cached_data(self.electorate())
     }
     pub async fn metadata(&self) -> Result<ElectionMetadata,String> {
-        if self.loader.can_load_full_data() { Ok(self.data().await?.metadata) } // this gets any EC decisions deduced in the full set
+        if self.loader.can_load_full_data(self.electorate()) { Ok(self.data().await?.metadata) } // this gets any EC decisions deduced in the full set
         else { self.loader.read_raw_metadata(self.electorate()).map_err(|e|e.to_string()) }
     }
     pub async fn get_info(&self) -> Result<ElectionInfo,String> {
-        let simple = if self.loader.can_load_full_data() {
+        let simple = if self.loader.can_load_full_data(self.electorate()) {
             Some(SimpleStatistics::new(&self.data().await?))
         } else { None };
         Ok(ElectionInfo{

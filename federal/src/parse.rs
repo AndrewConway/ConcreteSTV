@@ -39,7 +39,7 @@ pub fn get_federal_data_loader_2019(finder:&FileFinder) -> FederalDataLoader {
 }
 
 pub fn get_federal_data_loader_2022(finder:&FileFinder) -> FederalDataLoader {
-    FederalDataLoader::new(finder,"2022",false,"https://www.aec.gov.au/election/downloads.htm",0) // TODO update post election.
+    FederalDataLoader::new(finder,"2022",false,"https://tallyroom.aec.gov.au/SenateDownloadsMenu-27966-Csv.htm",27966)
 }
 
 
@@ -147,6 +147,7 @@ impl RawDataSource for FederalDataLoader {
             "2013" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2013,Self>(self,electorate),
             "2016" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2016,Self>(self,electorate),
             "2019" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
+            "2022" => self.read_raw_data(electorate), // TODO fix after 2022 election read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
             _ => Err(anyhow!("Invalid year {}",self.year)),
         }
     }
@@ -154,7 +155,7 @@ impl RawDataSource for FederalDataLoader {
     fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata> {
         let mut builder = CandidateAndGroupInformationBuilder::default();
         if self.year=="2013" { read_from_senate_group_voting_tickets_download_file2013(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
-        else if self.year=="2022" { read_candidate_list_file_available_before_election2022(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_pre_election()?)?.as_path(),state)?; }
+        else if self.year=="2022" && state!="ACT" && state!="NT" { read_candidate_list_file_available_before_election2022(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_pre_election()?)?.as_path(),state)?; }
         else { read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
         let vacancies = self.candidates_to_be_elected(state);
         Ok(ElectionMetadata{
@@ -204,16 +205,16 @@ impl RawDataSource for FederalDataLoader {
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
             },
             "2022" => AssociatedRules{
-                rules_used: Some("AEC2022".into()), // TODO update post 2022 election
-                rules_recommended: Some("Federal2021".into()),
-                comment: None,
+                rules_used: None, // Some("AEC2022".into()), // TODO update post 2022 election
+                rules_recommended: Some("FederalPost2021".into()),
+                comment: Some(Cow::Borrowed("This is preliminary data and is not fully sanity checked, and is not properly compared to the AEC distribution of preferences.")), // TODO update post 2022 election
                 reports: vec![]
             },
             _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
         }
     }
     fn can_read_raw_markings(&self) -> bool  { self.year=="2016" || self.year=="2019" } // TODO update post 2022 election
-    fn can_load_full_data(&self) -> bool { self.year!="2022" } // TODO update post 2022 election
+    fn can_load_full_data(&self,state:&str) -> bool { self.year!="2022" || state=="NT" || state=="ACT" } // TODO update post 2022 election
 
     fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let filename = self.name_of_official_transcript_zip_file();
@@ -428,7 +429,7 @@ fn read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(builder: 
 /// This is the format used in 2022.
 /// A similar format was used in 2016 and 2019
 fn read_candidate_list_file_available_before_election2022(builder: &mut CandidateAndGroupInformationBuilder,path:&Path,state:&str) -> anyhow::Result<()> {
-    let mut rdr = csv::Reader::from_reader(skip_first_line_of_file(path)?);
+    let mut rdr = csv::Reader::from_path(path)?;
     for result in rdr.records() {
         let record = result?;
         if state==&record[0] { // right state
