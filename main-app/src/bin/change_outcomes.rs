@@ -25,7 +25,7 @@ use main_app::rules::Rules;
 /// This will not reliably work with ticket elections (e.g. Federal 2013 and earlier) if ATL modifications are allowed.
 struct Opts {
     /// The counting rules to use.
-    /// Currently supported AEC2013, AEC2016, AEC2019, Federal, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021
+    /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021
     rules : Rules,
 
     /// The name of the .stv (or .vchange) file to get votes from
