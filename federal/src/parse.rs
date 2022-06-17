@@ -155,7 +155,7 @@ impl RawDataSource for FederalDataLoader {
     fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata> {
         let mut builder = CandidateAndGroupInformationBuilder::default();
         if self.year=="2013" { read_from_senate_group_voting_tickets_download_file2013(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
-        else if self.year=="2022" && state!="ACT" && state!="NT" && state!="SA" && state!="TAS"{ read_candidate_list_file_available_before_election2022(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_pre_election()?)?.as_path(),state)?; } // TODO remove post election.
+        else if !self.can_load_full_data(state) { read_candidate_list_file_available_before_election2022(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_pre_election()?)?.as_path(),state)?; }
         else { read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
         let vacancies = self.candidates_to_be_elected(state);
         Ok(ElectionMetadata{
@@ -214,7 +214,7 @@ impl RawDataSource for FederalDataLoader {
         }
     }
     fn can_read_raw_markings(&self) -> bool  { self.year=="2016" || self.year=="2019" } // TODO update post 2022 election
-    fn can_load_full_data(&self,state:&str) -> bool { self.year!="2022" || state=="NT" || state=="ACT" || state=="SA" || state=="TAS" } // TODO update post 2022 election
+    fn can_load_full_data(&self,state:&str) -> bool { self.year!="2022" || state=="NT" || state=="ACT" || state=="SA" || state=="TAS" || state=="QLD" } // TODO update post 2022 election
 
     fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let filename = self.name_of_official_transcript_zip_file();
