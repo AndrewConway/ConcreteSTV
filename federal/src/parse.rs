@@ -213,8 +213,8 @@ impl RawDataSource for FederalDataLoader {
             _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
         }
     }
-    fn can_read_raw_markings(&self) -> bool  { self.year=="2016" || self.year=="2019" } // TODO update post 2022 election
-    fn can_load_full_data(&self,state:&str) -> bool { self.year!="2022" || state=="NT" || state=="ACT" || state=="SA" || state=="TAS" || state=="QLD" } // TODO update post 2022 election
+    fn can_read_raw_markings(&self) -> bool  { self.year=="2016" || self.year=="2019" || self.year=="2022" }
+    fn can_load_full_data(&self,_state:&str) -> bool { true }
 
     fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let filename = self.name_of_official_transcript_zip_file();
