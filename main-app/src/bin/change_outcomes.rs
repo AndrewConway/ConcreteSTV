@@ -29,12 +29,12 @@ struct Opts {
     rules : Rules,
 
     /// The name of the .stv (or .vchange) file to get votes from
-    #[clap(parse(from_os_str))]
+    #[clap(value_parser)]
     votes : PathBuf,
 
     /// An optional .vchange file to store the output in.
     /// If not specified, defaults to votes_rules.vchange where votes and rules are from above.
-    #[clap(short, long,parse(from_os_str))]
+    #[clap(short, long,value_parser)]
     out : Option<PathBuf>,
 
     #[clap(flatten)]

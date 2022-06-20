@@ -127,7 +127,7 @@ pub struct ModifyStvFileOptions {
     /// not indicate relative ranking between 2 and 6, or 4,8 and 9.
     ///
     /// This flag may be used multiple times for multiple tie resolutions.
-    #[clap(long,parse(try_from_str=try_parse_candidate_list))]
+    #[clap(long,value_parser=try_parse_candidate_list)]
     tie : Vec<TieResolutionAtom>,
 
 }

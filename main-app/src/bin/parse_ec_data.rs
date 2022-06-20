@@ -30,7 +30,7 @@ struct Opts {
 
     /// An optional output file. If not specified, stdout is used.
     /// It is strongly recommended that this be used as stdout is also used for other information.
-    #[clap(short, long,parse(from_os_str))]
+    #[clap(short, long,value_parser)]
     out : Option<PathBuf>,
 
     /// An optional list of candidate numbers (starting counting at 0) to mark as to be excluded (ineligible).
@@ -50,7 +50,7 @@ struct Opts {
     /// For example in a tie resolved between candidates 27 and 43, ConcreteSTV would favour 43 by default. Enter `--tie 43,27` to
     /// indicate that 27 should be favoured over 43 in a decision between them.
     /// This flag may be used multiple times for multiple tie resolutions.
-    #[clap(long,parse(try_from_str=main_app::try_parse_candidate_list))]
+    #[clap(long,value_parser=main_app::try_parse_candidate_list)]
     tie : Vec<TieResolutionAtom>,
 }
 

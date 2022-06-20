@@ -23,7 +23,7 @@ use std::fmt::Display;
 /// Convert a .stv file or .transcript file to a LaTeX table.
 struct Opts {
     /// The name of the .stv or transcript file to convert to latex.
-    #[clap(parse(from_os_str))]
+    #[clap(value_parser)]
     file : PathBuf,
 
     /// If set, show the change effected in counts as well as the total after counts.
