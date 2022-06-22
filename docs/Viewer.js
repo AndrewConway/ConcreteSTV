@@ -44,6 +44,11 @@ function effect_to_string(metadata,list) {
     return list.map(c=>metadata.candidates[c].name).join(" & ");
 }
 
+function SayLoading() {
+    const render_div = document.getElementById("RenderThingToView");
+    removeAllChildElements(render_div);
+    render_div.innerText="Reading file. Please wait."
+}
 function Render() {
     // general purpose clearing up.
     const render_div = document.getElementById("RenderThingToView");
@@ -320,7 +325,10 @@ function GotURLList(baseURL,list) {
 }
 function ChooseTranscript() {
     const files = document.getElementById("ChooseTranscript").files;
-    if (files.length>0) files[0].text().then(text=>{document_to_show=JSON.parse(text); Render(); });
+    if (files.length>0) {
+        SayLoading();
+        files[0].text().then(text=>{document_to_show=JSON.parse(text); Render(); });
+    }
 }
 
 function MainViewerOnLoadFunction() {
