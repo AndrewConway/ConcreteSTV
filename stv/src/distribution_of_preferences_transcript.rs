@@ -12,7 +12,7 @@ use crate::ballot_pile::BallotPaperCount;
 use crate::ballot_metadata::{CandidateIndex, ElectionMetadata, NumberOfCandidates};
 use crate::transfer_value::{TransferValue, StringSerializedRational};
 use serde::{Serialize,Deserialize};
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug, Display, Formatter};
 use crate::preference_distribution::TransferValueMethod;
 use crate::signed_version::SignedVersion;
 use std::str::FromStr;
@@ -127,6 +127,12 @@ pub struct TransferValueCreation<Tally> {
 #[derive(Clone,Serialize,Deserialize)]
 pub struct DecisionMadeByEC {
     pub affected : Vec<CandidateIndex>
+}
+
+impl Display for DecisionMadeByEC {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"Decision({})",self.affected.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(","))
+    }
 }
 
 

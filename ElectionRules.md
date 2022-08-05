@@ -24,9 +24,9 @@ asking for the source code of the counting algorithm under FOI, so the actual ru
 - **FederalPre2021** My interpretation of the Australian Federal Senate election system prior to the
   2021 legislation changes. Used to be called **Federal** but renamed as the legislation changed.
 - **FederalPost2021** My interpretation of the Australian Federal Senate election system post the
-  2021 legislation changes. Changes are to tie resolution and the removal of bulk exclusion, making it close to **AEC2016**.
+  2021 legislation changes. Changes are to tie resolution and the removal of bulk exclusion, making it essentially **AEC2016**.
 - **FederalPost2021Manual** My interpretation of the Australian Federal Senate election system for manual counting post the
-  2021 legislation changes. Same as **FederalPost2021** except bulk exclusion is still included, making it close to **AEC2013**.
+  2021 legislation changes. Same as **FederalPost2021** except bulk exclusion is still included, making it essentially **AEC2013**.
 - **AEC2013** This is my interpretation of the rules actually used by the AEC for the 2013 election.
   It is very similar to *FederalPre2021* except when resolving 3 way ties by looking at prior counts, any difference is used as a discriminator,
           instead of requiring that each has a different count. Evidence: NSW 2016, special count
@@ -34,10 +34,10 @@ asking for the source code of the counting algorithm under FOI, so the actual ru
    by the response below to our report, but is not absolutely clear.
 - **AEC2016** This is my interpretation of the rules actually used by the AEC for the 2016 election.
   It is very similar to *AEC2013*, except the Bulk Exclusion rules are not applied (evidence : this crops
-  up frequently)
-- **AEC2019** This is my interpretation of the rules actually used by the AEC for the 2019 election.
-  It is very similar to *AEC2016*, except rule (18) is applied after determining who to exclude but
-  before transferring any votes (evidence 2019 NSW, count 429)
+  up frequently).
+- **AEC2019** This is my interpretation of the rules actually used by the AEC for the 2019 and 2022 election.
+  It is very similar to *AEC2016* or *FederalPost2021*, except rule (18) is applied after determining who to exclude but
+  before transferring any votes (evidence 2019 NSW, count 429 and 2022 QLD count 266).
   
 Update: A [personal communication (reproduced with permission)](reports/RecommendedAmendmentsSenateCountingAndScrutinyResponse/18_10_2021_-_Dr_Andrew_Conway_and_Prof._Vanessa_teague_-_Senate_Counting_and_Scrutiny.pdf) 
 from the Electoral Commissioner clarified some of these interpretations. Note that the personal response

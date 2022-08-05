@@ -39,7 +39,7 @@ pub fn get_federal_data_loader_2019(finder:&FileFinder) -> FederalDataLoader {
 }
 
 pub fn get_federal_data_loader_2022(finder:&FileFinder) -> FederalDataLoader {
-    FederalDataLoader::new(finder,"2022",false,"https://tallyroom.aec.gov.au/SenateDownloadsMenu-27966-Csv.htm",27966)
+    FederalDataLoader::new(finder,"2022",false,"https://results.aec.gov.au/27966/Website/SenateDownloadsMenu-27966-Csv.htm",27966)
 }
 
 
@@ -124,12 +124,11 @@ impl RawDataSource for FederalDataLoader {
         vec!["ACT".to_string(),"NT".to_string(),"TAS".to_string(),"VIC".to_string(),"NSW".to_string(),"QLD".to_string(),"SA".to_string(),"WA".to_string()]
     }
 
-    // This below should be made more general and most of it factored out into a separate function.
     fn read_raw_data(&self,state:&str) -> anyhow::Result<ElectionData> {
         if self.year=="2013" { return self.read_raw_data2013(state); }
 //        let mut metadata = self.read_raw_metadata(state)?;
         let mut builder = UniqueVoteBuilderMultipleTypes::default();
-        let callback = |markings:&RawBallotMarkings,_meta:&[(&str,&str)]| { // TODO use the metadata to divide votes by source. Collection point meta[1].1 can start with PROVISIONAL, PRE_POLL, POSTAL, ABSENT at the minimum.
+        let callback = |markings:&RawBallotMarkings,_meta:&[(&str,&str)]| {
             let collection_point = _meta[1].1;
             let vote_type = if collection_point.starts_with("PROVISIONAL") { Some("PROVISIONAL") }
                 else if collection_point.starts_with("PRE_POLL") { Some("PRE_POLL") }
@@ -147,7 +146,7 @@ impl RawDataSource for FederalDataLoader {
             "2013" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2013,Self>(self,electorate),
             "2016" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2016,Self>(self,electorate),
             "2019" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
-            "2022" => self.read_raw_data(electorate), // TODO fix after 2022 election read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
+            "2022" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
             _ => Err(anyhow!("Invalid year {}",self.year)),
         }
     }
@@ -205,9 +204,9 @@ impl RawDataSource for FederalDataLoader {
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
             },
             "2022" => AssociatedRules{
-                rules_used: None, // Some("AEC2022".into()), // TODO update post 2022 election
+                rules_used: Some("AEC2019".into()),
                 rules_recommended: Some("FederalPost2021".into()),
-                comment: Some(Cow::Borrowed("This is preliminary data and is not fully sanity checked, and is not properly compared to the AEC distribution of preferences.")), // TODO update post 2022 election
+                comment: Some(Cow::Borrowed("The AEC seems to me to have used the same rules as they used in 2019 (AEC2019). This is similar to my interpretation of the legislation (FederalPost2021) other than in Queensland, where on the last count the AEC did not distribute any votes. This did not change who was elected, or, in this case, the order.")),
                 reports: vec![]
             },
             _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
@@ -252,6 +251,7 @@ impl CanReadRawMarkings for FederalDataLoader {
         let num_atl_plus_num_btl_hint = metadata.candidates.len()+metadata.parties.len();
         for record in ParsedRawVoteIterator::new(&mut zipfile,num_atl_plus_num_btl_hint)? {
             let record=record?;
+            // if &record.record[4]!="1" { continue; } // test just using batch 1.
             let markings = RawBallotMarkings::new(&parties_that_can_get_atls,&record.markings);
             callback(&markings,&[("Electorate",&record.record[record.electorate_column]),("Collection Point",&record.record[record.collection_column])]);
         }

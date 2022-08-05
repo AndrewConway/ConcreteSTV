@@ -33,7 +33,7 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **FederalPost2021Manual** Federal Senate, my interpretation of the correct rules for manual counting after the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md).
 - **AEC2013** Possibly buggy rules used by AEC in 2013 Federal Senate election
 - **AEC2016** Buggy rules used by AEC in 2016 Federal Senate election
-- **AEC2019** Buggy rules used by AEC in 2019 Federal Senate election
+- **AEC2019** Buggy rules used by AEC in 2019 and 2022 Federal Senate election
 - **ACTPre2020** Rules used for ACT Legislative Assembly by ElectionsACT prior to 2020.
 - **ACT2020** Very buggy rules used by ElectionsACT in 2020
 - **ACT2021** Rules that should have been used by ElectionsACT in 2020 and were used for the 2021 recount.

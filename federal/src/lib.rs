@@ -322,7 +322,7 @@ pub type FederalRulesPost2021Manual = FederalVariant<ManualFederalVariationsPost
 pub struct AECVariations2013 {}
 /// Rules used by the AEC for the 2016 election
 pub struct AECVariations2016 {}
-/// Rules used by the AEC for the 2019 election
+/// Rules used by the AEC for the 2019 and 2022 election
 pub struct AECVariations2019 {}
 
 impl FederalVariations for AECVariations2013 {
@@ -404,6 +404,10 @@ impl FederalVariations for AECVariations2019 {
 */
 
     /// In 2019 NSW, count 429, K. McCulloch is excluded. This leaves 2 candidates, 2 vacancies.
+    /// The elimination is aborted and no ballots are transferred in this count.
+    ///
+    /// A similar thing happens in 2022 QLD: In count 266, A. Stoker is excluded,
+    /// leaving 2 candidates (P. Hanson and A. Chisholm) who both get elected.
     /// The elimination is aborted and no ballots are transferred in this count.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers }
 

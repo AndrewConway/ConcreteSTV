@@ -66,6 +66,10 @@ impl OfficialDistributionOfPreferencesTranscript {
     /// Get the current count
     pub fn count(&mut self) -> &mut OfficialDOPForOneCount { self.counts.last_mut().unwrap() }
 
+    /// Gets all elected candidates.
+    pub fn all_elected(&self) -> Vec<CandidateIndex> {
+        self.counts.iter().flat_map(|c|c.elected.iter()).cloned().collect()
+    }
     /// Compare the results from the official transcript to our transcript.
     /// panic if there are differences.
     pub fn compare_with_transcript<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr+CanConvertToF64PossiblyLossily>(&self,transcript:&Transcript<Tally>) {

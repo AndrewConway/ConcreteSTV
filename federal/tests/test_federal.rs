@@ -18,6 +18,7 @@ mod tests {
     use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
     use std::fs::File;
     use std::iter::FromIterator;
+    use stv::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
     use stv::parse_util::{RawDataSource, FileFinder};
 
 
@@ -33,8 +34,18 @@ mod tests {
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}2019.json",state))?;
         serde_json::to_writer_pretty(file,&transcript)?;
-        //let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
-        //official_transcript.compare_with_transcript(&transcript.transcript);
+        let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
+
+        if official_transcript.all_elected()!=transcript.transcript.elected {
+            let lists : DeltasInCandidateLists = DifferentCandidateLists{list1:official_transcript.all_elected(),list2:transcript.transcript.elected.clone() }.into();
+            println!("Official elected differs from computed : {}",lists.pretty_print(&transcript.metadata));
+        }
+        official_transcript.compare_with_transcript(&transcript.transcript);
+        for (number,count) in transcript.transcript.counts.iter().enumerate() {
+            for decision in &count.decisions {
+                println!("Decision made in count {} : {}",number+1,decision)
+            }
+        }
         Ok(())
     }
 
@@ -49,6 +60,11 @@ mod tests {
         serde_json::to_writer_pretty(file,&transcript)?;
         let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
         official_transcript.compare_with_transcript(&transcript.transcript);
+        for (number,count) in transcript.transcript.counts.iter().enumerate() {
+            for decision in &count.decisions {
+                println!("Decision made in count {} : {}",number+1,decision)
+            }
+        }
         Ok(())
     }
 
@@ -162,7 +178,25 @@ mod tests {
     fn test_ACT2022() { test2022("ACT").unwrap() }
     #[test]
     #[allow(non_snake_case)]
+    fn test_WA2022() { test2022("WA").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_SA2022() { test2022("SA").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
     fn test_NT2022() { test2022("NT").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_QLD2022() { test2022("QLD").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_NSW2022() { test2022("NSW").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_VIC2022() { test2022("VIC").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_TAS2022() { test2022("TAS").unwrap() }
 
 
 }
