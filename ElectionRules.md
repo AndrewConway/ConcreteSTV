@@ -119,3 +119,17 @@ to work out my interpretation of their interpretation, which is now also in the 
 - **NSWLocalGov2021** My interpretation, for what it is worth
 - **NSWECLocalGov2021** My interpretation of the rules used by the NSWEC for the 2021 NSW local government elections.
 
+## Victorian upper house (Legislative Council)
+
+The Victorian rules in the Electoral Act 2022 are relatively well written and mostly unambiguous, 
+although 114A(28)(c) conflicted with 114A(12)(b). The VEC seems to have (reasonably)
+come down on the side of 114A(12)(b), and indeed the legislation changed in 2018 
+changing 114A(28)(c), fixing the conflict and confirming the VEC's interpretation.
+
+Unfortunately the VEC does not publish full vote data, and so it is difficult to
+verify their count. The 2014 data matches the output of the *Vic2018*
+rule set for the regions not updated in 2015.
+
+- **Vic2018** My interpretation of the rules post the 2018 conflict resolution
+              (and a reasonable if not literal interpretation of prior rules).
+

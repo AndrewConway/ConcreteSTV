@@ -225,7 +225,7 @@ impl HowSplitByCountNumber for FullySplitByCountNumber {
 pub struct SplitFirstCount {}
 impl HowSplitByCountNumber for SplitFirstCount {
     type KeyToDivide = bool;
-    fn key(count_index: CountIndex, _when_tv_created: Option<CountIndex>) -> Self::KeyToDivide { count_index.0 == 0 }
+    fn key(count_index: CountIndex, _when_tv_created: Option<CountIndex>) -> Self::KeyToDivide { count_index.0 != 0 }
 }
 /// Split by when the transfer value was created
 pub struct SplitByWhenTransferValueWasCreated {}

@@ -8,6 +8,7 @@ members= [
     "act",
     "federal",
     "nsw",
+    "vic",
     "statistics",
     "main-app",
     "webserver"

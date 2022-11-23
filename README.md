@@ -12,11 +12,13 @@ a variety of jurisdictions. This emphasis on perfectly matching actual the
 algorithms used in actual, concrete elections is where the name comes from.
 
 ConcreteSTV is a rewrite of an [earlier project](https://github.com/SiliconEconometrics/PublicService)
-but does not yet have all the features of the earlier project. However it
-is more user friendly, and future development will be concentrating on
+but does not yet have all the features of the earlier project. However ConcreteSTV now has most
+of the features, many new features, is much more user-friendly, and future development will be on
 this project.  
 
 Results from the earlier project were used to find and fix bugs [in the 2020 ACT STV count](reports/2020%20Errors%20In%20ACT%20Counting.pdf), and to identify bugs in the [2012](reports/NSWLGE2012CountErrorTechReport.pdf) and [2016](reports/2016%20NSW%20LGE%20Errors.pdf) NSW count which led the NSW Parliament to simplify the rules. Everyone is encouraged to use this code to double-check and correct election results.
+
+Results from this project were used to find bugs [in the 2013, 2016 and 2019 Federal counts](reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf) resulting in legislation change resolving some of the issues.
 
 ## Currently Supported Election Rules
 
@@ -24,7 +26,7 @@ ConcreteSTV supports a variety of different rules. Each jurisdiction generally h
 which changes over time, and then there is the actual implementation by the electoral commission which
 is often buggy. ConcreteSTV aims to both provide the option of a correct count, and also the ability
 to emulate the bugs of present in a particular year's count. There are also often ambiguities in the legislation,
-in which case ConcreteSTV generally follows the corresponding electoral commissions's interpretation, unless that
+in which case ConcreteSTV generally follows the corresponding electoral commission's interpretation, unless that
 changes over time.
 
 See [ElectionRules.md](ElectionRules.md) for a detailed description of what each of the below options means. 
@@ -39,6 +41,7 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **ACT2021** Rules that should have been used by ElectionsACT in 2020 and were used for the 2021 recount.
 - **NSWLocalGov2021** My dubious interpretation of the new, very ambiguous, legislation for NSW local government elections introduced before the 2021 elections. 
 - **NSWECLocalGov2021** Rules used by the NSWEC in the 2021 local government elections. This differs in many respects from my interpretation of the very ambiguous legislation. See [my thoughts](nsw/NSWLocalCouncilLegislation2021Commentary.md) for details.
+- **Vic2018** My interpretation of the Victorian Legislative Council rules. The 2018 refers to a conflict resolution fixed in 2018, but the rules were plausible if not literal before then.
 
 This list is expected to grow as ConcreteSTV supports more jurisdictions.
 
@@ -57,7 +60,7 @@ set of rules that also would produce the same output.
 If my program matches their output exactly, is that evidence that the correct candidates
 were elected? Only very weak evidence. For a start, I may have the same bug as the electoral
 commission. This sounds unlikely, but it actually
-happened once in prior work - my transcripts matched the AEC's perfectly, but later I found a bug
+happened once in prior work - my transcripts matched the AEC's perfectly in 2013, but later I found a bug
 in my code. More importantly, the accuracy depends on the list of the votes provided by the
 electroral commission, and there is rarely any meaningful evidence provided either to the public
 or scrutineers that these
@@ -65,7 +68,7 @@ correspond to the physical ballots, and are not affected by hackers, malicious i
 insiders, OCR errors or other bugs. This could be mitigated by public random auditing.
 
 Note that prior to 2020, the ACT counting code was publicly available on their website. It
-also appears to be the least buggy EC code in practice. This was partially due to
+also appeared to be the least buggy EC code in practice. This was partially due to
 third parties who pointed out issues before they cropped up in elections.
 
 If you notice any bugs in ConcreteSTV, please contact me at the address at the bottom

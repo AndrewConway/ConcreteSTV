@@ -167,7 +167,7 @@ impl OfficialDistributionOfPreferencesTranscript {
                             panic!("{} was not in the list of not continuing. There was a relevant decision involving {:?} but I didn't exclude any.",who,relevant_decision.affected);
                         }
                     }
-                    panic!("{} was not in the list of not continuing",who);
+                    panic!("{} was in the official list of people stopping being continuing candidates for the first time in this round, but not in my list.",who);
                 }
                 assert!(my_count.not_continuing.contains(who),"{} was not in the list of not continuing",who);
             }
@@ -208,7 +208,7 @@ impl OfficialDistributionOfPreferencesTranscript {
                 }
             }
         }
-        assert_eq!(self.counts.len(),transcript.counts.len());
+        assert_eq!(self.counts.len(),transcript.counts.len(),"A different number of counts are present.");
         None
     }
 }

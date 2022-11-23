@@ -49,6 +49,28 @@ impl <X:Default+PartialEq+Clone+Display+FromStr> Default for PerCandidate<X> {
         }
     }
 }
+
+#[derive(thiserror::Error, Debug)]
+#[error("Not an integer")]
+pub struct NotInteger {}
+
+impl TryFrom<PerCandidate<f64>> for PerCandidate<isize> {
+    type Error = NotInteger;
+
+    fn try_from(value: PerCandidate<f64>) -> Result<Self, Self::Error> {
+        let as_int = |f:f64| -> Result<isize,NotInteger> {
+            if f.is_nan() { Ok(isize::MAX) }
+            else if f == (f as isize) as f64 { Ok(f as isize) }
+            else { Err(NotInteger{}) }
+        };
+        Ok(PerCandidate::<isize>{
+            candidate: value.candidate.into_iter().map(as_int).collect::<Result<Vec<isize>,NotInteger>>()?,
+            exhausted: as_int(value.exhausted)?,
+            rounding: SignedVersion{ negative: value.rounding.negative, value: as_int(value.rounding.value)? },
+            set_aside:  value.set_aside.map(as_int).transpose()?,
+        })
+    }
+}
 /// Record the status of the count at the end of the count.
 #[derive(Clone,Serialize,Deserialize,PartialEq)]
 pub struct EndCountStatus<Tally:PartialEq+Clone+Display+FromStr> {

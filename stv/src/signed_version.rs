@@ -15,8 +15,8 @@ use std::cmp::Ordering;
 /// A signed version of some type of number. Used when a number is almost always positive, but in some rare situations may be negative, like votes lost to rounding if rounding isn't always down.
 #[derive(Clone,Eq, PartialEq,Debug)]
 pub struct SignedVersion<Tally> {
-    negative : bool, // should always be false for zero.
-    value : Tally
+    pub negative : bool, // should always be false for zero.
+    pub value : Tally
 }
 
 impl <Tally:Clone+PartialEq> SignedVersion<Tally> {
