@@ -20,7 +20,7 @@ use crate::Vic2018LegislativeCouncil;
 use calamine::{DataType, open_workbook_auto};
 use stv::ballot_paper::{parse_marking, RawBallotMarking, RawBallotMarkings, UniqueBTLBuilder};
 use stv::ballot_pile::BallotPaperCount;
-use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
+use stv::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo};
 use stv::signed_version::SignedVersion;
 
 pub fn get_vic_data_loader_2014(finder:&FileFinder) -> anyhow::Result<VicDataLoader> {
@@ -367,6 +367,7 @@ impl DOPFileFormat {
                             if !found { return Err(anyhow!("Could not interpret names {} problem with {}",elected_names,remaining))}
                         }
                     }
+                    let mut papers_came_from_counts: Option<Vec<CountIndex>> = None;
                     if let Some(count_details) = value(0,self.count_details_columm).and_then(|v|v.get_string()) {
                         // println!("Details column {}",count_details);
                         if count_details.starts_with("Exclusion of ") {
@@ -377,6 +378,8 @@ impl DOPFileFormat {
                                     excluded.push(CandidateIndex(who));
                                 }
                             } else { return Err(anyhow!("Could not work out who was excluded in {}",count_details))}
+                            papers_came_from_counts=OfficialDOPForOneCount::extract_counts_from_comment(remaining,"from count ","")?;
+                            if papers_came_from_counts.is_none() { return Err(anyhow!("Could not work out who which counts contributed {}",count_details))}
                         }
                     }
                     let get_row = |rowdelta:u32|-> PerCandidate<f64> {
@@ -399,6 +402,7 @@ impl DOPFileFormat {
                         vote_delta : Some(get_row(if is_first {0} else {1})),
                         paper_delta : Some(get_row(0).try_into()?),
                         count_name: None,
+                        papers_came_from_counts,
                     });
                 }
             }

@@ -48,6 +48,7 @@ fn test_ineligible() {
     let data = loader.read_raw_data_checking_electorate_valid("Ballina - B Ward").unwrap();
     assert_eq!(data.metadata.excluded,vec![CandidateIndex(2)]);
 }
+/*
 #[test]
 fn test_all_council_races() {
     let finder = FileFinder::find_ec_data_repository();
@@ -65,8 +66,39 @@ fn test_all_council_races() {
             test::<NSWECLocalGov2021>(electorate,&loader);
         }
     }
-}
+}*/
 
+#[test]
+/// Test all 2021 Mayoral elections
+fn test_2021_mayoral() {
+    let finder = FileFinder::find_ec_data_repository();
+    println!("Found files at {:?}",finder.path);
+    let loader = get_nsw_lge_data_loader_2021(&finder).unwrap();
+    println!("Made loader");
+    let electorate =&loader.all_electorates()[0];
+    assert_eq!(electorate,"City of Albury");
+    for electorate in &loader.all_electorates() {
+        if electorate.ends_with(" Mayoral") {
+            println!("Testing Electorate {}",electorate);
+            test::<SimpleIRVAnyDifferenceBreaksTies>(electorate, &loader);
+        }
+    }
+}
+#[test]
+fn test_2021_council() {
+    let finder = FileFinder::find_ec_data_repository();
+    println!("Found files at {:?}",finder.path);
+    let loader = get_nsw_lge_data_loader_2021(&finder).unwrap();
+    println!("Made loader");
+    let electorate =&loader.all_electorates()[0];
+    assert_eq!(electorate,"City of Albury");
+    for electorate in &loader.all_electorates() {
+        if !electorate.ends_with(" Mayoral") {
+            println!("Testing Electorate {}",electorate);
+            test::<NSWECLocalGov2021>(electorate,&loader);
+        }
+    }
+}
 /*
 #[test]
 fn make_stv_file_of_everything() {

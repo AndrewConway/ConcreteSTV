@@ -5,13 +5,14 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-use crate::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo, Transcript};
+use crate::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo, Transcript};
 use crate::ballot_metadata::CandidateIndex;
 use std::cmp::min;
 use std::collections::HashSet;
 use num::{abs, Zero};
 use std::ops::Sub;
 use std::fmt::Display;
+use std::num::ParseIntError;
 use crate::ballot_pile::BallotPaperCount;
 use crate::signed_version::SignedVersion;
 use std::str::FromStr;
@@ -28,6 +29,7 @@ pub struct OfficialDOPForOneCount {
     pub vote_delta : Option<PerCandidate<f64>>, // A NaN means unknown
     pub paper_delta : Option<PerCandidate<isize>>, // an isize::MAX means unknown
     pub count_name : Option<String>,
+    pub papers_came_from_counts : Option<Vec<CountIndex>>, // if present, which were the source for the counts. Should be in ascending order.
 }
 
 /// Information from
@@ -58,6 +60,21 @@ pub trait CanConvertToF64PossiblyLossily {
 
 impl CanConvertToF64PossiblyLossily for usize {
     fn convert_to_f64(&self) -> f64 { *self as f64 }
+}
+
+impl OfficialDOPForOneCount {
+    // given a string containing a comma separated list of 1 based counts, starting with start_count_list_string and ending in suffix,
+    // get a list of counts.
+    pub fn extract_counts_from_comment(comment:&str, start_count_list_string:&str, suffix:&str) -> Result<Option<Vec<CountIndex>>,ParseIntError> {
+        if let Some(pos) = comment.find(start_count_list_string) {
+            if let Some(remaining) = comment[pos+start_count_list_string.len()..].strip_suffix(suffix) {
+                let count_list : Result<Vec<usize>,_> = remaining.trim().split(',').map(|s|s.trim().parse()).collect();
+                let mut count_list = count_list?;
+                count_list.sort();
+                Ok(Some(count_list.into_iter().map(|v|CountIndex(v-1)).collect()))
+            } else { Ok(None) }
+        } else { Ok(None) }
+    }
 }
 
 impl OfficialDistributionOfPreferencesTranscript {
@@ -206,6 +223,9 @@ impl OfficialDistributionOfPreferencesTranscript {
                 for candidate in 0..paper_delta.candidate.len() {
                     assert_papers_candidate_delta(paper_delta.candidate[candidate],my_count.status.papers.candidate[candidate].clone(),if i>0 { transcript.counts[i-1].status.papers.candidate[candidate].clone()} else {BallotPaperCount(0)},"papers delta",CandidateIndex(candidate));
                 }
+            }
+            if let Some(papers_came_from_counts) = &official_count.papers_came_from_counts {
+                assert_eq!(papers_came_from_counts,&my_count.portion.papers_came_from_counts);
             }
         }
         assert_eq!(self.counts.len(),transcript.counts.len(),"A different number of counts are present.");

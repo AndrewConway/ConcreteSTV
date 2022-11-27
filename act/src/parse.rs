@@ -22,7 +22,7 @@ use serde::Deserialize;
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use calamine::{open_workbook_auto, DataType};
 use stv::datasource_description::{AssociatedRules, Copyright};
-use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
+use stv::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo};
 use crate::{ACT2021, ACTPre2020};
 
 pub fn get_act_data_loader_2020(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
@@ -300,6 +300,7 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
     let mut table2_col_for_candidate = vec![u32::MAX;metadata.candidates.len()];
     let mut table1_col_for_exhausted_papers : Option<u32> = None;
     let mut table1_col_for_transfer_value : Option<u32> = None;
+    let mut table1_col_for_description_of_choices: Option<u32> = None;
     let mut table2_col_for_exhausted_votes : Option<u32> = None;
     let mut table2_col_for_loss_by_fraction : Option<u32> = None;
     let mut table2_col_for_remarks : Option<u32> = None;
@@ -318,12 +319,14 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
             if let Some(s) = v.get_string() {
                 if s.contains("Papers Exhausted at Count") { table1_col_for_exhausted_papers=Some(col); }
                 else if s.contains("Transfer Value") { table1_col_for_transfer_value=Some(col); }
+                else if s.contains("Description of Choices Counted") { table1_col_for_description_of_choices=Some(col); }
             }
         }
     }
     if table1_col_for_candidate.contains(&u32::MAX) { return Err(anyhow!("Could not find all candidates in table1"));}
     let table1_col_for_exhausted_papers=table1_col_for_exhausted_papers.ok_or_else(||anyhow!("Could not find exhausted papers column in table 1"))?;
     let table1_col_for_transfer_value=table1_col_for_transfer_value.ok_or_else(||anyhow!("Could not find transfer value column in table 1"))?;
+    let table1_col_for_description_of_choices= table1_col_for_description_of_choices.ok_or_else(||anyhow!("Could not find description of choices counted column in table 1"))?;
     for col in count_column+1 .. sheet2.width() as u32 {
         if let Some(v) = sheet2.get_value((row_index_for_names,col)) {
             if let Some(s) = v.get_string() {
@@ -416,6 +419,29 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
             rounding: 0.into(),
             set_aside: None,
         });
+        let mut papers_came_from_counts : Option<Vec<CountIndex>> = None;
+        if !counts.is_empty() {
+            let (row_offset,start_count_list_string,end_count_list_string) = match metadata.name.year.as_str() {
+                "2008" => ( 0,"On Papers at Count ",","),
+                "2012" => ( 0,"On Papers at Count ",","),
+                "2016" => (-1,"On Papers at Count ",","),
+                "2020" => {
+                    let buggy_version = if let Some(s) = sheet1.get_value((paper_row_index,table1_col_for_description_of_choices)).and_then(|v|v.get_string()) { // the original DOPs published had lots of bugs and a different format.
+                        s.starts_with("From counts")
+                    } else { false };
+                    if buggy_version { (0, "From counts", "") } else {(-1,"On Papers at Count ","")}
+                }
+                _ => return Err(anyhow!("Do not know how to parse Description of Choices Counted for {}",metadata.name.year)),
+            };
+            if let Some(s) = sheet1.get_value(((paper_row_index as i32+row_offset) as u32,table1_col_for_description_of_choices)).and_then(|v|v.get_string()) {
+                // println!("counts len {}, tv={:?}, s={}",counts.len(),transfer_value,s);
+                papers_came_from_counts=OfficialDOPForOneCount::extract_counts_from_comment(s,start_count_list_string,end_count_list_string)?;
+                if metadata.name.year=="2020" && metadata.name.electorate=="Kurrajong" && s=="From counts55" { papers_came_from_counts=Some(vec![CountIndex(51)])} // That year was really special. See the wayback machine to get the spreadsheet needing this.
+                if papers_came_from_counts.is_none() { return Err(anyhow!("Could not work out who which counts contributed {}",s))}
+            } else {
+                return Err(anyhow!("Could not find which counts this came from"))
+            }
+        }
         //println!("{:?}",paper_delta.as_ref().unwrap());
         row_index+=if only_1_row {1} else {2};
         paper_row_index+=2;
@@ -428,6 +454,7 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
             vote_delta,
             paper_delta,
             count_name: None,
+            papers_came_from_counts,
         });
         if sheet2.get_value((row_index,count_column)).is_none()&&sheet2.get_value((row_index+1,count_column)).is_none() {
            return Ok(OfficialDistributionOfPreferencesTranscript{ quota, counts ,missing_negatives_in_papers_delta:true, elected_candidates_are_in_order: true, all_exhausted_go_to_rounding: false })

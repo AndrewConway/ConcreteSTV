@@ -328,7 +328,8 @@ impl NSWLGEDataLoader {
                     paper_total: None,
                     vote_delta: Some(vote_delta),
                     paper_delta: Some(paper_delta),
-                    count_name: Some(line[col_count].clone())
+                    count_name: Some(line[col_count].clone()),
+                    papers_came_from_counts : None,
                 });
             }
             if (line_upto==table.len()-1 || table[line_upto+1][col_count].is_empty() || table[line_upto+1][col_count]=="Candidate(s) marked with an asterisk were elected without reaching quota.") && !counts.is_empty() { // last line for a major count. People can get elected here, and cumulative tallies are available.
@@ -461,7 +462,8 @@ impl NSWLGEDataLoader {
                 paper_total: column(col_total),
                 vote_delta: columnf64(col_delta),
                 paper_delta: columnisize(col_delta),
-                count_name: None
+                count_name: None,
+                papers_came_from_counts : None,
             };
             if let Some(candidate) = excluded {
                 let old_total = counts.last().unwrap().paper_total.as_ref().unwrap().candidate[candidate.0];

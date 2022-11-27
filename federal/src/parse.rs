@@ -16,11 +16,11 @@ use zip::ZipArchive;
 use zip::read::ZipFile;
 use anyhow::anyhow;
 use stv::election_data::ElectionData;
-use stv::distribution_of_preferences_transcript::QuotaInfo;
+use stv::distribution_of_preferences_transcript::{CountIndex, QuotaInfo};
 use serde::Deserialize;
 use stv::ballot_pile::BallotPaperCount;
 use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
-use stv::official_dop_transcript::{candidate_elem, OfficialDistributionOfPreferencesTranscript};
+use stv::official_dop_transcript::{candidate_elem, OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use stv::tie_resolution::TieResolutionsMadeByEC;
 use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder, RawDataSource, MissingFile, FileFinder, RawBallotPaperMetadata, CanReadRawMarkings, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
 use crate::{FederalRulesUsed2013, FederalRulesUsed2016, FederalRulesUsed2019};
@@ -335,13 +335,14 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
         #[serde(rename = "Status")] status : String, // blank, Elected, Excluded
         #[serde(rename = "Changed")] changed : String, // True or blank.
         #[serde(rename = "Order Elected")] order_elected : usize,
-        #[serde(rename = "Comment")] _comment: Option<String>,
+        #[serde(rename = "Comment")] comment: Option<String>,
     }
     let lookup_names : HashMap<String,CandidateIndex> = metadata.get_candidate_name_lookup();
     let mut res = OfficialDistributionOfPreferencesTranscript::default();
     let mut last_count : usize = 0;
     let mut order_elected : HashMap<CandidateIndex,usize> = Default::default(); // value is order elected, which is not necessarily as encountered.
     let mut excluded_last : Vec<CandidateIndex> = vec![]; // transcript marks them as excluded the round before they are excluded in.
+    let mut papers_came_from_counts : Option<Vec<CountIndex>> = None;
     for result in reader.deserialize() {
         let record : Record = result?;
         if last_count==0 {
@@ -355,6 +356,7 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
             last_count=record.count;
             res.finished_count();
             res.count().excluded.extend(excluded_last.drain(..));
+            res.count().papers_came_from_counts = papers_came_from_counts.take();
         }
         if record.transfer_value!=0.0 { res.count().transfer_value = Some(record.transfer_value) }
         if record.surname=="Exhausted" {
@@ -385,6 +387,14 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
                             _ => return Err(anyhow!("Could not understand status {}",record.status)),
                         }
                     }
+                }
+            }
+        }
+        if papers_came_from_counts.is_none() {
+            if let Some(comment) = &record.comment {
+                papers_came_from_counts = OfficialDOPForOneCount::extract_counts_from_comment(comment,"Preferences received at count(s) ",".")?;
+                if papers_came_from_counts.is_none() {
+                    papers_came_from_counts = OfficialDOPForOneCount::extract_counts_from_comment(comment,"papers are involved from count number(s) ",".")?;
                 }
             }
         }
