@@ -27,6 +27,16 @@ pub fn get_vic_data_loader_2014(finder:&FileFinder) -> anyhow::Result<VicDataLoa
     VicDataLoader::new(finder,"2014","https://www.vec.vic.gov.au/results/state-election-results/2014-state-election") // Note - not all needed files are public. Ask the VEC nicely if you want them, and maybe they will oblige.
 }
 
+pub fn get_vic_data_loader_2018(finder:&FileFinder) -> anyhow::Result<VicDataLoader> {
+    VicDataLoader::new(finder,"2018","https://www.vec.vic.gov.au/results/state-election-results/2018-state-election") // Note - not all needed files are public. Ask the VEC nicely if you want them, and maybe they will oblige.
+}
+
+pub fn get_vic_data_loader_2022(finder:&FileFinder) -> anyhow::Result<VicDataLoader> {
+    VicDataLoader::new(finder,"2022","https://www.vec.vic.gov.au/results/state-election-results/2022-state-election") // Note - not all needed files are public. Ask the VEC nicely if you want them, and maybe they will oblige.
+}
+
+
+
 pub struct NSWLGEDataSource {}
 
 impl ElectionDataSource for NSWLGEDataSource {
@@ -95,7 +105,7 @@ impl RawDataSource for VicDataLoader {
     }
     fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> {
         let metadata = self.read_raw_metadata(electorate)?;
-        println!("{:?}",metadata);
+        // println!("{:?}",metadata);
         let filename = format!("received_from_ec/Ballot Paper Details - {}.csv",electorate);
         let path = self.find_raw_data_file(&filename)?;
         let mut reader = csv::ReaderBuilder::new().flexible(true).has_headers(false).from_path(&path)?;
@@ -132,7 +142,8 @@ impl RawDataSource for VicDataLoader {
 
     /// Get the metadata from the file like south-easternmetropolitanregionvotesreceived.xls
     fn read_raw_metadata(&self,electorate:&str) -> anyhow::Result<ElectionMetadata> {
-        let filename = format!("{}votesreceived.xls",Self::region_human_name_to_computer_name(electorate));
+        if self.year=="2022" { return self.read_raw_metadata_from_candidate_list_on_main_website(electorate); }
+        let filename = format!("{}votesreceived.xls",Self::region_human_name_to_computer_name(electorate,false));
         let path = self.find_raw_data_file(&filename)?;
         use calamine::Reader;
         let mut workbook1 = open_workbook_auto(&path)?;
@@ -232,7 +243,7 @@ impl RawDataSource for VicDataLoader {
     }
 
     fn read_official_dop_transcript(&self, metadata: &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
-        let filename = format!("{}distributions.xls",Self::region_human_name_to_computer_name(&metadata.name.electorate));
+        let filename = format!("{}distributions.xls",Self::region_human_name_to_computer_name(&metadata.name.electorate,false));
         let path = self.find_raw_data_file(&filename)?;
         use calamine::Reader;
         let mut workbook1 = open_workbook_auto(&path)?;
@@ -242,6 +253,66 @@ impl RawDataSource for VicDataLoader {
     }
 }
 
+impl VicDataLoader {
+    /// Get the metadata from a url like https://www.vec.vic.gov.au/electoral-boundaries/state-regions/north-eastern-metropolitan-region/nominations
+    /// First will need to get file with something like
+    /// `wget -S -O northern-metropolitan-region.nominations.html https://www.vec.vic.gov.au/electoral-boundaries/state-regions/northern-metropolitan-region/nominations`
+    /// except the VEC blocks wget so you have to manually download it with a more conventional browser.
+    ///
+    fn read_raw_metadata_from_candidate_list_on_main_website(&self, electorate: &str) -> anyhow::Result<ElectionMetadata> {
+        let filename = format!("{}.nominations.html", Self::region_human_name_to_computer_name(electorate,true));
+        let path = self.finder.find_raw_data_file_with_extra_url_info(&filename, &self.archive_location, &format!("https://www.vec.vic.gov.au/electoral-boundaries/state-regions/{}/nominations",Self::region_human_name_to_computer_name(electorate,true)),"")?;
+        let html = scraper::Html::parse_document(&std::fs::read_to_string(&path)?);
+        let table = html.select(&scraper::Selector::parse("main table > tbody").unwrap()).next().ok_or_else(||anyhow!("Could not find main table in candidate list html page"))?;
+        let mut candidates = vec![];
+        let mut parties = vec![];
+        let mut position_in_party = 0;
+        for tr in table.select(&scraper::Selector::parse("tr").unwrap()) {
+            if let Some(party_name) = tr.select(&scraper::Selector::parse("td.party-name a").unwrap()).next() {
+                let party_name = party_name.text().collect::<Vec<_>>().join("").trim().to_string();
+                //println!("Party name : {}",party_name);
+                let (column_id,name) = party_name.split_once(' ').unwrap_or(("",&party_name));
+                parties.push(Party{
+                    column_id: column_id.to_string(),
+                    name: name.to_string(),
+                    abbreviation: None,
+                    atl_allowed: name!="Ungrouped",
+                    candidates: vec![],
+                    tickets: vec![]
+                });
+                position_in_party=1;
+            } else if let Some(candidate_name) = tr.select(&scraper::Selector::parse("tr.candidate-row td").unwrap()).next() {
+                let candidate_name = candidate_name.text().next().ok_or_else(||anyhow!("No candidate name found in html file"))?.trim();
+                //println!("Candidate name : {:?}",candidate_name);
+                parties.last_mut().unwrap().candidates.push(CandidateIndex(candidates.len()));
+                candidates.push(Candidate{
+                    name: candidate_name.to_string(),
+                    party: Some(PartyIndex(parties.len()-1)),
+                    position: Some(position_in_party),
+                    ec_id: None
+                });
+                position_in_party+=1;
+            }
+        }
+        let metadata = ElectionMetadata{
+            name: self.name(electorate),
+            candidates,
+            parties,
+            source: vec![DataSource{
+                url: self.page_url.to_string(),
+                files: vec![path.file_name().as_ref().unwrap().to_string_lossy().to_string()],
+                comments: None
+            }],
+            results: None,
+            vacancies: Some(self.candidates_to_be_elected(electorate)),
+            enrolment: None,
+            secondary_vacancies: None,
+            excluded: vec![],
+            tie_resolutions: Default::default()
+        };
+        Ok(metadata)
+    }
+}
 /// The headings for the distribution of preferences (DOP) file (excel spreadsheet).
 /// The parsing of this is split into two sections
 ///  * Read the quota and headings (making this structure)
@@ -423,7 +494,7 @@ impl VicDataLoader {
     }
 
     fn reorder_candidates_in_metadata_by_official_dop_transcript(&self, metadata: &mut ElectionMetadata) -> anyhow::Result<()>  {
-        let filename = format!("{}distributions.xls",Self::region_human_name_to_computer_name(&metadata.name.electorate));
+        let filename = format!("{}distributions.xls",Self::region_human_name_to_computer_name(&metadata.name.electorate,false));
         let path = self.find_raw_data_file(&filename)?;
         use calamine::Reader;
         let mut workbook1 = open_workbook_auto(&path)?;
@@ -432,9 +503,9 @@ impl VicDataLoader {
         format.reorder_candidates_to_match_this(metadata);
         Ok(())
     }
-    /// Convert a name like "South-Eastern Metropolitan Region" to "south-easternmetropolitanregion" as used in file names.
-    fn region_human_name_to_computer_name(electorate:&str) -> String {
-        electorate.chars().filter(|c|!c.is_whitespace()).map(|c|c.to_ascii_lowercase()).collect()
+    /// Convert a name like "South-Eastern Metropolitan Region" to "south-easternmetropolitanregion" as used in file names. or "south-eastern-metropolitan-region" as used in urls
+    fn region_human_name_to_computer_name(electorate:&str,convert_spaces_to_hypens:bool) -> String {
+        electorate.chars().map(|c|if convert_spaces_to_hypens&&c==' ' {'-'} else {c}).filter(|c|!c.is_whitespace()).map(|c|c.to_ascii_lowercase()).collect()
     }
 
 }

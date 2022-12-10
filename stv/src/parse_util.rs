@@ -91,11 +91,16 @@ impl CandidateAndGroupInformationBuilder {
 pub struct MissingFile {
     pub file_name : String,
     pub where_to_get : String,
+    pub where_to_get_is_exact_url : bool,
 }
 
 impl Display for MissingFile {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f,"Missing file {} look in {}",self.file_name,self.where_to_get)
+        if self.where_to_get_is_exact_url {
+            write!(f,"Missing file {} from URL {} : try wget -O {} {}",self.file_name,self.where_to_get,self.file_name,self.where_to_get)
+        } else {
+            write!(f,"Missing file {} look in {}",self.file_name,self.where_to_get)
+        }
     }
 }
 impl Error for MissingFile {
@@ -299,7 +304,7 @@ impl FileFinder {
         if expect.exists() { return Ok(expect) }
         let expect = self.path.join(archive_location).join(filename);
         if expect.exists() { return Ok(expect) }
-        Err(MissingFile{ file_name: filename.to_string(), where_to_get: source_url.to_string() })
+        Err(MissingFile{ file_name: filename.to_string(), where_to_get: source_url.to_string(), where_to_get_is_exact_url : false })
     }
 
     pub fn find_raw_data_file_with_extra_url_info(&self,filename:&str,archive_location:&str,source_url_base:&str,source_url_relative:&str) -> Result<PathBuf,MissingFile> {
@@ -307,8 +312,11 @@ impl FileFinder {
         if expect.exists() { return Ok(expect) }
         let expect = self.path.join(archive_location).join(filename);
         if expect.exists() { return Ok(expect) }
-        let url = Url::parse(source_url_base).unwrap().join(source_url_relative).unwrap();
-        Err(MissingFile{ file_name: filename.to_string(), where_to_get: url.as_str().to_string() })
+        let where_to_get : String = if source_url_relative.is_empty() { source_url_base.to_string() } else {
+            let url = Url::parse(source_url_base).unwrap().join(source_url_relative).unwrap();
+            url.as_str().to_string()
+        };
+        Err(MissingFile{ file_name: filename.to_string(), where_to_get, where_to_get_is_exact_url: true })
     }
 
 

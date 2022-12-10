@@ -17,7 +17,7 @@ use main_app::rules::Rules;
 /// those used by various electoral commissions on various elections.
 struct Opts {
     /// The counting rules to use.
-    /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021
+    /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021, Vic2018
     rules : Rules,
 
     /// The name of the .stv (or .vchange) file to get votes from
