@@ -18,7 +18,7 @@ use stv::parse_util::{FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSou
 use stv::tie_resolution::TieResolutionsMadeByEC;
 use crate::Vic2018LegislativeCouncil;
 use calamine::{DataType, open_workbook_auto};
-use stv::ballot_paper::{parse_marking, RawBallotMarking, RawBallotMarkings, UniqueBTLBuilder};
+use stv::ballot_paper::{ATL, BTL, parse_marking, RawBallotMarking, RawBallotMarkings, UniqueBTLBuilder};
 use stv::ballot_pile::BallotPaperCount;
 use stv::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo};
 use stv::signed_version::SignedVersion;
@@ -104,7 +104,7 @@ impl RawDataSource for VicDataLoader {
         ]
     }
     fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> {
-        let metadata = self.read_raw_metadata(electorate)?;
+        let mut metadata = self.read_raw_metadata(electorate)?;
         // println!("{:?}",metadata);
         let filename = format!("received_from_ec/Ballot Paper Details - {}.csv",electorate);
         let path = self.find_raw_data_file(&filename)?;
@@ -126,14 +126,48 @@ impl RawDataSource for VicDataLoader {
                 }
             }
         }
-        Ok(ElectionData{
+        metadata.source.push(DataSource{
+            url: "VEC does not publish unfortunately".to_string(),
+            files: vec![filename],
+            comments: None
+        });
+        let mut result = ElectionData{
             metadata,
             atl: vec![],
             atl_types: vec![],
             btl: builder.to_btls(),
             btl_types: vec![],
             informal
-        })
+        };
+        if self.election_count_not_published_yet() { // in this case the file above is only partial results. Add an estimate of the remaining results from the count by first preference.
+            let early_preference_votes = self.parse_results_by_region_intermediate_webpage(&mut result.metadata)?;
+            let mut votes_by_candidate_first_pref = vec![0;result.metadata.candidates.len()]; // the number of votes we have BTL candidates for.
+            for b in &result.btl {
+                votes_by_candidate_first_pref[b.candidates[0].0]+=b.n;
+            }
+            // Deal with all votes for parties as if they are ATL votes for all votes not already in btl.
+            for party_index in 0..result.metadata.parties.len().min(early_preference_votes.by_party.len()) {
+                let (num_atl,num_btl) = early_preference_votes.by_party[party_index];
+                let mut unaccounted = num_atl+num_btl;
+                for &c in &result.metadata.parties[party_index].candidates {
+                    unaccounted-=votes_by_candidate_first_pref[c.0];
+                    votes_by_candidate_first_pref[c.0]=0; // accounted for
+                }
+                result.atl.push(ATL{
+                    parties: vec![PartyIndex(party_index)],
+                    n: unaccounted,
+                    ticket_index: Some(0)
+                });
+            }
+            // Deal with votes for ungrouped candidates, as just a first pref vote for them.
+            for candidate_index in 0..result.metadata.candidates.len() {
+                let n = early_preference_votes.by_candidate[candidate_index];
+                if n>votes_by_candidate_first_pref[candidate_index] {
+                    result.btl.push(BTL{ candidates: vec![CandidateIndex(candidate_index)], n:n-votes_by_candidate_first_pref[candidate_index] })
+                }
+            }
+        }
+        Ok(result)
     }
 
     fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> {
@@ -142,7 +176,11 @@ impl RawDataSource for VicDataLoader {
 
     /// Get the metadata from the file like south-easternmetropolitanregionvotesreceived.xls
     fn read_raw_metadata(&self,electorate:&str) -> anyhow::Result<ElectionMetadata> {
-        if self.year=="2022" { return self.read_raw_metadata_from_candidate_list_on_main_website(electorate); }
+        if self.election_count_not_published_yet() {
+            let mut metadata = self.read_raw_metadata_from_candidate_list_on_main_website(electorate)?;
+            self.parse_pdf_tickets_file(&mut metadata)?;
+            return Ok(metadata)
+        }
         let filename = format!("{}votesreceived.xls",Self::region_human_name_to_computer_name(electorate,false));
         let path = self.find_raw_data_file(&filename)?;
         use calamine::Reader;
@@ -233,7 +271,13 @@ impl RawDataSource for VicDataLoader {
     fn rules(&self, _electorate: &str) -> AssociatedRules {
         match self.year.as_str() {
             "2014" => AssociatedRules {
-                rules_used: Some("VEC2014".into()),
+                rules_used: Some("VEC2018".into()),
+                rules_recommended: None,
+                comment: Some("Untested. 2018 rules used rather than literal legislation which included what could reasonably be considered a typo fixed in 2018.".into()),
+                reports: vec![],
+            },
+            "2022" => AssociatedRules {
+                rules_used: Some("VEC2018".into()),
                 rules_recommended: None,
                 comment: Some("Untested.".into()),
                 reports: vec![],
@@ -254,6 +298,9 @@ impl RawDataSource for VicDataLoader {
 }
 
 impl VicDataLoader {
+
+    fn election_count_not_published_yet(&self) -> bool { self.year=="2022" } // TODO change when published.
+
     /// Get the metadata from a url like https://www.vec.vic.gov.au/electoral-boundaries/state-regions/north-eastern-metropolitan-region/nominations
     /// First will need to get file with something like
     /// `wget -S -O northern-metropolitan-region.nominations.html https://www.vec.vic.gov.au/electoral-boundaries/state-regions/northern-metropolitan-region/nominations`
@@ -261,7 +308,8 @@ impl VicDataLoader {
     ///
     fn read_raw_metadata_from_candidate_list_on_main_website(&self, electorate: &str) -> anyhow::Result<ElectionMetadata> {
         let filename = format!("{}.nominations.html", Self::region_human_name_to_computer_name(electorate,true));
-        let path = self.finder.find_raw_data_file_with_extra_url_info(&filename, &self.archive_location, &format!("https://www.vec.vic.gov.au/electoral-boundaries/state-regions/{}/nominations",Self::region_human_name_to_computer_name(electorate,true)),"")?;
+        let url = format!("https://www.vec.vic.gov.au/electoral-boundaries/state-regions/{}/nominations",Self::region_human_name_to_computer_name(electorate,true));
+        let path = self.finder.find_raw_data_file_with_extra_url_info(&filename, &self.archive_location, &url,"")?;
         let html = scraper::Html::parse_document(&std::fs::read_to_string(&path)?);
         let table = html.select(&scraper::Selector::parse("main table > tbody").unwrap()).next().ok_or_else(||anyhow!("Could not find main table in candidate list html page"))?;
         let mut candidates = vec![];
@@ -273,7 +321,7 @@ impl VicDataLoader {
                 //println!("Party name : {}",party_name);
                 let (column_id,name) = party_name.split_once(' ').unwrap_or(("",&party_name));
                 parties.push(Party{
-                    column_id: column_id.to_string(),
+                    column_id: column_id.trim_end_matches(".").to_string(),
                     name: name.to_string(),
                     abbreviation: None,
                     atl_allowed: name!="Ungrouped",
@@ -299,7 +347,7 @@ impl VicDataLoader {
             candidates,
             parties,
             source: vec![DataSource{
-                url: self.page_url.to_string(),
+                url,
                 files: vec![path.file_name().as_ref().unwrap().to_string_lossy().to_string()],
                 comments: None
             }],
@@ -312,7 +360,187 @@ impl VicDataLoader {
         };
         Ok(metadata)
     }
+
+    /// Parse the PDF file (!) containing party tickets, adding the tickets to the metadata reference.
+    fn parse_pdf_tickets_file(&self,metadata:&mut ElectionMetadata) -> anyhow::Result<()> {
+        let filename = format!("State Election {}-{}-Group Voting Tickets.pdf",metadata.name.year,metadata.name.electorate);
+        let path = self.finder.find_raw_data_file(&filename, &self.archive_location, "https://www.vec.vic.gov.au/candidates-and-parties/become-a-state-election-candidate/groups-and-voting-tickets")?;
+        let pdf = pdf::file::File::open(path)?;
+        let mut current_font : Option<String> = None; // the font currently active
+        let font_of_preference_numbers = Some("T1_1".to_string());
+        let font_of_address = Some("T1_2".to_string());
+        let font_of_surname = Some("T1_0".to_string());
+        let font_of_firstname = None;
+        let mut current_preference_number : Option<usize> = None;
+        let mut current_candidate_name : Option<String> = None;
+        let mut current_group_ticket : Option<PartyIndex> = None;
+        let mut current_ticket_contents : Vec<Option<CandidateIndex>> = vec![None;metadata.candidates.len()];
+        let candidate_name_lookup = metadata.get_candidate_name_lookup();
+        let candidate_from_name = |name:&str| {
+            candidate_name_lookup.get(name).cloned().or_else(||{
+                // Sometimes the PDF file contains a different anglicalization of the name to the web page. Check for unique surnames in this case.
+                if let Some((surname,firstname)) = name.split_once(',') {
+                    let just_match_surname : Vec<CandidateIndex> = metadata.candidates.iter().enumerate().filter(|(_,c)|c.name.starts_with(surname)).map(|(i,_)|CandidateIndex(i)).collect::<Vec<_>>();
+                    if just_match_surname.len()==1 { Some(just_match_surname[0]) } else {
+                        let just_match_firstname : Vec<CandidateIndex> = metadata.candidates.iter().enumerate().filter(|(_,c)|c.name.ends_with(firstname)).map(|(i,_)|CandidateIndex(i)).collect::<Vec<_>>();
+                        if just_match_firstname.len()==1 { Some(just_match_firstname[0]) } else { None }
+                    }
+                } else { None }
+            })
+        };
+        let party_id_lookup = metadata.get_party_id_lookup();
+        for page in pdf.pages() {
+            let page = page?;
+            if let Some(content) = &page.contents {
+                for op in &content.operations {
+                    match op.operator.to_uppercase().as_str() {
+                        "BT" => {  current_font=None; }
+                        "TF" if op.operands.len()==2 => {  current_font=Some(op.operands[0].as_name()?.to_string()); }
+                        "TJ" => {
+                            let text = extract_string(op);
+                            // println!("TJ : {} (font {:?})",text,current_font);
+                            if text.starts_with("Group ") && text.ends_with(" Voting") {
+                                let group = text[5..text.len()-6].trim();
+                                if let Some(&party) = party_id_lookup.get(group) {
+                                    //println!("Group voting ticket for {}",party);
+                                    if !current_ticket_contents.iter().all(|c|c.is_none()) {
+                                        if let Some(prior_ticket) = current_group_ticket.take() { // This is duplicated below! Ugh!
+                                            if !current_ticket_contents.iter().all(|c|c.is_some()) { return Err(anyhow!("Partial ticket found"))}
+                                            metadata.parties[prior_ticket.0].tickets.push(current_ticket_contents.iter_mut().map(|c|c.take().unwrap()).collect())
+                                        }
+                                    }
+                                    current_group_ticket=Some(party);
+                                }
+                            } else if current_font==font_of_preference_numbers {
+                                if let Ok(preference_number) = text.parse::<usize>() {
+                                    //println!("Preference number {}",preference_number);
+                                    current_preference_number=Some(preference_number);
+                                }
+                            } else if current_font==font_of_address {
+                                if let Some(preference_number) = current_preference_number.take() {
+                                    if let Some(name) = current_candidate_name.take() {
+                                        if let Some(candidate_index) = candidate_from_name(&name) {
+                                            //println!("Found address. Preference number {} for {}",preference_number,candidate_index);
+                                            if preference_number==0 || preference_number>current_ticket_contents.len() { return Err(anyhow!("Unexpected preference {}",preference_number))}
+                                            if current_ticket_contents[preference_number-1].is_some() { return Err(anyhow!("Duplicated preference {}",preference_number))}
+                                            current_ticket_contents[preference_number-1]=Some(candidate_index);
+                                        } else { return Err(anyhow!("Did not understand candidate name {}",name))}
+                                    } else { return Err(anyhow!("Found address without candidate name"))}
+                                }
+                            } else if current_font==font_of_surname && current_preference_number.is_some() {
+                                //println!("Found surname {}",text);
+                                current_candidate_name=Some(text);
+                            } else if current_font==font_of_firstname && current_preference_number.is_some() {
+                                if let Some(name) = current_candidate_name.as_mut() {
+                                    //println!("Found first name {}",text);
+                                    name.push_str(&text);
+                                }
+                            }
+                            //if res.len()>0 && current_font==font_of_last_text { res.last_mut().unwrap().push_str(&text) }
+                            //else { res.push(text); font_of_last_text=current_font.clone(); }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        if let Some(prior_ticket) = current_group_ticket.take() { // This is duplicated above! Ugh!
+            if !current_ticket_contents.iter().all(|c|c.is_some()) { return Err(anyhow!("Partial ticket found"))}
+            metadata.parties[prior_ticket.0].tickets.push(current_ticket_contents.iter_mut().map(|c|c.take().unwrap()).collect())
+        }
+        metadata.source.push(DataSource{
+            url: "https://www.vec.vic.gov.au/candidates-and-parties/become-a-state-election-candidate/groups-and-voting-tickets".to_string(),
+            files: vec![filename],
+            comments: None
+        });
+        Ok(())
+    }
+
+    /// Produce a list of (atl,btl) votes from the table of ATL and BTL votes at e.g. https://www.vec.vic.gov.au/results/2022-state-election-results/results-by-region/northern-metropolitan-region-results
+    fn parse_results_by_region_intermediate_webpage(&self,metadata:&mut ElectionMetadata) -> anyhow::Result<EarlyFirstPreferenceVotes> {
+        let filename = format!("{}-results.html", Self::region_human_name_to_computer_name(&metadata.name.electorate,true));
+        let url = format!("https://www.vec.vic.gov.au/results/2022-state-election-results/results-by-region/{}-results",Self::region_human_name_to_computer_name(&metadata.name.electorate,true));
+        let path = self.finder.find_raw_data_file_with_extra_url_info(&filename, &self.archive_location, &url,"")?;
+        let html = scraper::Html::parse_document(&std::fs::read_to_string(&path)?);
+        let table = html.select(&scraper::Selector::parse("main table > tbody").unwrap()).next().ok_or_else(||anyhow!("Could not find main table in region results html page {}",filename))?;
+        let mut by_party: Vec<(usize, usize)> = Vec::default();
+        let mut by_candidate : Vec<usize> = vec![0;metadata.candidates.len()];
+        let candidate_of_name = metadata.get_candidate_name_lookup();
+        for tr in table.select(&scraper::Selector::parse("tr").unwrap()) {
+            let tds = tr.select(&scraper::Selector::parse("td").unwrap()).collect::<Vec<_>>();
+            if tds.len()>3 { // first tr just has headings
+                let id = tds[0].text().collect::<Vec<_>>().join("").trim().to_string();
+                let name = tds[1].text().collect::<Vec<_>>().join("").trim().to_string();
+                let atl : usize = tds[2].text().collect::<Vec<_>>().join("").trim().parse()?;
+                let btl : usize = tds[3].text().collect::<Vec<_>>().join("").trim().parse()?;
+                if id.is_empty() {
+                    let candidate = *candidate_of_name.get(&name).ok_or_else(||anyhow!("Unexpected name {}",name))?;
+                    by_candidate[candidate.0] = atl+btl;
+                } else {
+                    if by_party.len()>=metadata.parties.len() { return Err(anyhow!("More rows in table than there are parties")); }
+                    if id!=metadata.parties[by_party.len()].column_id { return Err(anyhow!("Found unexpected party id {}",id)); }
+                    by_party.push((atl, btl))
+                }
+            }
+        }
+        metadata.source.push(DataSource{
+            url,
+            files: vec![filename],
+            comments: None
+        });
+        Ok(EarlyFirstPreferenceVotes{by_party,by_candidate})
+    }
 }
+
+/// First preferences are counted before everything else. Used when they are available but others are not.
+#[derive(Debug)]
+struct EarlyFirstPreferenceVotes {
+    /// for each party, the number of (atl,btl) first pref votes
+    by_party : Vec<(usize,usize)>,
+    /// for each candidate, the number of btl first pref votes if not counted above (e.g. for ungrouped candidates).
+    by_candidate : Vec<usize>,
+}
+
+/// A PDF TJ operation takes a string, or rather an array of strings and other stuff. Extract just the string. Also works for Tj
+pub(crate) fn extract_string(op:&pdf::content::Operation) -> String {
+    let mut res = String::new();
+    // println!("{:?}",op);
+    for o in &op.operands {
+        if let Ok(a) = o.as_array() {
+            for p in a {
+                if let Ok(s) = p.as_string() {
+                    if let Ok(s) = s.as_str() {
+                        res.push_str(&s);
+                    }
+                }
+            }
+        } else if let Ok(s) = o.as_string() {
+            if let Ok(s) = s.as_str() {
+                res.push_str(&s);
+            }
+        }
+    }
+    res
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use stv::parse_util::FileFinder;
+    use crate::parse_vic::get_vic_data_loader_2022;
+    #[test]
+    fn test_pdf_parse() -> anyhow::Result<()>{
+        let loader = get_vic_data_loader_2022(&FileFinder::find_ec_data_repository())?;
+        let mut metadata = loader.read_raw_metadata_from_candidate_list_on_main_website("Northern Metropolitan Region")?;
+        loader.parse_pdf_tickets_file(&mut metadata)?;
+        let first_pref_votes = loader.parse_results_by_region_intermediate_webpage(&mut metadata)?;
+        println!("{:?}",metadata);
+        println!("{:?}",first_pref_votes);
+        Ok(())
+    }
+}
+
 /// The headings for the distribution of preferences (DOP) file (excel spreadsheet).
 /// The parsing of this is split into two sections
 ///  * Read the quota and headings (making this structure)
