@@ -173,7 +173,7 @@ impl <Tally:Clone> ElectionChanges<Tally> {
     }
 }
 
-impl <Tally:PartialEq+Clone+Display+FromStr> ElectionChanges<Tally> {
+impl <Tally:PartialEq+Clone+Display+FromStr+Debug> ElectionChanges<Tally> {
     /// Add in a (suspicious, possible old) extra data structure, reevaluating everything
     pub fn merge_reevaluating<R:PreferenceDistributionRules<Tally=Tally>>(&mut self,other:&[ElectionChange<Tally>],election_data:&ElectionData,ballot_types_considered_unverifiable:&HashSet<String>,verbose:bool) {
         for v in other {

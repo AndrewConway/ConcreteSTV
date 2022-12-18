@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -184,15 +184,21 @@ pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
     pub count_name : Option<String>,
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct QuotaInfo<Tally> {
+#[derive(Clone,Serialize,Deserialize,Debug)]
+pub struct QuotaInfo<Tally:Debug> {
     pub papers : BallotPaperCount,
     pub vacancies : NumberOfCandidates,
     pub quota : Tally,
 }
 
+impl <Tally:Display+Debug> Display for QuotaInfo<Tally> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"({} Papers)/({} vacancies+1) -> quota {}",self.papers,self.vacancies,self.quota)
+    }
+}
+
 #[derive(Clone,Serialize,Deserialize)]
-pub struct Transcript<Tally:PartialEq+Clone+Display+FromStr> {
+pub struct Transcript<Tally:PartialEq+Clone+Display+FromStr+Debug> {
     /// The rules that were used to compute this transcript.
     pub rules : String,
     #[serde(skip_serializing_if = "Option::is_none",default="produce_none")] // can't just have default as there is no default on Tally, which is needed for some reason.
@@ -203,14 +209,14 @@ pub struct Transcript<Tally:PartialEq+Clone+Display+FromStr> {
 
 fn produce_none<T>() -> Option<T> { None }
 
-impl <Tally:PartialEq+Clone+Display+FromStr> Transcript<Tally> {
+impl <Tally:PartialEq+Clone+Display+FromStr+Debug> Transcript<Tally> {
     pub fn count(&self,index:CountIndex) -> &SingleCount<Tally> {
         &self.counts[index.0]
     }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct TranscriptWithMetadata<Tally:PartialEq+Clone+Display+FromStr> {
+pub struct TranscriptWithMetadata<Tally:PartialEq+Clone+Display+FromStr+Debug> {
     pub metadata : ElectionMetadata,
     pub transcript : Transcript<Tally>,
 }

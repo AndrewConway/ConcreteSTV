@@ -10,7 +10,7 @@
 
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::iter::Sum;
 use std::ops::{AddAssign, Sub, SubAssign};
@@ -237,7 +237,7 @@ impl <Tally> BallotChanges<Tally> {
         data
     }
 }
-impl <Tally:PartialEq+Clone+Display+FromStr> BallotChanges<Tally> {
+impl <Tally:PartialEq+Clone+Display+FromStr+Debug> BallotChanges<Tally> {
     pub fn see_effect<R:PreferenceDistributionRules<Tally=Tally>>(&self, election_data:&ElectionData) -> DeltasInCandidateLists {
         let changed_data = self.apply_to_votes(election_data,false);
         let transcript = changed_data.distribute_preferences::<R>();

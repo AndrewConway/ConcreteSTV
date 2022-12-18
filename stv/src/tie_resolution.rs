@@ -11,7 +11,7 @@ use std::collections::{HashSet, HashMap};
 use std::hash::Hash;
 use serde::{Serialize,Deserialize};
 use anyhow::anyhow;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::str::FromStr;
 
 #[derive(Debug,Clone,Copy)]
@@ -60,7 +60,7 @@ pub enum TieResolutionGranularityNeeded {
 impl MethodOfTieResolution {
     /// sort tied_candidates low to high based upon the given method of tie resolution.
     /// If the method does not resolve it, return a DecisionMadeByEC object.
-    pub fn resolve<Tally:Clone+Hash+Ord+Display+FromStr>(self,tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded) -> Option<DecisionMadeByEC> {
+    pub fn resolve<Tally:Clone+Hash+Ord+Display+FromStr+Debug>(self,tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded) -> Option<DecisionMadeByEC> {
         let resolved = match self {
             MethodOfTieResolution::None => false,
             MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent => resolve_ties_require_all_different(tied_candidates,transcript,false),
@@ -178,7 +178,7 @@ impl TieResolutionsMadeByEC {
 
 /// Sort candidates low to high based on some prior period when they each had a different tally.
 /// Return true iff ties are resolved.
-fn resolve_ties_require_all_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,just_consider_major_counts:bool) -> bool {
+fn resolve_ties_require_all_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr+Debug>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,just_consider_major_counts:bool) -> bool {
     for count in transcript.counts.iter().rev() {
         if count.reason_completed || !just_consider_major_counts {
             let mut observed = HashSet::new();
@@ -197,7 +197,7 @@ fn resolve_ties_require_all_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr>(t
 
 /// Sort candidates low to high based on the tie resolution rules.
 /// Return true iff ties are resolved to the required granularity.
-fn resolve_ties_any_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded,just_consider_major_counts:bool) -> bool {
+fn resolve_ties_any_different<Tally:Clone+Eq+Hash+Ord+Display+FromStr+Debug>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded,just_consider_major_counts:bool) -> bool {
     //println!("Resolve ties any different between {}",tied_candidates.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(","));
     for count in transcript.counts.iter().rev() {if count.reason_completed || !just_consider_major_counts {
         let mut observed : HashMap<Tally,Vec<CandidateIndex>> = HashMap::new();

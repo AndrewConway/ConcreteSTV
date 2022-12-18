@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use crate::ballot_metadata::ElectionMetadata;
 use crate::compare_transcripts::{DifferenceBetweenTranscripts, compare_transcripts};
 use serde::{Serialize,Deserialize};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use crate::ballot_pile::BallotPaperCount;
 use crate::transfer_value::{TransferValue};
 use crate::tie_resolution::MethodOfTieResolution;
@@ -165,7 +165,7 @@ impl CompareRules {
     }
 
     /// This should be more general, rather than restricted to 4 rules.
-    pub fn compute_dataset<CommonTally:PartialEq+Clone+FromStr+Display,R1,R2,R3,R4>(&self,data:&ElectionData) -> anyhow::Result<(Vec<RuleComparisonDefinition>,CompareRulesOneDataset)>
+    pub fn compute_dataset<CommonTally:PartialEq+Clone+FromStr+Display+Debug,R1,R2,R3,R4>(&self,data:&ElectionData) -> anyhow::Result<(Vec<RuleComparisonDefinition>,CompareRulesOneDataset)>
     where
         R1: PreferenceDistributionRules<Tally=CommonTally>,
         R2: PreferenceDistributionRules<Tally=CommonTally>,
@@ -195,7 +195,7 @@ impl CompareRules {
         Ok((comparisons,CompareRulesOneDataset{ dataset: data.metadata.clone(), results }))
     }
 
-    pub fn compare_datasets<CommonTally:PartialEq+Clone+FromStr+Display,R1,R2,R3,R4,I>(&self,data_iterator:I) -> anyhow::Result<CompareRulesResults>
+    pub fn compare_datasets<CommonTally:PartialEq+Clone+FromStr+Display+Debug,R1,R2,R3,R4,I>(&self,data_iterator:I) -> anyhow::Result<CompareRulesResults>
         where
             R1: PreferenceDistributionRules<Tally=CommonTally>,
             R2: PreferenceDistributionRules<Tally=CommonTally>,

@@ -11,7 +11,7 @@ use std::cmp::min;
 use std::collections::HashSet;
 use num::{abs, Zero};
 use std::ops::Sub;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::num::ParseIntError;
 use crate::ballot_pile::BallotPaperCount;
 use crate::signed_version::SignedVersion;
@@ -89,14 +89,14 @@ impl OfficialDistributionOfPreferencesTranscript {
     }
     /// Compare the results from the official transcript to our transcript.
     /// panic if there are differences.
-    pub fn compare_with_transcript<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr+CanConvertToF64PossiblyLossily>(&self,transcript:&Transcript<Tally>) {
+    pub fn compare_with_transcript<Tally:Clone+Zero+Debug+PartialEq+Sub<Output=Tally>+Display+FromStr+CanConvertToF64PossiblyLossily>(&self,transcript:&Transcript<Tally>) {
         let ec_decision = self.compare_with_transcript_checking_for_ec_decisions(transcript,true);
         if let Some(decision) = ec_decision {
             panic!("An EC decision was not made the way we expected: {:?} was favoured over {:?}",decision.favoured,decision.disfavoured);
         }
     }
     /// like compare_with_transcript but don't panic if the first difference is caused by a difference in EC decision making. If so, return the decision.
-    pub fn compare_with_transcript_checking_for_ec_decisions<Tally:Clone+Zero+PartialEq+Sub<Output=Tally>+Display+FromStr+CanConvertToF64PossiblyLossily>(&self,transcript:&Transcript<Tally>,verbose:bool) -> Option<TieResolutionExplicitDecision> {
+    pub fn compare_with_transcript_checking_for_ec_decisions<Tally:Clone+Zero+Debug+PartialEq+Sub<Output=Tally>+Display+FromStr+CanConvertToF64PossiblyLossily>(&self,transcript:&Transcript<Tally>,verbose:bool) -> Option<TieResolutionExplicitDecision> {
         fn decode<Tally : CanConvertToF64PossiblyLossily>(tally:Tally) -> f64 { tally.convert_to_f64() }
         if let Some(quota) = &self.quota {
             assert_eq!(quota.vacancies,transcript.quota.as_ref().unwrap().vacancies,"vacancies official vs me");

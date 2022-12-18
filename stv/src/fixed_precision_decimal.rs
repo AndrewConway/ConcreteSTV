@@ -10,7 +10,7 @@
 
 use std::ops::{AddAssign, SubAssign, Sub, Add, Div};
 use num::{Zero, BigRational, BigInt, ToPrimitive};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use std::str::FromStr;
@@ -90,6 +90,12 @@ impl <const DIGITS:usize> Display for FixedPrecisionDecimal<DIGITS> {
             let decimal_digits : String = format!("{:01$}",frac_portion,DIGITS);
             write!(f,"{}.{}",int_portion,decimal_digits.trim_end_matches("0"))
         }
+    }
+}
+
+impl <const DIGITS:usize> Debug for FixedPrecisionDecimal<DIGITS> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"{}",self)
     }
 }
 

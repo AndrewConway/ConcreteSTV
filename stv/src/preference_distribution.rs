@@ -17,7 +17,7 @@ use std::collections::{HashSet, VecDeque};
 use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use crate::transfer_value::{TransferValue, StringSerializedRational};
 use std::ops::{AddAssign, Neg, SubAssign, Sub, Range, Div};
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, DecisionMadeByEC, CountIndex};
 use crate::util::{DetectUnique, CollectAll};
 use crate::tie_resolution::{MethodOfTieResolution, TieResolutionsMadeByEC, TieResolutionGranularityNeeded};
@@ -103,7 +103,7 @@ impl RoundUpToUsize for usize {
 
 pub trait PreferenceDistributionRules {
     /// The type for the number of votes. Usually an integer.
-    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>+RoundUpToUsize+Div<usize,Output=Self::Tally>+CanConvertToF64PossiblyLossily;
+    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Debug+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>+RoundUpToUsize+Div<usize,Output=Self::Tally>+CanConvertToF64PossiblyLossily;
     type SplitByNumber : HowSplitByCountNumber;
 
     /// Whether or not the system has a quota. False for IRV.

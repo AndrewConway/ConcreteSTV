@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -16,7 +16,7 @@ use num::Zero;
 use std::ops::Sub;
 use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 use std::str::FromStr;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 #[derive(Parser)]
 #[clap(version = "0.1", author = "Andrew Conway", name="ConcreteSTV")]
@@ -48,7 +48,7 @@ where <T as Sub>::Output: ToString
     else  { "-".to_string()+&(t_old-t_new).to_string() }
 }
 
-fn print_transcript<T:Copy+ToString+Eq+Ord+Sub<Output=T>+Clone+Display+FromStr+Zero>(transcript:TranscriptWithMetadata<T>,opt:&Opts) {
+fn print_transcript<T:Copy+ToString+Eq+Ord+Sub<Output=T>+Clone+Display+FromStr+Zero+Debug>(transcript:TranscriptWithMetadata<T>,opt:&Opts) {
     let use_candidate = |c:CandidateIndex|{ opt.candidates.is_none() || opt.candidates.as_ref().unwrap().contains(&c.0)};
 
     let separate_row_for_paper_deltas = false;
