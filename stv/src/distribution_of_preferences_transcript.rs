@@ -23,6 +23,12 @@ use std::str::FromStr;
 #[derive(Copy,Clone,Debug,Ord, PartialOrd, Eq, PartialEq,Hash,Serialize,Deserialize)]
 pub struct CountIndex(pub usize);
 
+impl Display for CountIndex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"{}",self.0)
+    }
+}
+
 /// A value that is primarily per candidate, but may also go to some other source.
 /// Generally, this is used for preserved properties such that the sum over all candidates and other destinations is always the same.
 /// For instance, ballots, which start out all assigned to candidates, are shifted around between people, but some will get exhausted.

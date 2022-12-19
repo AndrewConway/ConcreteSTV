@@ -28,6 +28,7 @@ use serde::{Serialize,Deserialize};
 use std::str::FromStr;
 use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
 use crate::signed_version::SignedVersion;
+use crate::verify_official_transcript::OracleFromOfficialDOP;
 
 
 /// Many systems have a special rules for termination when there are a small number of
@@ -111,9 +112,9 @@ pub trait PreferenceDistributionRules {
     /// Whether to transfer all the votes or just the last parcel.
     fn use_last_parcel_for_surplus_distribution() -> bool;
     fn transfer_value_method() -> TransferValueMethod;
-    fn convert_tally_to_rational(tally:Self::Tally) -> num::rational::BigRational;
+    fn convert_tally_to_rational(tally:Self::Tally) -> BigRational;
     /// convert a rational value to the tally type, rounding as if one would do after applying a transfer value.
-    fn convert_rational_to_tally_after_applying_transfer_value(rational:num::rational::BigRational) -> Self::Tally;
+    fn convert_rational_to_tally_after_applying_transfer_value(rational:BigRational) -> Self::Tally;
     fn make_transfer_value(surplus:Self::Tally,ballots:BallotPaperCount) -> TransferValue; // could be implemented using Self::convert_tally_to_rational { TransferValue::new(BigInt::from(surplus),BigInt::from(ballots.0)) }
     fn use_transfer_value(transfer_value:&TransferValue,ballots:BallotPaperCount) -> Self::Tally;
     /// if true, then distribute all votes with a single transfer value. If false, separate by incoming transfer value
@@ -211,13 +212,14 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
 
     // information about what is going on in this count.
     in_this_count : PendingTranscript<Rules::Tally>,
-    transcript : Transcript<Rules::Tally>,
+    pub(crate) transcript : Transcript<Rules::Tally>,
     print_progress_to_stdout : bool, // if true, then print tallys etc to stdout.
+    oracle : Option<OracleFromOfficialDOP<'a>>,
 }
 
 impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 {
-    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<PartiallyDistributedVote<'a>>,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC,print_progress_to_stdout : bool) -> Self {
+    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<PartiallyDistributedVote<'a>>,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC,print_progress_to_stdout : bool,oracle : Option<OracleFromOfficialDOP<'a>>) -> Self {
         let num_candidates = data.metadata.candidates.len();
         let tallys = vec![Rules::Tally::zero();num_candidates];
         let mut papers = vec![];
@@ -264,11 +266,22 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 elected: vec![]
             },
             print_progress_to_stdout,
+            oracle,
         }
     }
 
+    /// distribute the given votes by the next preference (unless there is an oracle overriding it).
+    pub fn distribute(&mut self,votes:&Vec<PartiallyDistributedVote<'a>>) -> DistributedVotes<'a> {
+        if let Some(oracle) = &mut self.oracle {
+            if let Some(mut oracle_by_candidate) = oracle.get_distribution_by_candidate(self.current_count) {
+                return DistributedVotes::distribute_by_oracle(votes,&self.continuing_candidates,self.num_candidates,&mut oracle_by_candidate)
+            }
+        }
+        DistributedVotes::distribute(votes,&self.continuing_candidates,self.num_candidates)
+    }
+
     pub fn distribute_first_preferences(& mut self) {
-        let distributed = DistributedVotes::distribute(self.original_votes,&self.continuing_candidates,self.num_candidates);
+        let distributed = self.distribute(self.original_votes);
         let mut total_first_preferences : BallotPaperCount = BallotPaperCount(0);
         for i in 0..self.num_candidates {
             let votes = &distributed.by_candidate[i];
@@ -559,7 +572,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 (ballots,provenance)
             };
         let ballots_considered : BallotPaperCount = ballots.num_ballots;
-        let distributed = DistributedVotes::distribute(&ballots.votes,&self.continuing_candidates,self.num_candidates);
+        let distributed = self.distribute(&ballots.votes);
         let continuing_ballots = ballots_considered-distributed.exhausted;
         let tv_denom = if Rules::transfer_value_method().denom_is_just_continuing() {continuing_ballots} else {ballots.num_ballots};
         let mut transfer_value : TransferValue = if tv_denom.is_zero() { TransferValue::one() } else {Rules::make_transfer_value(surplus.clone(),tv_denom)};
@@ -624,7 +637,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let mut total_value_of_exhausted_votes = BigRational::zero();
         let continuing_candidates_when_distribution_done = self.continuing_candidates_sorted_by_tally.len();
         for (tv,(step_tally,ballots,prov)) in votes_to_distribute {
-            let distributed = DistributedVotes::distribute(&ballots.votes,&self.continuing_candidates,self.num_candidates);
+            let distributed = self.distribute(&ballots.votes);
             let exhausted_value = tv.mul(distributed.exhausted);
             total_value_of_exhausted_votes+=exhausted_value.clone();
             partially_distributed.push((tv,step_tally,ballots,prov,distributed,exhausted_value));
@@ -649,7 +662,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             let after : Rules::Tally = Rules::convert_rational_to_tally_after_applying_transfer_value(current_remaining_tally_for_candidate_being_distributed.clone());
             self.tallys[candidate_to_distribute.0] = after.clone();
             let original_worth = before-after;
-            let distributed = if continuing_candidates_when_distribution_done == self.continuing_candidates_sorted_by_tally.len() {distributed} else { DistributedVotes::distribute(&ballots.votes,&self.continuing_candidates,self.num_candidates) }; // recompute if the continuing candidates list changed.
+            let distributed = if continuing_candidates_when_distribution_done == self.continuing_candidates_sorted_by_tally.len() {distributed} else { self.distribute(&ballots.votes) }; // recompute if the continuing candidates list changed.
             let transfer_value = TransferValue(tv.0*general_tv.0.clone());
             let continuing_ballots = ballots.num_ballots-distributed.exhausted;
             self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),distributed,Some(self.current_count),original_worth,special_factor_excluded.is_some() || !Rules::transfer_value_method().denom_is_just_continuing(),false,special_factor_excluded.as_ref());
@@ -949,7 +962,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 }
             }
             let when_tv_created=when_tv_created.take().flatten();
-            let distributed = DistributedVotes::distribute(&all_votes.votes,&self.continuing_candidates,self.num_candidates);
+            let distributed = self.distribute(&all_votes.votes);
             self.parcel_out_votes_with_given_transfer_value(key.1.clone(),distributed,when_tv_created,original_worth,true,true,None);
             togo-=1;
             self.end_of_count_step(ReasonForCount::Elimination(candidates_to_exclude.clone()), PortionOfReasonBeingDoneThisCount {
@@ -984,7 +997,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool) -> Transcript<Rules::Tally> {
     let arena = typed_arena::Arena::<CandidateIndex>::new();
     let votes = data.resolve_atl(&arena,vote_types);
-    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates,ec_resolutions,print_progress_to_stdout);
+    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates,ec_resolutions,print_progress_to_stdout,None);
     work.go();
     work.transcript
 }

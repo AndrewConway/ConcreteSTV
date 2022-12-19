@@ -25,6 +25,7 @@ use std::fmt;
 use std::fmt::{Debug, Display};
 use std::iter::Sum;
 use std::str::FromStr;
+use crate::verify_official_transcript::OracleFromOfficialDOP;
 
 /// A number representing a count of pieces of paper.
 /// This is distinct from votes which may be fractional in the presence of weights.
@@ -197,6 +198,59 @@ impl <'a> DistributedVotes<'a> {
             if let Some(next) = vote.next(continuing_candidates) {
                 by_candidate[next.candidate().0].add_vote(next);
             } else { exhausted+=vote.n; if vote.is_atl() { exhausted_atl+=vote.n; } }
+        }
+        DistributedVotes{by_candidate,exhausted,exhausted_atl}
+    }
+
+    /// distribute votes ignoring the preferences totally, using an oracle that tells you how many votes to put where.
+    /// Used to check the DoPs of jurisdictions that publish DoPs, but not actual votes.
+    pub fn distribute_by_oracle_recording_prefs_to_get_here(votes:&Vec<PartiallyDistributedVote<'a>>,continuing_candidates:&HashSet<CandidateIndex>,num_candidates:usize,oracle_by_candidate:&mut [usize],_oracle:&mut OracleFromOfficialDOP,oracle_arena : &'a typed_arena::Arena::<CandidateIndex>) -> Self {
+        assert_eq!(num_candidates+1,oracle_by_candidate.len()); // extra one is exhausted.
+        let mut new_votes = vec![];
+        let mut upto_candidate : usize=0;
+        for vote in votes {
+            let mut togo = vote.n.0;
+            while togo>0 {
+                while upto_candidate<=num_candidates && oracle_by_candidate[upto_candidate]==0 { upto_candidate+=1; }
+                if upto_candidate<=num_candidates {
+                    let use_here = oracle_by_candidate[upto_candidate].min(togo);
+                    togo-=use_here;
+                    oracle_by_candidate[upto_candidate]-=use_here;
+                    let prefs = if upto_candidate==num_candidates { vote.prefs} else {
+                        let mut v = vote.prefs.to_vec();
+                        v.push(CandidateIndex(upto_candidate));
+                        oracle_arena.alloc_extend(v)
+                    };
+                    //let prefs = if upto_candidate==num_candidates { vote.prefs} else {oracle.add_vote(vote.prefs,CandidateIndex(upto_candidate))};
+                    new_votes.push(PartiallyDistributedVote{
+                        upto: vote.upto,
+                        n: BallotPaperCount(use_here),
+                        prefs,
+                        source: vote.source.clone(),
+                    })
+                } else {
+                    // oracle.report_unused_votes(togo,vote.prefs);
+                }
+            }
+        }
+        // TODO still need to deal with the case of more ballot papers needed. But this function will probably never be used.
+        DistributedVotes::distribute(&new_votes,continuing_candidates,num_candidates)
+    }
+    /// distribute votes ignoring the preferences totally, using an oracle that tells you how many votes to put where.
+    /// Used to check the DoPs of jurisdictions that publish DoPs, but not actual votes.
+    pub fn distribute_by_oracle(votes:&Vec<PartiallyDistributedVote<'a>>,continuing_candidates:&HashSet<CandidateIndex>,num_candidates:usize,oracle_by_candidate:&[BallotPaperCount]) -> Self {
+        assert_eq!(num_candidates+1,oracle_by_candidate.len()); // extra one is exhausted.
+        let mut by_candidate = vec![VotesWithSameTransferValue::default();num_candidates];
+        let exhausted = oracle_by_candidate[num_candidates];
+        let exhausted_atl = BallotPaperCount(0);
+        for c in 0..num_candidates {
+            let n = oracle_by_candidate[c];
+            if !n.is_zero() {
+                if !continuing_candidates.contains(&CandidateIndex(c)) {
+                    println!("** ERROR: Oracle assigned {} papers to candidate {} who is not continuing.",n,c);
+                }
+                by_candidate[c].add_vote(PartiallyDistributedVote{upto:0,n,prefs:&[],source:votes[0].source.clone()});
+            }
         }
         DistributedVotes{by_candidate,exhausted,exhausted_atl}
     }
