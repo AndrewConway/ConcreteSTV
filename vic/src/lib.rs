@@ -4,6 +4,8 @@
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
+extern crate core;
+
 use stv::ballot_pile::{BallotPaperCount, SplitFirstCount};
 use stv::preference_distribution::{BigRational, CountNamingMethod, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
 use stv::tie_resolution::MethodOfTieResolution;
@@ -152,7 +154,12 @@ impl PreferenceDistributionRules for Vic2018LegislativeCouncil {
     /// to be elected notwithstanding that that number is
     /// below the quota.
     /// ```
-    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfExclusionNotOngoing }
+    /// In 2022, Eastern Victoria Region, On counts 243-247, Mat Morgan is excluded.
+    /// On count 243, SHING, Harriet went over quota. At then end of 247, there were
+    /// two continuing candidates left and 1 remaining vacancy. No one was elected
+    /// until count 248 which was the distribution of Harriet SHING's surplus.
+    /// This seems a reasonable interpretation.
+    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
 
     /// This doesn't seem well defined by the legislation. (but it doesn't affect who is elected)
     /// ```text

@@ -138,11 +138,11 @@ impl<'a> RawBallotMarkings<'a> {
 
     /// Interpret a list of markings as preferences.
     /// * Ignore all repeated numbers. E.g. 1 2 2 ignore the 2s.
-    /// * Ignore all numbers after a gap. E.g. 1 3 4 ignore the 3 and 4
+    /// * Ignore all numbers after a gap. E.g. 1 3 4 ignore the 3 and 4 (unless allow_gaps) is true
     /// * Treat a cross as a 1 iff consider_cross_as_one true
     /// Otherwise take the longest list of preferences starting at 1.
     /// The return type is given by a (provided) function
-    fn look_for_continuous_streams<T:Copy,F : Fn(usize)->T>(markings:&[RawBallotMarking],result_generator:F,consider_cross_as_one:bool) -> Vec<T> {
+    fn look_for_continuous_streams<T:Copy,F : Fn(usize)->T>(markings:&[RawBallotMarking],result_generator:F,consider_cross_as_one:bool,allow_gaps:bool) -> Vec<T> {
         let mut times_seen = vec![0 as usize;markings.len()];
         let mut prefs = vec![result_generator(0);markings.len()];
         for i in 0..markings.len() {
@@ -158,18 +158,33 @@ impl<'a> RawBallotMarkings<'a> {
                 _ => {}
             }
         }
-        let mut num_good = 0;
-        while num_good<times_seen.len() && times_seen[num_good]==1 { num_good+=1; }
-        prefs.truncate(num_good);
+        if allow_gaps {
+            let mut num_good = 0;
+            let mut num_up_to = 0;
+            while num_up_to<times_seen.len() && times_seen[num_up_to]<2 {
+                if times_seen[num_up_to]==0 { prefs.remove(num_good); } else { num_good+=1; }
+                num_up_to+=1;
+            }
+            prefs.truncate(num_good);
+        } else {
+            let mut num_good = 0;
+            while num_good<times_seen.len() && times_seen[num_good]==1 { num_good+=1; }
+            prefs.truncate(num_good);
+        }
         prefs
     }
 
     fn interpret_vote_as_atl(&'a self,min_atl_prefs_needed:usize) -> Option<ATL> {
-        let prefs = RawBallotMarkings::look_for_continuous_streams(self.atl,|i|self.atl_parties[i],true);
+        let prefs = RawBallotMarkings::look_for_continuous_streams(self.atl,|i|self.atl_parties[i],true,false);
         if prefs.len()>=min_atl_prefs_needed { Some(ATL{ parties: prefs, n: 1, ticket_index: None })} else { None }
     }
     pub fn interpret_vote_as_btl(&'a self, min_btl_prefs_needed:usize) -> Option<BTL> {
-        let prefs = RawBallotMarkings::look_for_continuous_streams(self.btl,|i|CandidateIndex(i),true);
+        let prefs = RawBallotMarkings::look_for_continuous_streams(self.btl,|i|CandidateIndex(i),true,false);
+        if prefs.len()>=min_btl_prefs_needed { Some(BTL{ candidates: prefs, n: 1 })} else { None }
+    }
+    /// intepret 1 2 4 5 as a valid sequence.
+    pub fn interpret_vote_as_btl_allowing_gaps(&'a self, min_btl_prefs_needed:usize) -> Option<BTL> {
+        let prefs = RawBallotMarkings::look_for_continuous_streams(self.btl,|i|CandidateIndex(i),true,true);
         if prefs.len()>=min_btl_prefs_needed { Some(BTL{ candidates: prefs, n: 1 })} else { None }
     }
 }

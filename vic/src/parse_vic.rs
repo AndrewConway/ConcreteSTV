@@ -14,7 +14,7 @@ use stv::ballot_metadata::{Candidate, CandidateIndex, DataSource, ElectionMetada
 use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
 use stv::election_data::ElectionData;
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
-use stv::parse_util::{FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
+use stv::parse_util::{CalamineLikeWrapper, FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
 use stv::tie_resolution::TieResolutionsMadeByEC;
 use crate::Vic2018LegislativeCouncil;
 use calamine::{DataType, open_workbook_auto};
@@ -92,8 +92,10 @@ impl RawDataSource for VicDataLoader {
         self.finder.find_raw_data_file(filename, &self.archive_location, &self.page_url)
     }
     fn all_electorates(&self) -> Vec<String> {
-        vec![
-            "Eastern Metropolitan Region".to_string(),
+        let year_as_num : u32 = self.year.chars().filter(|c|c.is_ascii_digit()).collect::<String>().parse().unwrap_or(0);
+        let east_met_name = if year_as_num<2022 { "Eastern Metropolitan Region" } else { "North-Eastern Metropolitan Region" };
+        let mut res = vec![
+            east_met_name.to_string(),
             "Eastern Victoria Region".to_string(),
             "Northern Metropolitan Region".to_string(),
             "Northern Victoria Region".to_string(),
@@ -101,12 +103,18 @@ impl RawDataSource for VicDataLoader {
             "Southern Metropolitan Region".to_string(),
             "Western Metropolitan Region".to_string(),
             "Western Victoria Region".to_string(),
-        ]
+        ];
+        res.sort();
+        res
     }
     fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> {
         let mut metadata = self.read_raw_metadata(electorate)?;
         // println!("{:?}",metadata);
-        let filename = format!("received_from_ec/Ballot Paper Details - {}.csv",electorate);
+        let filename = match self.year.as_str() {
+            "2014" => format!("received_from_ec/Ballot Paper Details - {}.csv",electorate),
+            "2022" => format!("received_from_ec/BallotPaperDetails-{}.csv",electorate.trim_end_matches(" Region").trim_end_matches("politan")),
+            _ => {return Err(anyhow!("Do not know the file naming convention for votes received in {}",self.year))}
+        };
         let path = self.find_raw_data_file(&filename)?;
         let mut reader = csv::ReaderBuilder::new().flexible(true).has_headers(false).from_path(&path)?;
         let mut builder = UniqueBTLBuilder::default();
@@ -121,6 +129,19 @@ impl RawDataSource for VicDataLoader {
                         btl_markings[i]=parse_marking(&record[1+i]);
                     }
                     if let Some(btl) = (RawBallotMarkings{ atl: &[], btl: &btl_markings, atl_parties: &[] }).interpret_vote_as_btl(min_btl_prefs_needed) {
+                        /* Code below used to debug an error in the VEC transcript for North Eastern Region, 2022, where on count 169 a paper was strangely transferred to DOLAN, Hugh.
+                        if let Some(p1) = btl.candidates.iter().position(|c|c.0==32) {
+                            if let Some(p2) = btl.candidates.iter().position(|c|c.0==25) {
+                                if p1<p2 {
+                                    let s = format!("{:?}",btl.candidates);
+                                    if s=="[#31, #32, #33, #34, #25]" || s=="[#38, #31, #32, #25, #11]" || s=="[#32, #25, #38, #44, #51]" || s=="[#32, #31, #35, #14, #25]" || s=="[#32, #25, #33, #30, #45]"
+                                        || s=="[#32, #34, #35, #31, #33, #25, #26, #50, #51, #54, #55]" || s=="[#32, #30, #53, #55, #25]" || s=="[#34, #32, #33, #31, #35, #25, #26]" || s=="[#35, #31, #32, #33, #34, #25, #26]"
+                                        || s=="[#35, #31, #32, #33, #34, #25, #3, #13]" || s=="[#35, #31, #32, #34, #33, #25, #26, #14, #13]" || s=="[#32, #31, #35, #33, #34, #36, #37, #25, #26]" || s=="[#31, #32, #33, #34, #35, #19, #20, #25, #26, #50, #51]" || s=="[#31, #33, #32, #34, #35, #13, #14, #25, #26]" {
+                                        println!("Record {:?}, result {:?}",record,btl.candidates);
+                                    }
+                                }
+                            }
+                        }*/
                         builder.add_vote(btl);
                     } else { informal+=1;}
                 }
@@ -181,11 +202,18 @@ impl RawDataSource for VicDataLoader {
             self.parse_pdf_tickets_file(&mut metadata)?;
             return Ok(metadata)
         }
-        let filename = format!("{}votesreceived.xls",Self::region_human_name_to_computer_name(electorate,false));
+        let filename = match self.year.as_str() {
+            "2014" => format!("{}votesreceived.xls",Self::region_human_name_to_computer_name(electorate,false)),
+            "2018" => format!("{}votesreceived.xls",Self::region_human_name_to_computer_name(electorate,false)),
+            "2022" => format!("{}-Votes Received.xls",electorate),
+            _ => {return Err(anyhow!("Do not know the file naming convention for votes received in {}",self.year))}
+        };
         let path = self.find_raw_data_file(&filename)?;
-        use calamine::Reader;
-        let mut workbook1 = open_workbook_auto(&path)?;
-        let sheet1 = workbook1.worksheet_range_at(0).ok_or_else(||anyhow!("No sheets in {}",path.to_string_lossy()))??;
+        // calamine seems not to work for this file
+        let sheet1 = CalamineLikeWrapper::open(&path)?;
+        //use calamine::Reader;
+        //let mut workbook1 = open_workbook_auto(&path)?;
+        //let sheet1 = workbook1.worksheet_range_at(0).ok_or_else(||anyhow!("No sheets in {}",path.to_string_lossy()))??;
         // find the row of headings. Probably 7...
         let is_headings_row = |row:usize|{
             if let Some(v) = sheet1.get_value((row as u32,0)) {
@@ -287,7 +315,7 @@ impl RawDataSource for VicDataLoader {
     }
 
     fn read_official_dop_transcript(&self, metadata: &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
-        let filename = format!("{}distributions.xls",Self::region_human_name_to_computer_name(&metadata.name.electorate,false));
+        let filename = self.distribution_of_preferences_filename(&metadata.name.electorate)?;
         let path = self.find_raw_data_file(&filename)?;
         use calamine::Reader;
         let mut workbook1 = open_workbook_auto(&path)?;
@@ -299,7 +327,7 @@ impl RawDataSource for VicDataLoader {
 
 impl VicDataLoader {
 
-    fn election_count_not_published_yet(&self) -> bool { self.year=="2022" } // TODO change when published.
+    fn election_count_not_published_yet(&self) -> bool { false }
 
     /// Get the metadata from a url like https://www.vec.vic.gov.au/electoral-boundaries/state-regions/north-eastern-metropolitan-region/nominations
     /// First will need to get file with something like
@@ -362,13 +390,15 @@ impl VicDataLoader {
     }
 
     /// Parse the PDF file (!) containing party tickets, adding the tickets to the metadata reference.
+    /// This is not very reliable
     fn parse_pdf_tickets_file(&self,metadata:&mut ElectionMetadata) -> anyhow::Result<()> {
         let filename = format!("State Election {}-{}-Group Voting Tickets.pdf",metadata.name.year,metadata.name.electorate);
         let path = self.finder.find_raw_data_file(&filename, &self.archive_location, "https://www.vec.vic.gov.au/candidates-and-parties/become-a-state-election-candidate/groups-and-voting-tickets")?;
         let pdf = pdf::file::File::open(path)?;
         let mut current_font : Option<String> = None; // the font currently active
         let font_of_preference_numbers = Some("T1_1".to_string());
-        let font_of_address = Some("T1_2".to_string());
+        let font_of_address1 = Some("T1_2".to_string());
+        let font_of_address2 = Some("T1_3".to_string());
         let font_of_surname = Some("T1_0".to_string());
         let font_of_firstname = None;
         let mut current_preference_number : Option<usize> = None;
@@ -389,6 +419,7 @@ impl VicDataLoader {
             })
         };
         let party_id_lookup = metadata.get_party_id_lookup();
+        let mut found_candidate_party_name = true;
         for page in pdf.pages() {
             let page = page?;
             if let Some(content) = &page.contents {
@@ -398,7 +429,7 @@ impl VicDataLoader {
                         "TF" if op.operands.len()==2 => {  current_font=Some(op.operands[0].as_name()?.to_string()); }
                         "TJ" => {
                             let text = extract_string(op);
-                            // println!("TJ : {} (font {:?})",text,current_font);
+                            //println!("TJ : {} (font {:?})",text,current_font);
                             if text.starts_with("Group ") && text.ends_with(" Voting") {
                                 let group = text[5..text.len()-6].trim();
                                 if let Some(&party) = party_id_lookup.get(group) {
@@ -415,8 +446,10 @@ impl VicDataLoader {
                                 if let Ok(preference_number) = text.parse::<usize>() {
                                     //println!("Preference number {}",preference_number);
                                     current_preference_number=Some(preference_number);
+                                } else {
+                                    found_candidate_party_name = true;
                                 }
-                            } else if current_font==font_of_address {
+                            } else if current_font==font_of_address1 || current_font==font_of_address2 {
                                 if let Some(preference_number) = current_preference_number.take() {
                                     if let Some(name) = current_candidate_name.take() {
                                         if let Some(candidate_index) = candidate_from_name(&name) {
@@ -428,9 +461,10 @@ impl VicDataLoader {
                                     } else { return Err(anyhow!("Found address without candidate name"))}
                                 }
                             } else if current_font==font_of_surname && current_preference_number.is_some() {
-                                //println!("Found surname {}",text);
+                               // println!("Found surname {}",text);
                                 current_candidate_name=Some(text);
-                            } else if current_font==font_of_firstname && current_preference_number.is_some() {
+                                found_candidate_party_name=false;
+                            } else if current_font==font_of_firstname && current_preference_number.is_some() && !found_candidate_party_name {
                                 if let Some(name) = current_candidate_name.as_mut() {
                                     //println!("Found first name {}",text);
                                     name.push_str(&text);
@@ -593,6 +627,7 @@ impl DOPFileFormat {
                                     "Exhausted" => exhausted_column=col,
                                     "TOTAL" => { } // boring.
                                     "Candidates provisionally elected at this count" => elected_column=col,
+                                    "Candidates elected at this count" => elected_column=col,
                                     "" => {}
                                     _ => {return Err(anyhow!("Don't understand heading {}",heading));}
                                 }
@@ -722,7 +757,7 @@ impl VicDataLoader {
     }
 
     fn reorder_candidates_in_metadata_by_official_dop_transcript(&self, metadata: &mut ElectionMetadata) -> anyhow::Result<()>  {
-        let filename = format!("{}distributions.xls",Self::region_human_name_to_computer_name(&metadata.name.electorate,false));
+        let filename = self.distribution_of_preferences_filename(&metadata.name.electorate)?;
         let path = self.find_raw_data_file(&filename)?;
         use calamine::Reader;
         let mut workbook1 = open_workbook_auto(&path)?;
@@ -734,6 +769,14 @@ impl VicDataLoader {
     /// Convert a name like "South-Eastern Metropolitan Region" to "south-easternmetropolitanregion" as used in file names. or "south-eastern-metropolitan-region" as used in urls
     fn region_human_name_to_computer_name(electorate:&str,convert_spaces_to_hypens:bool) -> String {
         electorate.chars().map(|c|if convert_spaces_to_hypens&&c==' ' {'-'} else {c}).filter(|c|!c.is_whitespace()).map(|c|c.to_ascii_lowercase()).collect()
+    }
+    fn distribution_of_preferences_filename(&self,electorate:&str) -> anyhow::Result<String> {
+        Ok(match self.year.as_str() {
+            "2014" => format!("{}distributions.xls",Self::region_human_name_to_computer_name(electorate,false)),
+            "2018" => format!("{}distributions.xls",Self::region_human_name_to_computer_name(electorate,false)),
+            "2022" => format!("{}-Distribution of Preferences.xls",electorate),
+            _ => { return Err(anyhow!("Do not know name for distribution of preferences file for year {}",self.year))}
+        })
     }
 
 }

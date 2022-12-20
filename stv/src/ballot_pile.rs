@@ -197,7 +197,10 @@ impl <'a> DistributedVotes<'a> {
         for vote in votes {
             if let Some(next) = vote.next(continuing_candidates) {
                 by_candidate[next.candidate().0].add_vote(next);
-            } else { exhausted+=vote.n; if vote.is_atl() { exhausted_atl+=vote.n; } }
+            } else {
+                exhausted+=vote.n;
+                if vote.is_atl() { exhausted_atl+=vote.n; }
+            }
         }
         DistributedVotes{by_candidate,exhausted,exhausted_atl}
     }

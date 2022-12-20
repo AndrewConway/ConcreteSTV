@@ -363,7 +363,7 @@ pub fn parse_xlsx_by_converting_to_csv_using_openoffice(path:&PathBuf) -> anyhow
     // run open office
 //    println!("Converting {:?}",path);
     let temp_path = temp_dir();
-    Command::new("libreoffice").arg("--headless").arg("--convert-to").arg("csv").arg(path).arg("--outdir").arg(&temp_path).output().context("Problem running libreoffice")?;
+    Command::new("libreoffice").arg("--headless").arg("--convert-to").arg("csv:Text - txt - csv (StarCalc):44,34,0,1,,0").arg(path).arg("--outdir").arg(&temp_path).output().context("Problem running libreoffice")?;
     let filename = path.file_name().ok_or_else(||anyhow!("Provided path {:?} doesn't seem to have a file name",&path))?;
     let mut output_path = temp_path.join(filename);
     output_path.set_extension("csv");
@@ -381,3 +381,31 @@ pub fn parse_xlsx_by_converting_to_csv_using_openoffice(path:&PathBuf) -> anyhow
     Ok(res)
 }
 
+/// A wrapper around parse_xlsx_by_converting_to_csv_using_openoffice result that has an API somewhat like Calamine's for cases where it doesn't work.
+pub struct CalamineLikeWrapper {
+    pub contents : Vec<Vec<String>>,
+}
+
+#[derive(Debug,Clone)]
+pub struct CalamineLikeCellWrapper {
+    pub contents : String,
+}
+impl CalamineLikeWrapper {
+    pub fn open(path:&PathBuf) -> anyhow::Result<Self> {
+        Ok(CalamineLikeWrapper{ contents: parse_xlsx_by_converting_to_csv_using_openoffice(path).with_context(|| format!("Processing {}",path.to_string_lossy()))? })
+    }
+    pub fn height(&self) -> usize { self.contents.len() }
+    pub fn width(&self) -> usize { self.contents.iter().map(|v|v.len()).max().unwrap_or(0) }
+    pub fn get_value(&self,coords:(u32,u32)) -> Option<CalamineLikeCellWrapper> {
+        let (row,col) = coords;
+        let row = row as usize;
+        let col = col as usize;
+        if row < self.contents.len() && col < self.contents[row].len() {
+            let contents = &self.contents[row][col];
+            if contents.is_empty() { None } else { Some(CalamineLikeCellWrapper{contents:contents.to_string()}) }
+        } else { None }
+    }
+}
+impl CalamineLikeCellWrapper {
+    pub fn get_string(&self) -> Option<String> { Some(self.contents.to_string()) }
+}
