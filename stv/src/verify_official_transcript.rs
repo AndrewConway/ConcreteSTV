@@ -12,18 +12,18 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Display};
 use std::iter;
 use thiserror::Error;
-use crate::ballot_metadata::{CandidateIndex, ElectionMetadata, NumberOfCandidates};
+use crate::ballot_metadata::{CandidateIndex, ElectionMetadata};
 use crate::ballot_paper::BTL;
-use crate::ballot_paper::FormalVote::Btl;
 use crate::ballot_pile::BallotPaperCount;
-use crate::distribution_of_preferences_transcript::{CandidateElected, CountIndex, ElectionReason, PerCandidate, QuotaInfo, Transcript};
+use crate::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo, Transcript};
 use crate::election_data::ElectionData;
 use crate::official_dop_transcript::{CanConvertToF64PossiblyLossily, OfficialDistributionOfPreferencesTranscript};
-use crate::preference_distribution::{distribute_preferences, PreferenceDistributionRules, PreferenceDistributor};
+use crate::preference_distribution::{PreferenceDistributionRules, PreferenceDistributor};
 use crate::tie_resolution::TieResolutionsMadeByEC;
 
 #[derive(Error, Debug)]
 pub enum IssueWithOfficialDOPTranscript<Tally:Display+Debug> {
+    // The first set come from some general sanity checks.
     #[error("No counts present in official transcript, not even first preference distribution.")]
     DoesntHaveFirstCount,
     #[error("No vote counts present in official transcript first count.")]
@@ -33,7 +33,7 @@ pub enum IssueWithOfficialDOPTranscript<Tally:Display+Debug> {
     #[error("The first preferences counts are not all integers")]
     FirstPreferenceVoteCountNotInteger,
     #[error("Official quota {0}, computed quota {1}")]
-    QuotaWrong(QuotaInfo<f64>,QuotaInfo<Tally>),
+    QuotaWrong(QuotaInfo<f64>, QuotaInfo<Tally>),
     #[error("Count #{0} had the wrong number of candidates in the vote delta array")]
     WrongNumberOfCandidatesVoteDelta(CountIndex),
     #[error("Count #{0} had the wrong number of candidates in the vote total array")]
@@ -43,7 +43,7 @@ pub enum IssueWithOfficialDOPTranscript<Tally:Display+Debug> {
     #[error("Count #{0} had the wrong number of candidates in the paper total array")]
     WrongNumberOfCandidatesPaperTotal(CountIndex),
     #[error("Count #{0} has the wrong total number of votes for candidate #{1} not equal to sum of prior count plus change")]
-    VoteSumIncorrect(CountIndex,CandidateIndex),
+    VoteSumIncorrect(CountIndex, CandidateIndex),
     #[error("Count #{0} has the wrong total number of votes for exhausted votes not equal to sum of prior count plus change")]
     VoteSumIncorrectExhausted(CountIndex),
     #[error("Count #{0} has the wrong total number of votes for votes lost to rounding not equal to sum of prior count plus change")]
@@ -51,7 +51,7 @@ pub enum IssueWithOfficialDOPTranscript<Tally:Display+Debug> {
     #[error("Count #{0} has the wrong total number of votes for set aside votes not equal to sum of prior count plus change")]
     VoteSumIncorrectSetAside(CountIndex),
     #[error("Count #{0} has the wrong total number of papers for candidate #{1} not equal to sum of prior count plus change")]
-    PaperSumIncorrect(CountIndex,CandidateIndex),
+    PaperSumIncorrect(CountIndex, CandidateIndex),
     #[error("Count #{0} has the wrong total number of papers for exhausted votes not equal to sum of prior count plus change")]
     PaperSumIncorrectExhausted(CountIndex),
     #[error("Count #{0} has the wrong total number of papers for set aside votes not equal to sum of prior count plus change")]
@@ -204,9 +204,10 @@ impl <'a,Rules:PreferenceDistributionRules> VerifyOfficialDopTranscript<'a,Rules
 
 
 pub fn veryify_official_dop_transcript<Rules:PreferenceDistributionRules>(official:&OfficialDistributionOfPreferencesTranscript,metadata:&ElectionMetadata) -> Result<(),IssueWithOfficialDOPTranscript<Rules::Tally>> {
-    let mut work: VerifyOfficialDopTranscript<'_, Rules> = VerifyOfficialDopTranscript::new(official,metadata)?;
+    let work: VerifyOfficialDopTranscript<'_, Rules> = VerifyOfficialDopTranscript::new(official,metadata)?;
     work.check_basic_arithmetic_adding_deltas_to_totals()?;
     work.check_first_preferences_count()?;
+    println!("{} {}",work.quota,work.first_preference_votes);
     // do the STV algorithm.
     Ok(())
 }
@@ -258,7 +259,8 @@ pub struct OracleFromOfficialDOP<'a> {
 }
 
 impl <'a> OracleFromOfficialDOP<'a> {
-    pub fn get_distribution_by_candidate(&mut self,current_count:CountIndex) -> Option<Vec<BallotPaperCount>> {
+    /// The Oracle declares that verily votes shall be distributed as it shall say.
+    pub fn get_distribution_by_candidate(&mut self, current_count:CountIndex) -> Option<Vec<BallotPaperCount>> {
         if current_count.0>self.official.counts.len() { return None }
         let count = &self.official.counts[current_count.0];
         if let Some(paper_delta) = &count.paper_delta {

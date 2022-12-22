@@ -30,7 +30,7 @@ fn test<Rules:PreferenceDistributionRules>(electorate:&str,loader:&NSWLGEDataLoa
             let file = File::create(format!("test_transcripts/NSW LG{} {}.transcript",transcript.metadata.name.year,electorate)).unwrap();
             serde_json::to_writer_pretty(file,&transcript).unwrap();
         }
-        if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,true) {
+        if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,true).unwrap() {
             println!("Observed tie resolution favouring {:?} over {:?}", decision.favoured, decision.disfavoured);
             assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
             tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));

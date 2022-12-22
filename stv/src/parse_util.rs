@@ -20,6 +20,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::process::Command;
 use std::str::FromStr;
+use std::sync::Mutex;
 use reqwest::Url;
 use crate::ballot_paper::{RawBallotMarkings};
 use crate::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
@@ -196,7 +197,7 @@ pub trait CanReadRawMarkings {
 /// Like read_raw_data, except also try to deduce the tie breaking decisions that were used by the electoral commission.
 /// This is a powerful function, but it will be slow and panic if anything goes even slightly wrong.
 /// Also deduce the offical results, possibly reordering to better match the actual order here.
-pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions<Rules:PreferenceDistributionRules,Source:RawDataSource>(loader:&Source, electorate: &str) -> anyhow::Result<ElectionData>  {
+pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions<Rules:PreferenceDistributionRules,Source:RawDataSource>(loader:&Source, electorate: &str) -> anyhow::Result<ElectionData> where <Rules as PreferenceDistributionRules>::Tally : Send+Sync+'static {
     println!("Trying to deduce ec resolutions for {}",electorate);
     let mut data = loader.read_raw_data(electorate)?;
     if electorate.ends_with("Mayoral") { return Ok(data); } // don't have DOP file for mayoral elections. Besides, STV is not necessarily exactly a generalization of IRV... e.g. early termination conditions.
@@ -207,7 +208,7 @@ pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutio
     loop {
         println!("Looping...");
         let transcript = data.distribute_preferences::<Rules>();
-        if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript,false) {
+        if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript,false).context("Trying to determine EC decisions")? {
             println!("Observed tie resolution favouring {:?} over {:?}", decision.favoured, decision.disfavoured);
             assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
             data.metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
@@ -350,6 +351,9 @@ pub fn file_to_string(file:&mut File) -> anyhow::Result<String> {
     file.read_to_string(&mut res)?;
     Ok(res)
 }
+use once_cell::sync::Lazy;
+// The openoffice CLI seems to be unreliable if running multiple simultaneously. This is used as a lock.
+static OPENOFFICE_CLI_LOCK: Lazy<Mutex<u64>> = Lazy::new(||Mutex::new(1u64));
 
 /// Parse an xslx file by the horrible convoluted method of running libreoffice to convert it
 /// into a csv file in the temporary directory, reading that into an array of strings, and
@@ -358,12 +362,13 @@ pub fn file_to_string(file:&mut File) -> anyhow::Result<String> {
 /// It is generally better to use a library like calamine, but if that doesn't work for some reason,
 /// this is a fall back.
 ///
-/// TODO this seems unreliable if running multiple simultaneously.
 pub fn parse_xlsx_by_converting_to_csv_using_openoffice(path:&PathBuf) -> anyhow::Result<Vec<Vec<String>>> {
     // run open office
 //    println!("Converting {:?}",path);
+    let lock = OPENOFFICE_CLI_LOCK.lock().unwrap();
     let temp_path = temp_dir();
-    Command::new("libreoffice").arg("--headless").arg("--convert-to").arg("csv:Text - txt - csv (StarCalc):44,34,0,1,,0").arg(path).arg("--outdir").arg(&temp_path).output().context("Problem running libreoffice")?;
+    let convert_to = if path.ends_with(".xlsx") {"csv"} else {"csv:Text - txt - csv (StarCalc):44,34,0,1,,0"}; // needed for .xls files to get unicode correctly.
+    Command::new("libreoffice").arg("--headless").arg("--convert-to").arg(convert_to).arg(path).arg("--outdir").arg(&temp_path).output().context("Problem running libreoffice")?;
     let filename = path.file_name().ok_or_else(||anyhow!("Provided path {:?} doesn't seem to have a file name",&path))?;
     let mut output_path = temp_path.join(filename);
     output_path.set_extension("csv");
@@ -378,6 +383,7 @@ pub fn parse_xlsx_by_converting_to_csv_using_openoffice(path:&PathBuf) -> anyhow
         }
     }
     std::fs::remove_file(output_path)?;
+    assert_eq!(lock.count_ones(),1);
     Ok(res)
 }
 

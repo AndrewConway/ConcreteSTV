@@ -12,7 +12,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use stv::ballot_metadata::{Candidate, CandidateIndex, ElectionMetadata, ElectionName, NumberOfCandidates, Party, PartyIndex};
 use stv::election_data::ElectionData;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use scraper::{ElementRef, Html, Selector};
 use stv::ballot_paper::PreferencesComingOutOfOrderHelper;
 use stv::parse_util::{file_to_string, FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
@@ -147,7 +147,7 @@ impl RawDataSource for NSWLGEDataLoader {
 
     fn read_official_dop_transcript(&self, metadata: &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         if metadata.name.electorate.ends_with("Mayoral") { self.read_official_dop_transcript_mayoral(metadata) }
-        else { self.read_official_dop_transcript_councillor(metadata) }
+        else { self.read_official_dop_transcript_councillor(metadata).context("read_official_dop_transcript_councillor") }
     }
 }
 
@@ -275,11 +275,12 @@ impl NSWLGEDataLoader {
     pub fn read_official_dop_transcript_councillor(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let contest = &self.find_contest(&metadata.name.electorate)?.url;
         let dop_file = self.find_raw_data_file_relative(contest,"download","dopfulldetails.xlsx","download/dopfulldetails.xlsx")?;
-        let table = parse_xlsx_by_converting_to_csv_using_openoffice(&dop_file)?; // do it this way as calamine does not read this file properly.
+        let table = parse_xlsx_by_converting_to_csv_using_openoffice(&dop_file).context("parsing dopfulldetails.xlsx")?; // do it this way as calamine does not read this file properly.
         if table.len() < 7 { return Err(anyhow!("DoP spreadsheet is too short"))}
         let expected_number_columns = 11+4*metadata.candidates.len()+14;
         if table[0].len() != expected_number_columns { return Err(anyhow!("DoP spreadsheet has {} columns expecting {}",table[0].len(),expected_number_columns)) }
-        // println!("Read into a table with {} rows and {} columns",table.len(),table[0].len());
+        //println!("Read into a table with {} rows and {} columns",table.len(),table[0].len());
+        //for line in &table { println!("{:?}",line); }
         let candidate_lookup = metadata.get_candidate_name_lookup();
         let col_candidate_papers = |c:CandidateIndex| 12+4*c.0;
         let col_count = 1;
@@ -297,9 +298,9 @@ impl NSWLGEDataLoader {
         let col_votes_lost = col_lost_rounding+4;
         let col_result = col_votes_lost+1;
         let quota = Some(QuotaInfo{
-            papers: BallotPaperCount(table[1][2].parse::<usize>()?-table[7][col_exhausted_bps].parse::<usize>()?),
-            vacancies: NumberOfCandidates(table[2][2].parse::<usize>()?),
-            quota: table[3][2].parse::<f64>()?
+            papers: BallotPaperCount(remove_comma(&table[1][2]).parse::<usize>()?-remove_comma(&table[7][col_exhausted_bps]).parse::<usize>()?),
+            vacancies: NumberOfCandidates(remove_comma(&table[2][2]).parse::<usize>()?),
+            quota: remove_comma(&table[3][2]).parse::<f64>()?
         });
         assert_eq!(col_result+1,expected_number_columns);
         let mut counts = vec![];
@@ -309,7 +310,7 @@ impl NSWLGEDataLoader {
             if line.len()!=expected_number_columns { return Err(anyhow!("DoP spreadsheet has {} columns on line {} expecting {}",line.len(),line_upto+1,expected_number_columns)) }
             let excluded_candidate_0_ballots = line[col_description].trim()=="Total" && about_to_be_excluded.is_some();
             if (line[col_description].is_empty() && !line[col_count].is_empty() && line[col_count].chars().all(|c|c=='.'||c.is_ascii_digit())) || excluded_candidate_0_ballots { // line is an actual count!
-                let transfer_value = if excluded_candidate_0_ballots { None} else { Some(if line[col_ctv].is_empty() {1.0} else {line[col_ctv].parse::<f64>()?})};
+                let transfer_value = if excluded_candidate_0_ballots { None} else { Some(if line[col_ctv].is_empty() {1.0} else {remove_comma(&line[col_ctv]).parse::<f64>()?})};
                 let mut vote_delta = PerCandidate::default();
                 let mut paper_delta = PerCandidate::default();
                 for c in metadata.candidate_indices() {
@@ -490,13 +491,13 @@ impl NSWLGEDataLoader {
 
 fn parse_number_blank_as_nan(s:&str) -> f64 {
     let s = s.trim();
-    if s.is_empty() { f64::NAN} else { s.parse().unwrap() }
+    if s.is_empty() { f64::NAN} else { remove_comma(s).parse().unwrap() }
 }
 fn parse_number_blank_as_zero(s:&str) -> isize {
     let s = s.trim();
-    if s.is_empty() { 0 } else { s.parse().unwrap() }
+    if s.is_empty() { 0 } else { remove_comma(s).parse().unwrap() }
 }
-
+fn remove_comma(s:&str) -> String { s.chars().filter(|c|*c!=',').collect() }
 
 /// Parse the zipped election file.
 /// The function currently ignores non-formal markings.

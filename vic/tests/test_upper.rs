@@ -4,7 +4,7 @@
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::fs::{File, metadata};
+use std::fs::File;
 use stv::ballot_metadata::CandidateIndex;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::parse_util::{FileFinder, RawDataSource};
@@ -41,7 +41,7 @@ fn test<Rules:PreferenceDistributionRules>(electorate:&str, loader:&VicDataLoade
             let file = File::create(format!("test_transcripts/Vic {} {}.transcript",transcript.metadata.name.year,electorate)).unwrap();
             serde_json::to_writer_pretty(file,&transcript).unwrap();
         }
-        if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,true) {
+        if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,true).unwrap() {
             println!("Observed tie resolution favouring {:?} over {:?}", decision.favoured, decision.disfavoured);
             assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
             tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
