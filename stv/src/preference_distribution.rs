@@ -347,7 +347,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
     /// See if there are any ties in the tallys for the candidates in
     /// to_check (which should be already sorted by tally). If there are,
-    /// resolve them, first using "how", secondly using self.ec_resolutions.
+    /// resolve them, first using "how", secondly using an Oracle, if present,
+    /// third using self.ec_resolutions,
     /// Re-orders to_check to be in the appropriate order.
     pub fn check_for_ties_and_resolve(&mut self,to_check:&mut [CandidateIndex],how:MethodOfTieResolution,granularity:TieResolutionGranularityNeeded) {
         // let mut to_check = &mut self.continuing_candidates_sorted_by_tally[to_check];
@@ -357,9 +358,22 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             while differs<to_check.len() && self.tally(to_check[i])==self.tally(to_check[differs]) { differs+=1; }
             if differs!=i+1 { // we have a few with identical tallies
                 let tied = &mut to_check[i..differs];
-                if let Some(decision) = how.resolve(tied,&self.transcript,granularity) {
-                    self.in_this_count.decisions.push(decision);
-                    self.ec_resolutions.resolve(tied,granularity);
+                if let Some(sub_granularity) = match granularity {
+                    TieResolutionGranularityNeeded::Total => Some(TieResolutionGranularityNeeded::Total),
+                    TieResolutionGranularityNeeded::LowestSeparated(n) if n<=differs && n>i  => Some(TieResolutionGranularityNeeded::LowestSeparated(n-i)),
+                    _ => None, // no resolution needed as all in or all not in.
+                } {
+                    if let Some(decision) = how.resolve(tied,&self.transcript,sub_granularity) {
+                        self.in_this_count.decisions.push(decision.clone());
+                        let solved_by_oracle = if let Some(oracle) = &mut self.oracle {
+                            if let Some(solution) = oracle.resolve_tie_resolution(self.current_count,sub_granularity,decision) {
+                                let resolutions = TieResolutionsMadeByEC{ tie_resolutions: vec![solution] };
+                                resolutions.resolve(tied,sub_granularity);
+                                true
+                            } else { false }
+                        } else { false };
+                        if !solved_by_oracle { self.ec_resolutions.resolve(tied,sub_granularity); }
+                    }
                 }
             }
             i=differs;

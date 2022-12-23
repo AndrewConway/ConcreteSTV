@@ -5,20 +5,21 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-use crate::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo, Transcript};
+use crate::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo, ReasonForCount, Transcript};
 use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use std::cmp::min;
 use num::{abs, Zero};
 use std::ops::Sub;
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug, Display, Formatter};
 use std::num::ParseIntError;
 use crate::ballot_pile::BallotPaperCount;
 use crate::signed_version::SignedVersion;
 use std::str::FromStr;
+use crate::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
 use crate::official_dop_transcript::DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyDeltaRounding;
 use crate::tie_resolution::TieResolutionExplicitDecision;
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Eq, PartialEq)]
 // The following differences come from a comparison of the official transcript against one created by ConcreteSTV.
 pub enum DifferenceBetweenOfficialDoPAndComputed<Tally:Display+Debug> {
     #[error("There are {0} counts in the official DoP and {1} in the ConcreteSTV DoP.")]
@@ -28,7 +29,7 @@ pub enum DifferenceBetweenOfficialDoPAndComputed<Tally:Display+Debug> {
     #[error("There are {0} formal ballot papers in the official DoP quota computation and {1} in the ConcreteSTV case.")]
     DifferentNumbersOfPapersInQuota(BallotPaperCount,BallotPaperCount),
     #[error("The quota is {0} in the official DoP quota computation and {1} in the ConcreteSTV case.")]
-    DifferentQuota(f64,Tally),
+    DifferentQuota(ECTally,Tally),
     #[error("There is a difference on count {} : {2}", count_name(*.0,&.1))]
     DifferentOnCount(CountIndex,Option<String>,DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally>),
 }
@@ -40,7 +41,7 @@ fn count_name(count_index:CountIndex,count_name:&Option<String>) -> String {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Eq, PartialEq)]
 // The following differences come from a comparison of the official transcript against one created by ConcreteSTV.
 pub enum DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally:Display+Debug> {
     #[error("The count name is {0:?} in the official DoP quota computation and {1:?} in the ConcreteSTV case.")]
@@ -49,10 +50,12 @@ pub enum DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally:Display+
     ElectedCandidatesOrdered(Vec<CandidateIndex>,Vec<CandidateIndex>),
     #[error("The elected candidates (ballot paper order) are {0:?} in the official DoP and {1:?} in the ConcreteSTV case.")]
     ElectedCandidatesUnordered(Vec<CandidateIndex>,Vec<CandidateIndex>),
-    #[error("In the official list candidate {0} ceased to be a continuing candidate for the first time this count, but not in the ConcreteSTV case.")]
-    CandidateNotContinuingInOfficalCount(CandidateIndex),
-    #[error("In the official list candidate {0} ceased to be a continuing candidate for the first time this count, but not in the ConcreteSTV case. There was an EC decision involving {1:?} but none were excluded by ConcreteSTV.")]
-    CandidateNotContinuingInOfficialCountWithPointlessDecision(CandidateIndex, Vec<CandidateIndex>),
+    #[error("The excluded candidates (ballot paper order) are {0:?} in the official DoP and {1:?} in the ConcreteSTV case.")]
+    ExcludedCandidatesUnordered(Vec<CandidateIndex>,Vec<CandidateIndex>),
+    //#[error("In the official list candidate {0} ceased to be a continuing candidate for the first time this count, but not in the ConcreteSTV case.")]
+    //CandidateNotContinuingInOfficalCount(CandidateIndex),
+    //#[error("In the official list candidate {0} ceased to be a continuing candidate for the first time this count, but not in the ConcreteSTV case. There was an EC decision involving {1:?} but none were excluded by ConcreteSTV.")]
+    //CandidateNotContinuingInOfficialCountWithPointlessDecision(CandidateIndex, Vec<CandidateIndex>),
     #[error("The affected ballots in this count came from counts {0:?} (0 based) in the official DoP and {1:?} in ConcreteSTV.")]
     FromCounts(Vec<CountIndex>,Vec<CountIndex>),
     #[error("The total number of exhausted papers is {0} in the official DoP and {1} in ConcreteSTV.")]
@@ -68,20 +71,53 @@ pub enum DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally:Display+
     #[error("The change in number of papers is {0} in the official DoP and {1} in ConcreteSTV for candidate #{2}.")]
     PaperDeltaCandidate(isize,isize,CandidateIndex),
     #[error("The total number of papers lost to exhaustion or rounding is {0} in the official DoP and {1} from exhaustion and {2} from rounding ConcreteSTV.")]
-    TallyTotalExhaustedAndRounding(f64,Tally,SignedVersion<Tally>),
+    TallyTotalExhaustedAndRounding(ECTally,Tally,SignedVersion<Tally>),
     #[error("The total number of exhausted papers is {0} in the official DoP and {1} in ConcreteSTV.")]
-    TallyTotalExhausted(f64,Tally),
+    TallyTotalExhausted(ECTally,Tally),
     #[error("The total number of lost to rounding papers is {0} in the official DoP and {1} in ConcreteSTV.")]
-    TallyTotalRounding(f64,SignedVersion<Tally>), // should be 0 in all cases???
+    TallyTotalRounding(ECTally,SignedVersion<Tally>), // should be 0 in all cases???
     #[error("The total number of papers is {0} in the official DoP and {1} in ConcreteSTV for candidate #{2}.")]
-    TallyTotalCandidate(f64,Tally,CandidateIndex),
+    TallyTotalCandidate(ECTally,Tally,CandidateIndex),
     #[error("The change in number of exhausted papers is {0} in the official DoP and {2}-{1} in ConcreteSTV.")]
-    TallyDeltaExhausted(f64,Tally,Tally),
+    TallyDeltaExhausted(ECTally,Tally,Tally),
     #[error("The change in number of lost to rounding papers is {0} in the official DoP and {1} in ConcreteSTV.")]
-    TallyDeltaRounding(f64,SignedVersion<Tally>), // should be 0 in all cases???
+    TallyDeltaRounding(ECTally,SignedVersion<Tally>), // should be 0 in all cases???
     #[error("The change in number of papers is {0} in the official DoP and {2}-{1} in ConcreteSTV for candidate #{3}.")]
-    TallyDeltaCandidate(f64,Tally,Tally,CandidateIndex),
+    TallyDeltaCandidate(ECTally,Tally,Tally,CandidateIndex),
 }
+
+/// A vote that is a finite, comparable, not-NaN value
+#[derive(Copy,Clone)]
+pub struct ECTally(f64);
+
+impl Display for ECTally {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"{}",self.0)
+    }
+}
+impl Debug for ECTally {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"{}",self.0)
+    }
+}
+
+impl PartialEq<Self> for ECTally {
+    fn eq(&self, other: &Self) -> bool { self.0 == other.0 }
+}
+
+impl From<ECTally> for f64 {
+    fn from(value: ECTally) -> Self { value.0 }
+}
+
+impl From<f64> for ECTally {
+    fn from(value: f64) -> Self {
+        assert!(!value.is_nan());
+        ECTally(value)
+    }
+}
+
+impl Eq for ECTally {}
+
 /// Information for a particular count from the official transcript.
 #[derive(Default)]
 pub struct OfficialDOPForOneCount {
@@ -166,7 +202,7 @@ impl OfficialDistributionOfPreferencesTranscript {
         if let Some(quota) = &self.quota {
             if quota.vacancies != transcript.quota.as_ref().unwrap().vacancies { return Err(DifferenceBetweenOfficialDoPAndComputed::DifferentNumbersOfVacanciesInQuota(quota.vacancies, transcript.quota.as_ref().unwrap().vacancies)) }
             if quota.papers != transcript.quota.as_ref().unwrap().papers { return Err(DifferenceBetweenOfficialDoPAndComputed::DifferentNumbersOfPapersInQuota(quota.papers, transcript.quota.as_ref().unwrap().papers)) }
-            if quota.quota != decode(transcript.quota.as_ref().unwrap().quota.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputed::DifferentQuota(quota.quota, transcript.quota.as_ref().unwrap().quota.clone())) }
+            if quota.quota != decode(transcript.quota.as_ref().unwrap().quota.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputed::DifferentQuota(quota.quota.into(), transcript.quota.as_ref().unwrap().quota.clone())) }
         }
         for count_number in 0..min(self.counts.len(), transcript.counts.len()) {
             let count_number = CountIndex(count_number);
@@ -204,48 +240,63 @@ impl OfficialDistributionOfPreferencesTranscript {
             my_order.sort_by_key(|c|c.0);
             if official_order!=my_order { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::ElectedCandidatesUnordered(official_order,my_order))}
         }
-        for who in &official_count.excluded {
-            if !my_count.not_continuing.contains(who) {
-                return if let Some(relevant_decision) = my_count.decisions.iter().find(|d| d.affected.contains(who)) { // may exclude a different candidate because of random decisions.
-                    // The EC excluded "who". Work out whom I excluded.
-                    if let Some(&_who_was_lucky) = relevant_decision.affected.iter().find(|&c| my_count.not_continuing.contains(c)) {
-                        // I excluded "who_was_lucky". They should have a higher priority than "who".
-                        let favoured = relevant_decision.affected.iter().filter(|&&c| c != *who).cloned().collect::<Vec<_>>();
-                        Ok(Some(TieResolutionExplicitDecision { favoured, disfavoured: vec![*who], came_up_in: my_count.count_name.clone().or_else(|| Some((count_number.0 + 1).to_string())) }))
-                        // panic!("I excluded candidate {} but the EC excluded candidate {}. This was chosen by lot.",who_was_lucky,who);
-                    } else {
-                        Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::CandidateNotContinuingInOfficialCountWithPointlessDecision(*who, relevant_decision.affected.clone()))
-                    }
-                } else {
-                    Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::CandidateNotContinuingInOfficalCount(*who))
+        let my_excluded : Vec<CandidateIndex> = if let ReasonForCount::Elimination(eliminated) = &my_count.reason { eliminated.iter().filter(|c|my_count.not_continuing.contains(*c)).cloned().collect() } else { vec![] };
+        let excluded_comparison = DifferentCandidateLists{ list1: official_count.excluded.clone(), list2: my_excluded.clone() };
+        let excluded_deltas : DeltasInCandidateLists = excluded_comparison.into();
+        if !excluded_deltas.is_empty() {
+            for who in &official_count.excluded {
+                if !my_excluded.contains(who) { // this could be improved.
+                    if let Some(relevant_decision) = my_count.decisions.iter().find(|d| d.affected.contains(who)) { // may exclude a different candidate because of random decisions.
+                        // The EC excluded "who". Work out whom I excluded.
+                        if let Some(&_who_was_lucky) = relevant_decision.affected.iter().find(|&c| my_count.not_continuing.contains(c)) {
+                            // I excluded "who_was_lucky". They should have a higher priority than "who".
+                            let favoured = relevant_decision.affected.iter().filter(|&&c| c != *who).cloned().collect::<Vec<_>>();
+                            return Ok(Some(TieResolutionExplicitDecision { favoured, disfavoured: vec![*who], came_up_in: my_count.count_name.clone().or_else(|| Some((count_number.0 + 1).to_string())) }))
+                            // panic!("I excluded candidate {} but the EC excluded candidate {}. This was chosen by lot.",who_was_lucky,who);
+                        } /*else {
+                            Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::CandidateNotContinuingInOfficialCountWithPointlessDecision(*who, relevant_decision.affected.clone()))
+                        }*/
+                    } /*else {
+                        let mut official_order = official_count.elected.clone();
+                        official_order.sort_by_key(|c|c.0);
+                        let mut my_order = my_count.elected.iter().map(|e| e.who).collect::<Vec<CandidateIndex>>();
+                        my_order.sort_by_key(|c|c.0);
+
+                        Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::CandidateNotContinuingInOfficalCount(*who))
+                    }*/
                 }
             }
+            let mut official_order = official_count.excluded.clone();
+            official_order.sort_by_key(|c|c.0);
+            let mut my_order = my_excluded;
+            my_order.sort_by_key(|c|c.0);
+            return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::ExcludedCandidatesUnordered(official_order,my_order))
         }
         if let Some(vote_total) = &official_count.vote_total {
             if verbose { println!("Checking tally count {}", count_number.0 + 1); }
             if self.all_exhausted_go_to_rounding {
-                if different(vote_total.rounding.resolve()-my_count.status.tallies.rounding.convert_f64(&decode),my_count.status.tallies.exhausted.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalExhaustedAndRounding(vote_total.rounding.resolve(),my_count.status.tallies.exhausted.clone(),my_count.status.tallies.rounding.clone()))}
+                if different(vote_total.rounding.resolve()-my_count.status.tallies.rounding.convert_f64(&decode),my_count.status.tallies.exhausted.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalExhaustedAndRounding(vote_total.rounding.resolve().into(),my_count.status.tallies.exhausted.clone(),my_count.status.tallies.rounding.clone()))}
             } else {
-                if different(vote_total.exhausted,my_count.status.tallies.exhausted.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalExhausted(vote_total.exhausted,my_count.status.tallies.exhausted.clone()))}
-                if different_signed(vote_total.rounding.resolve(),my_count.status.tallies.rounding.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalRounding(vote_total.rounding.resolve(),my_count.status.tallies.rounding.clone()))}
+                if different(vote_total.exhausted,my_count.status.tallies.exhausted.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalExhausted(vote_total.exhausted.into(),my_count.status.tallies.exhausted.clone()))}
+                if different_signed(vote_total.rounding.resolve(),my_count.status.tallies.rounding.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalRounding(vote_total.rounding.resolve().into(),my_count.status.tallies.rounding.clone()))}
             }
             for candidate in 0..vote_total.candidate.len() {
-                if different(vote_total.candidate[candidate],my_count.status.tallies.candidate[candidate].clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalCandidate(vote_total.candidate[candidate],my_count.status.tallies.candidate[candidate].clone(),CandidateIndex(candidate)))}
+                if different(vote_total.candidate[candidate],my_count.status.tallies.candidate[candidate].clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalCandidate(vote_total.candidate[candidate].into(),my_count.status.tallies.candidate[candidate].clone(),CandidateIndex(candidate)))}
             }
         }
         if let Some(vote_delta) = &official_count.vote_delta {
             if verbose { println!("Checking tally delta count {}", count_number.0 + 1); }
             let tally_exhausted_now = my_count.status.tallies.exhausted.clone();
             let tally_exhausted_prior = my_prior_count.map(|c|c.status.tallies.exhausted.clone()).unwrap_or_else(||Tally::zero());
-            if different(vote_delta.exhausted+decode(tally_exhausted_prior.clone()),tally_exhausted_now.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyDeltaExhausted(vote_delta.exhausted,tally_exhausted_prior,tally_exhausted_now))}
+            if different(vote_delta.exhausted+decode(tally_exhausted_prior.clone()),tally_exhausted_now.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyDeltaExhausted(vote_delta.exhausted.into(),tally_exhausted_prior,tally_exhausted_now))}
             let tally_rounding_now = my_count.status.tallies.rounding.clone();
             let tally_rounding_prior = my_prior_count.map(|c|c.status.tallies.rounding.clone()).unwrap_or_else(||SignedVersion::<Tally>::zero());
             let tally_rounding = tally_rounding_now-tally_rounding_prior;
-            if different_signed(vote_delta.rounding.resolve(),tally_rounding.clone()) { return Err(TallyDeltaRounding(vote_delta.rounding.resolve(),tally_rounding))}
+            if different_signed(vote_delta.rounding.resolve(),tally_rounding.clone()) { return Err(TallyDeltaRounding(vote_delta.rounding.resolve().into(),tally_rounding))}
             for candidate in 0..vote_delta.candidate.len() {
                 let tally_now = my_count.status.tallies.candidate[candidate].clone();
                 let tally_prior = my_prior_count.map(|c|c.status.tallies.candidate[candidate].clone()).unwrap_or_else(||Tally::zero());
-                if different(vote_delta.candidate[candidate]+decode(tally_prior.clone()),tally_now.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyDeltaCandidate(vote_delta.candidate[candidate],tally_prior,tally_now,CandidateIndex(candidate)))}
+                if different(vote_delta.candidate[candidate]+decode(tally_prior.clone()),tally_now.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyDeltaCandidate(vote_delta.candidate[candidate].into(),tally_prior,tally_now,CandidateIndex(candidate)))}
             }
         }
         if let Some(paper_total) = &official_count.paper_total {

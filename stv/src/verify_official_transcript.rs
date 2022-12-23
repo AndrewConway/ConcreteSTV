@@ -15,11 +15,11 @@ use thiserror::Error;
 use crate::ballot_metadata::{CandidateIndex, ElectionMetadata};
 use crate::ballot_paper::BTL;
 use crate::ballot_pile::BallotPaperCount;
-use crate::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo, Transcript};
+use crate::distribution_of_preferences_transcript::{CountIndex, DecisionMadeByEC, PerCandidate, QuotaInfo, Transcript};
 use crate::election_data::ElectionData;
 use crate::official_dop_transcript::{CanConvertToF64PossiblyLossily, OfficialDistributionOfPreferencesTranscript};
 use crate::preference_distribution::{PreferenceDistributionRules, PreferenceDistributor};
-use crate::tie_resolution::TieResolutionsMadeByEC;
+use crate::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionGranularityNeeded, TieResolutionsMadeByEC};
 
 #[derive(Error, Debug)]
 pub enum IssueWithOfficialDOPTranscript<Tally:Display+Debug> {
@@ -216,7 +216,7 @@ pub fn veryify_official_dop_transcript<Rules:PreferenceDistributionRules>(offici
 pub fn distribute_preferences_using_official_results<Rules:PreferenceDistributionRules>(official:&OfficialDistributionOfPreferencesTranscript,metadata:&ElectionMetadata) -> Result<Transcript<Rules::Tally>,IssueWithOfficialDOPTranscript<Rules::Tally>> {
     if official.counts.is_empty() { return Err(IssueWithOfficialDOPTranscript::DoesntHaveFirstCount)}
     let excluded_candidates : HashSet<CandidateIndex> = metadata.excluded.iter().cloned().collect();
-    let print_progress_to_stdout:bool = true;
+    let print_progress_to_stdout:bool = false;
     let num_candidates = metadata.candidates.len();
     // check quota
     let candidates_to_be_elected = metadata.vacancies.ok_or_else(||IssueWithOfficialDOPTranscript::MetadataMissingVacancies)?;
@@ -247,7 +247,7 @@ pub fn distribute_preferences_using_official_results<Rules:PreferenceDistributio
     let ec_resolutions = TieResolutionsMadeByEC::default(); // TODO make EC resolutions correct.
     let arena = typed_arena::Arena::<CandidateIndex>::new();
     let votes = data.resolve_atl(&arena,None);
-    let oracle = OracleFromOfficialDOP{official};
+    let oracle = OracleFromOfficialDOP{official, tie_resolutions: Default::default() };
     let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(&data,&votes,candidates_to_be_elected,&excluded_candidates,&ec_resolutions,print_progress_to_stdout,Some(oracle));
     work.go();
     Ok(work.transcript)
@@ -255,13 +255,14 @@ pub fn distribute_preferences_using_official_results<Rules:PreferenceDistributio
 
 pub struct OracleFromOfficialDOP<'a> {
     official:&'a OfficialDistributionOfPreferencesTranscript,
-    //arena : typed_arena::Arena::<CandidateIndex>
+    // this is built up as they are encountered.
+    tie_resolutions : TieResolutionsMadeByEC,
 }
 
 impl <'a> OracleFromOfficialDOP<'a> {
     /// The Oracle declares that verily votes shall be distributed as it shall say.
     pub fn get_distribution_by_candidate(&mut self, current_count:CountIndex) -> Option<Vec<BallotPaperCount>> {
-        if current_count.0>self.official.counts.len() { return None }
+        if current_count.0>=self.official.counts.len() { return None }
         let count = &self.official.counts[current_count.0];
         if let Some(paper_delta) = &count.paper_delta {
             let res : Vec<BallotPaperCount> = paper_delta.candidate.iter().chain(iter::once(&paper_delta.exhausted)).map(|v|if *v>=0 {BallotPaperCount(*v as usize)} else {BallotPaperCount(0)}).collect();
@@ -269,6 +270,39 @@ impl <'a> OracleFromOfficialDOP<'a> {
         } else {
             None
         }
+    }
+
+    pub fn resolve_tie_resolution(&mut self, current_count:CountIndex,granularity:TieResolutionGranularityNeeded,decision_needed:DecisionMadeByEC) -> Option<TieResolutionAtom> {
+        if current_count.0>self.official.counts.len() { return None }
+        let count = &self.official.counts[current_count.0];
+        let mut elected_this_count : Vec<CandidateIndex> = count.elected.iter().filter(|c|decision_needed.affected.contains(c)).cloned().collect();
+        let mut excluded_this_count : Vec<CandidateIndex> = count.excluded.iter().filter(|c|decision_needed.affected.contains(c)).cloned().collect();
+        let mut remaining : Vec<CandidateIndex> = decision_needed.affected.iter().filter(|c|!(elected_this_count.contains(*c)||excluded_this_count.contains(*c))).cloned().collect();
+        assert_eq!(decision_needed.affected.len(),elected_this_count.len()+excluded_this_count.len()+remaining.len());
+        let decision = match granularity {
+            TieResolutionGranularityNeeded::Total => {
+                if remaining.len()>1 { return None } // not enough information
+                let mut favoured = vec![];
+                for c in excluded_this_count { favoured.push(c) }
+                for c in remaining { favoured.push(c) }
+                for &c in elected_this_count.iter().rev() { favoured.push(c) }
+                TieResolutionAtom::IncreasingFavour(favoured)
+            }
+            TieResolutionGranularityNeeded::LowestSeparated(n) => {
+                if excluded_this_count.len()==n {
+                    elected_this_count.append(&mut remaining);
+                } else if excluded_this_count.len()+remaining.len()==n {
+                    excluded_this_count.append(&mut remaining);
+                } else { return None }
+                TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{
+                    favoured: elected_this_count,
+                    disfavoured: excluded_this_count,
+                    came_up_in: Some(count.count_name.clone().unwrap_or_else(||format!("{}",current_count.0+1))),
+                })
+            }
+        };
+        self.tie_resolutions.tie_resolutions.push(decision.clone());
+        Some(decision)
     }
     /*
     pub fn add_vote(&self,old_prefs:&[CandidateIndex],add:CandidateIndex) -> &[CandidateIndex] {
