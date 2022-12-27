@@ -241,18 +241,26 @@ impl <'a> DistributedVotes<'a> {
     }
     /// distribute votes ignoring the preferences totally, using an oracle that tells you how many votes to put where.
     /// Used to check the DoPs of jurisdictions that publish DoPs, but not actual votes.
-    pub fn distribute_by_oracle(votes:&Vec<PartiallyDistributedVote<'a>>,continuing_candidates:&HashSet<CandidateIndex>,num_candidates:usize,oracle_by_candidate:&[BallotPaperCount]) -> Self {
+    /// oracle_by_candidate is only used for the first num_candidates values - the number of exhausted votes is ignored. Any votes not assigned to candidates are considered exhausted.
+    pub fn distribute_by_oracle(votes:&Vec<PartiallyDistributedVote<'a>>,continuing_candidates:&HashSet<CandidateIndex>,num_candidates:usize,oracle_by_candidate:&mut [BallotPaperCount]) -> Self {
         assert_eq!(num_candidates+1,oracle_by_candidate.len()); // extra one is exhausted.
         let mut by_candidate = vec![VotesWithSameTransferValue::default();num_candidates];
-        let exhausted = oracle_by_candidate[num_candidates];
+        let mut exhausted = BallotPaperCount(0);
         let exhausted_atl = BallotPaperCount(0);
-        for c in 0..num_candidates {
-            let n = oracle_by_candidate[c];
-            if !n.is_zero() {
-                if !continuing_candidates.contains(&CandidateIndex(c)) {
-                    println!("** ERROR: Oracle assigned {} papers to candidate {} who is not continuing.",n,c);
+        let mut upto_candidate = CandidateIndex(0);
+        for v in votes {
+            let mut nv = v.n; // number of votes not used yet from this ballot paper.
+            while !nv.is_zero() {
+                while upto_candidate.0 < num_candidates && (oracle_by_candidate[upto_candidate.0].is_zero() || !continuing_candidates.contains(&upto_candidate)) { upto_candidate=CandidateIndex(upto_candidate.0+1); }
+                if upto_candidate.0 < num_candidates {
+                    let n = BallotPaperCount::min(oracle_by_candidate[upto_candidate.0],nv);
+                    nv-=n;
+                    oracle_by_candidate[upto_candidate.0]-=n;
+                    by_candidate[upto_candidate.0].add_vote(PartiallyDistributedVote{upto:0,n,prefs:&[],source:v.source.clone()});
+                } else {
+                    exhausted+=nv;
+                    nv=BallotPaperCount(0);
                 }
-                by_candidate[c].add_vote(PartiallyDistributedVote{upto:0,n,prefs:&[],source:votes[0].source.clone()});
             }
         }
         DistributedVotes{by_candidate,exhausted,exhausted_atl}

@@ -10,6 +10,7 @@
 
 
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use stv::parse_util::{FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
 use std::path::PathBuf;
@@ -21,10 +22,15 @@ use anyhow::anyhow;
 use serde::Deserialize;
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use calamine::{open_workbook_auto, DataType};
-use stv::datasource_description::{AssociatedRules, Copyright};
+use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
 use stv::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo};
-use crate::{ACT2021, ACTPre2020};
+use crate::{ACT2020, ACT2021, ACTPre2020};
 
+// Get a data loader that loads the original Distribution of Preferences.
+pub fn get_act_data_loader_2020_0(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
+    ACTDataLoader::new(finder,"2020.0","https://www.elections.act.gov.au/elections_and_voting/2020_legislative_assembly_election/ballot-paper-preference-data-2020-election")
+}
+// Get a data loader that loads the March 2021 updated Distribution of Preferences.
 pub fn get_act_data_loader_2020(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
     ACTDataLoader::new(finder,"2020","https://www.elections.act.gov.au/elections_and_voting/2020_legislative_assembly_election/ballot-paper-preference-data-2020-election")
 }
@@ -36,6 +42,27 @@ pub fn get_act_data_loader_2012(finder:&FileFinder) -> anyhow::Result<ACTDataLoa
 }
 pub fn get_act_data_loader_2008(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
     ACTDataLoader::new(finder,"2008","https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections/2008_election/ballot_paper_preference_data_2008_election")
+}
+
+
+/// Note: do not use this for a website as data does not have a suitable license.
+pub struct ACTDataSource {}
+
+impl ElectionDataSource for ACTDataSource {
+    fn name(&self) -> Cow<'static, str> { "ACT Legislative Assembly".into() }
+    fn ec_name(&self) -> Cow<'static, str> { "Elections ACT".into() }
+    fn ec_url(&self) -> Cow<'static, str> { "https://www.elections.act.gov.au/".into() }
+    fn years(&self) -> Vec<String> { vec!["2008".to_string(),"2012".to_string(),"2016".to_string(),"2020".to_string()] } // 2020.0 means the original DoP not the fixed result posted in 2021.
+    fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
+        match year {
+            "2008" => Ok(Box::new(get_act_data_loader_2008(finder)?)),
+            "2012" => Ok(Box::new(get_act_data_loader_2012(finder)?)),
+            "2016" => Ok(Box::new(get_act_data_loader_2016(finder)?)),
+            "2020" => Ok(Box::new(get_act_data_loader_2020(finder)?)),
+            "2020.0" => Ok(Box::new(get_act_data_loader_2020_0(finder)?)),
+            _ => Err(anyhow!("Not a valid year")),
+        }
+    }
 }
 
 pub struct ACTDataLoader {
@@ -121,6 +148,7 @@ impl RawDataSource for ACTDataLoader {
         match self.year.as_str() {
             "2008"|"2012"|"2016" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<ACTPre2020,Self>(self,electorate),
             "2020" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<ACT2021,Self>(self,electorate),
+            "2020.0" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<ACT2020,Self>(self,electorate),
             _ => Err(anyhow!("Invalid year {}",self.year)),
         }
     }
@@ -173,7 +201,7 @@ impl RawDataSource for ACTDataLoader {
                 comment: None,
                 reports: vec![]
             },
-            "2020" => AssociatedRules{
+            "2020" | "2020.0" => AssociatedRules{
                 rules_used: Some("ACT2020".into()),
                 rules_recommended: Some("ACT2021".into()),
                 comment: Some("The election was initially run with buggy rules ACT2020. After we pointed out the bugs, the counts on Elections ACT website were changed in 2021 to use the correct rules ACT2021".into()),
@@ -196,7 +224,7 @@ impl RawDataSource for ACTDataLoader {
 impl ACTDataLoader {
 
     pub fn new(finder:&FileFinder,year:&'static str,page_url:&'static str) -> anyhow::Result<Self> {
-        let archive_location = "ACT/".to_string()+year;
+        let archive_location = "ACT/".to_string()+year.trim_end_matches(".0");
         let electorate_to_ecode = read_electorate_to_ecode(&finder.find_raw_data_file("Electorates.txt",&archive_location,page_url)?)?;
         Ok(ACTDataLoader {
             finder : finder.clone(),
@@ -425,7 +453,7 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
                 "2008" => ( 0,"On Papers at Count ",","),
                 "2012" => ( 0,"On Papers at Count ",","),
                 "2016" => (-1,"On Papers at Count ",","),
-                "2020" => {
+                "2020"|"2020.0" => { // 2020.0 is the buggy version, but some older code paths might get it other ways.
                     let buggy_version = if let Some(s) = sheet1.get_value((paper_row_index,table1_col_for_description_of_choices)).and_then(|v|v.get_string()) { // the original DOPs published had lots of bugs and a different format.
                         s.starts_with("From counts")
                     } else { false };

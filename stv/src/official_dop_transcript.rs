@@ -5,19 +5,24 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-use crate::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo, ReasonForCount, Transcript};
+use crate::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo, ReasonForCount, Transcript, TranscriptWithMetadata};
 use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use std::cmp::min;
 use num::{abs, Zero};
 use std::ops::Sub;
 use std::fmt::{Debug, Display, Formatter};
+use std::fs::File;
 use std::num::ParseIntError;
 use crate::ballot_pile::BallotPaperCount;
 use crate::signed_version::SignedVersion;
 use std::str::FromStr;
 use crate::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
+use crate::datasource_description::ElectionDataSource;
 use crate::official_dop_transcript::DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyDeltaRounding;
+use crate::parse_util::FileFinder;
+use crate::preference_distribution::PreferenceDistributionRules;
 use crate::tie_resolution::TieResolutionExplicitDecision;
+use crate::verify_official_transcript::distribute_preferences_using_official_results;
 
 #[derive(thiserror::Error, Debug, Eq, PartialEq)]
 // The following differences come from a comparison of the official transcript against one created by ConcreteSTV.
@@ -334,4 +339,24 @@ pub fn candidate_elem<T:Default+Clone>(vec : &mut Vec<T>, who:CandidateIndex) ->
 }
 
 
+/// Test a particular year & electorate against a particular set of rules.
+/// Outermost error is IO type errors.
+/// Innermost error is discrepancies with the official DoP.
+///
+/// If `save_transcripts` is true, transcripts will be saved to the `test_transcripts` folder.
+pub fn test_official_dop_without_actual_votes<Rules:PreferenceDistributionRules,Source:ElectionDataSource>(source:&Source,year:&str,state:&str,save_transcripts:bool) -> anyhow::Result<Result<Option<TieResolutionExplicitDecision>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
+    let loader = source.get_loader_for_year(year,&FileFinder::find_ec_data_repository())?;
+    let metadata = loader.read_raw_metadata(state)?;
+    let official_transcript = loader.read_official_dop_transcript(&metadata)?;
+    //veryify_official_dop_transcript::<Rules>(&official_transcript,&metadata)?;
+    let transcript = distribute_preferences_using_official_results::<Rules>(&official_transcript,&metadata)?;
+    let result = Ok(official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript,false));
+    if save_transcripts {
+        let transcript = TranscriptWithMetadata{ metadata, transcript };
+        std::fs::create_dir_all("test_transcripts")?;
+        let file = File::create(format!("test_transcripts/transcript{}{}_{}.json",state,year,Rules::name()))?;
+        serde_json::to_writer_pretty(file,&transcript)?;
+    }
+    result
+}
 
