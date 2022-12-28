@@ -36,17 +36,19 @@ pub fn get_vic_data_loader_2022(finder:&FileFinder) -> anyhow::Result<VicDataLoa
 }
 
 
+/// Do not use on website as votes are not published.
+pub struct VicDataSource {}
 
-pub struct NSWLGEDataSource {}
-
-impl ElectionDataSource for NSWLGEDataSource {
+impl ElectionDataSource for VicDataSource {
     fn name(&self) -> Cow<'static, str> { "Victorian Upper House".into() }
     fn ec_name(&self) -> Cow<'static, str> { "Victorian Electoral Commission".into() }
     fn ec_url(&self) -> Cow<'static, str> { "https://www.vec.vic.gov.au/".into() }
-    fn years(&self) -> Vec<String> { vec!["2014".to_string()] }
+    fn years(&self) -> Vec<String> { vec!["2014".to_string(),"2018".to_string(),"2022".to_string()] }
     fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
         match year {
             "2014" => Ok(Box::new(get_vic_data_loader_2014(finder)?)),
+            "2018" => Ok(Box::new(get_vic_data_loader_2018(finder)?)),
+            "2022" => Ok(Box::new(get_vic_data_loader_2022(finder)?)),
             _ => Err(anyhow!("Not a valid year")),
         }
     }
