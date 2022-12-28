@@ -348,3 +348,32 @@ function MainViewerOnLoadFunction() {
     // getWebJSON("../transcript.json",data=>{full_transcript=data; Render();},null);
 }
 
+function triggerDownload (imgURI,filenamebase,extension) {
+    const evt = new MouseEvent('click', {
+        view: window,
+        bubbles: false,
+        cancelable: true
+    });
+    const a = document.createElement('a');
+    a.setAttribute('download',filenamebase+(extension||".svg"));
+    a.setAttribute('href', imgURI);
+    a.setAttribute('target', '_blank');
+    a.dispatchEvent(evt);
+}
+function saveHTML(name,title) {
+    const desired_section = document.getElementById(name);
+    const desired_section_text = desired_section.outerHTML;
+    let internal_css = "";
+    for (const css of document.getElementsByTagName("link")) {
+        if (css.sheet && css.sheet.cssRules) {
+            for (const rule of css.sheet.cssRules) {
+                internal_css+=rule.cssText+"\n";
+            }
+        }
+    }
+    const full_string = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"/><title>"+title+"</title><style>"+internal_css+"</style></head><body>"+desired_section_text+"</body></html>";
+    const DOM_URL = window.URL || window.webkitURL || window;
+    const blob = new Blob([full_string], {type: 'text/html;charset=utf-8'});
+    const url = DOM_URL.createObjectURL(blob);
+    triggerDownload(url,title,".html");
+}
