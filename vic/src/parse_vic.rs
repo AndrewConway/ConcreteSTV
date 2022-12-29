@@ -110,7 +110,7 @@ impl RawDataSource for VicDataLoader {
         res
     }
     fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> {
-        let mut metadata = self.read_raw_metadata(electorate)?;
+        let (mut metadata,atl_votes) = self.read_raw_metadata_and_atl_votes(electorate)?;
         // println!("{:?}",metadata);
         let filename = match self.year.as_str() {
             "2014" => format!("received_from_ec/Ballot Paper Details - {}.csv",electorate),
@@ -156,12 +156,15 @@ impl RawDataSource for VicDataLoader {
         });
         let mut result = ElectionData{
             metadata,
-            atl: vec![],
+            atl : vec![],
             atl_types: vec![],
-            btl: builder.to_btls(),
+            btl : builder.to_btls(),
             btl_types: vec![],
             informal
         };
+        if atl_votes.len()>0 { // the ATL votes are converted to BTL already. Deduce them (and tickets) from the BTL via the (ugly, unreliable) method of assuming the largest number of full length BTL votes starting with a given candidate is it.
+            find_atl_votes_in_btl(&mut result,&atl_votes)?;
+        }
         if self.election_count_not_published_yet() { // in this case the file above is only partial results. Add an estimate of the remaining results from the count by first preference.
             let early_preference_votes = self.parse_results_by_region_intermediate_webpage(&mut result.metadata)?;
             let mut votes_by_candidate_first_pref = vec![0;result.metadata.candidates.len()]; // the number of votes we have BTL candidates for.
@@ -199,93 +202,7 @@ impl RawDataSource for VicDataLoader {
 
     /// Get the metadata from the file like south-easternmetropolitanregionvotesreceived.xls
     fn read_raw_metadata(&self,electorate:&str) -> anyhow::Result<ElectionMetadata> {
-        if self.election_count_not_published_yet() {
-            let mut metadata = self.read_raw_metadata_from_candidate_list_on_main_website(electorate)?;
-            self.parse_pdf_tickets_file(&mut metadata)?;
-            return Ok(metadata)
-        }
-        let filename = match self.year.as_str() {
-            "2014" => format!("{}votesreceived.xls",Self::region_human_name_to_computer_name(electorate,false)),
-            "2018" => format!("{}votesreceived.xls",Self::region_human_name_to_computer_name(electorate,false)),
-            "2022" => format!("{}-Votes Received.xls",electorate),
-            _ => {return Err(anyhow!("Do not know the file naming convention for votes received in {}",self.year))}
-        };
-        let path = self.find_raw_data_file(&filename)?;
-        // calamine seems not to work for this file
-        let sheet1 = CalamineLikeWrapper::open(&path)?;
-        //use calamine::Reader;
-        //let mut workbook1 = open_workbook_auto(&path)?;
-        //let sheet1 = workbook1.worksheet_range_at(0).ok_or_else(||anyhow!("No sheets in {}",path.to_string_lossy()))??;
-        // find the row of headings. Probably 7...
-        let is_headings_row = |row:usize|{
-            if let Some(v) = sheet1.get_value((row as u32,0)) {
-                if let Some(s) = v.get_string() {
-                    s.ends_with(" District")
-                } else {false}
-            } else {false}
-        };
-        let headings_row = (0..sheet1.height()).into_iter().find(|&row|is_headings_row(row)).ok_or_else(||anyhow!("Could not find headlines in {}",path.to_string_lossy()))?;
-        let mut candidates = vec![];
-        let mut parties = vec![];
-        let mut current_party_name = "".to_string();
-        let mut position_in_party = 0;
-        for col in 1..sheet1.width() {
-            if let Some(v) = sheet1.get_value((headings_row as u32,col as u32)) {
-                if let Some(s) = v.get_string() {
-                    let lines : Vec<&str> = s.split('\n').collect();
-                    if lines.len()==3 || (lines.len()==2 && lines[0].starts_with("Group ")) {
-                        let last_line = lines[lines.len()-1];
-                        if last_line!="ATL" && last_line!="TOTAL" {
-                            let party_line = lines[lines.len()-1];
-                            if parties.is_empty() || current_party_name!=lines[1] {
-                                current_party_name=party_line.to_string();
-                                position_in_party=1;
-                                parties.push(Party{
-                                    column_id: lines[0].to_string(),
-                                    name: if lines.len()==3 { party_line.to_string() } else {"".to_string()},
-                                    abbreviation: None,
-                                    atl_allowed: true,
-                                    candidates: vec![],
-                                    tickets: vec![]
-                                })
-                            }
-                            parties.last_mut().unwrap().candidates.push(CandidateIndex(candidates.len()));
-                            candidates.push(Candidate{
-                                name: last_line.to_string(),
-                                party: Some(PartyIndex(parties.len()-1)),
-                                position: Some(position_in_party),
-                                ec_id: None
-                            });
-                            position_in_party+=1;
-                        }
-                    } else if lines.len()==2 && lines[0]=="Ungrouped" { // Just to make life exciting, the ungrouped candidates appear to be listed in random order, not ballot paper order! Wheee!
-                        candidates.push(Candidate{
-                            name: lines[1].to_string(),
-                            party: None,
-                            position: None,
-                            ec_id: None
-                        });
-                    }
-                }
-            }
-        }
-        let mut metadata = ElectionMetadata{
-            name: self.name(electorate),
-            candidates,
-            parties,
-            source: vec![DataSource{
-                url: self.page_url.to_string(),
-                files: vec![path.file_name().unwrap().to_string_lossy().to_string()],
-                comments: None
-            }],
-            results: None,
-            vacancies: Some(self.candidates_to_be_elected(electorate)),
-            enrolment: None,
-            secondary_vacancies: None,
-            excluded: vec![],
-            tie_resolutions: Default::default()
-        };
-        self.reorder_candidates_in_metadata_by_official_dop_transcript(&mut metadata)?;
+        let (metadata,_) = self.read_raw_metadata_and_atl_votes(electorate)?;
         Ok(metadata)
     }
 
@@ -327,7 +244,202 @@ impl RawDataSource for VicDataLoader {
     }
 }
 
+/// Deduce ATL votes and tickets from the BTL votes given the number of ATL votes, given that the ATL votes are already turned into BTL votes.
+///
+/// This is in general not solvable, of course, but since most people vote ATL it will work almost always by taking
+/// the largest number of full ticket votes. It is unfortunate that we have to use this messy unreliable algorithm.
+///
+/// If there are multiple tickets, it is even less reliably, particularly with working out the rounding on the tickets... it is impossible
+/// to distinguish this if multiple people vote BTL according to the ticket. However the effect on statistics is tiny and it will not modify the
+/// election transcript other than slight changes to the ATL/BTL number assignments.
+///
+/// We don't actually require the first candidate to have the ticket first preference, example Palmer United Party, 2014, South Eastern Metropolitan Region.
+fn find_atl_votes_in_btl(result:&mut ElectionData,atl_votes:&[BallotPaperCount]) -> anyhow::Result<()> {
+    let mut highest_by_candidate : Vec<(usize,Option<usize>)> = vec![(0,None);result.metadata.candidates.len()]; // first value is the largest number of identical votes starting with the given candidate and full length, second is the index into btl that has it
+    for btl_index in 0..result.btl.len() {
+        let btl = &result.btl[btl_index];
+        if let Some(&c) = btl.candidates.first() {
+            if btl.n>highest_by_candidate[c.0].0 && btl.candidates.len()==result.metadata.candidates.len() {
+                highest_by_candidate[c.0] = (btl.n,Some(btl_index));
+            }
+        }
+    }
+    for party_index in 0..atl_votes.len() {
+        let wanted = atl_votes[party_index];
+        if wanted.0>0 {
+            if result.metadata.parties[party_index].candidates.is_empty() { return Err(anyhow!("No candidates for party {}",party_index)) }
+            // find the candidate in the party with the most first pref votes.
+            let (available,index) = result.metadata.parties[party_index].candidates.iter().map(|c|highest_by_candidate[c.0]).max_by_key(|(n,_)|*n).unwrap();
+            // let (available,index) = highest_by_candidate[result.metadata.parties[party_index].candidates.first().ok_or_else(||anyhow!("No candidates for party {}",party_index))?.0];
+            if available<wanted.0 { // Not enough. This is not necessarily a show stopper - there may be multiple tickets!
+                if available>1 {
+                    let tickets_needed = ((wanted.0 as f64)/(available as f64)).round() as usize;
+                    if tickets_needed<5 { // sanity check
+                        println!("Trying {} tickets for party {} ({}), needing {} but best that could be found was {}",tickets_needed,party_index,result.metadata.parties[party_index].column_id,wanted,available);
+                        let mut btl_index = 0;
+                        let needed_given_perfect_rounding = wanted.0/tickets_needed;
+                        let mut rounding_needed = wanted.0-tickets_needed*needed_given_perfect_rounding;
+                        'next_ticket : for ticket_number in 0..tickets_needed {
+                            let needed = needed_given_perfect_rounding+if rounding_needed==tickets_needed-ticket_number {1} else {0};
+                            while btl_index<result.btl.len() {
+                                let btl = &result.btl[btl_index];
+                                if btl.candidates.len()==result.metadata.candidates.len() && btl.candidates[0]==result.metadata.parties[party_index].candidates[0] && btl.n>=needed {
+                                    let used_rounding = if rounding_needed>0 && btl.n>needed_given_perfect_rounding {1} else {0};
+                                    rounding_needed-=used_rounding;
+                                    let used = needed_given_perfect_rounding+used_rounding;
+                                    result.btl[btl_index].n-=used;
+                                    result.atl.push(ATL{
+                                        parties: vec![PartyIndex(party_index)],
+                                        n: used,
+                                        ticket_index: Some(ticket_number)
+                                    });
+                                    let ticket = result.btl[btl_index].candidates.clone();
+                                    result.metadata.parties[party_index].tickets.push(ticket);
+                                    btl_index+=1;
+                                    continue 'next_ticket;
+                                }
+                                btl_index+=1;
+                            }
+                            return Err(anyhow!("Could only find {} of {} tickets for party {} ({}), needing {} but best that could be found was {}",ticket_number,tickets_needed,party_index,result.metadata.parties[party_index].column_id,wanted,available));
+                        }
+                        continue; // found multiple tickets!
+                    }
+                }/*
+                println!("Metadata : {:#?}",result.metadata);
+                for c in &result.metadata.parties[party_index].candidates {
+                    println!("Candidate {} largest number of votes {:?}",result.metadata.candidates[c.0].name,highest_by_candidate[c.0]);
+                }*/
+                return Err(anyhow!("Could not find enough ATL votes using heuristics for party {} ({}), needing {} but best that could be found starting with {} was {}",party_index,result.metadata.parties[party_index].column_id,wanted,result.metadata.candidates[result.metadata.parties[party_index].candidates[0].0].name,available));
+            }
+            let index = index.ok_or_else(||anyhow!("Internal error - got votes>0 with no source"))?;
+            result.btl[index].n-=wanted.0;
+            result.atl.push(ATL{
+                parties: vec![PartyIndex(party_index)],
+                n: wanted.0,
+                ticket_index: Some(0)
+            });
+            let ticket = result.btl[index].candidates.clone();
+            result.metadata.parties[party_index].tickets.push(ticket);
+        }
+    }
+    result.btl.retain(|v|v.n>0); // get rid of BTL entries if all converted to ATL.
+    Ok(())
+}
 impl VicDataLoader {
+    /// Get the metadata from the file like south-easternmetropolitanregionvotesreceived.xls
+    fn read_raw_metadata_and_atl_votes(&self,electorate:&str) -> anyhow::Result<(ElectionMetadata,Vec<BallotPaperCount>)> {
+        if self.election_count_not_published_yet() {
+            let mut metadata = self.read_raw_metadata_from_candidate_list_on_main_website(electorate)?;
+            self.parse_pdf_tickets_file(&mut metadata)?;
+            return Ok((metadata,vec![])) // could be more sophisticated here and actually produce meaningful results.
+        }
+        let filename = match self.year.as_str() {
+            "2014" => format!("{}votesreceived.xls",Self::region_human_name_to_computer_name(electorate,false)),
+            "2018" => format!("{}votesreceived.xls",Self::region_human_name_to_computer_name(electorate,false)),
+            "2022" => format!("{}-Votes Received.xls",electorate),
+            _ => {return Err(anyhow!("Do not know the file naming convention for votes received in {}",self.year))}
+        };
+        let path = self.find_raw_data_file(&filename)?;
+        // calamine seems not to work for this file
+        let sheet1 = CalamineLikeWrapper::open(&path)?;
+        //use calamine::Reader;
+        //let mut workbook1 = open_workbook_auto(&path)?;
+        //let sheet1 = workbook1.worksheet_range_at(0).ok_or_else(||anyhow!("No sheets in {}",path.to_string_lossy()))??;
+        // find the row of headings. Probably 7...
+        let is_headings_row = |row:usize|{
+            if let Some(v) = sheet1.get_value((row as u32,0)) {
+                if let Some(s) = v.get_string() {
+                    s.ends_with(" District")
+                } else {false}
+            } else {false}
+        };
+        let headings_row = (0..sheet1.height()).into_iter().find(|&row|is_headings_row(row)).ok_or_else(||anyhow!("Could not find headlines in {}",path.to_string_lossy()))?;
+        let is_region_total_row = |row:usize|{
+            if let Some(v) = sheet1.get_value((row as u32,0)) {
+                if let Some(s) = v.get_string() {
+                    s.trim().to_uppercase()=="REGION TOTAL"
+                } else {false}
+            } else {false}
+        };
+        let region_total_row = (0..sheet1.height()).into_iter().find(|&row|is_region_total_row(row)).ok_or_else(||anyhow!("Could not find region total in {}",path.to_string_lossy()))?;
+        let mut candidates = vec![];
+        let mut parties = vec![];
+        let mut current_party_name = "".to_string();
+        let mut position_in_party = 0;
+        let mut atl_votes : Vec<BallotPaperCount> = vec![];
+        for col in 1..sheet1.width() {
+            if let Some(v) = sheet1.get_value((headings_row as u32,col as u32)) {
+                if let Some(s) = v.get_string() {
+                    let lines : Vec<&str> = s.split('\n').collect();
+                    if lines.len()==3 || (lines.len()==2 && lines[0].starts_with("Group ")) {
+                        let last_line = lines[lines.len()-1];
+                        if last_line=="ATL" {
+                            if let Some(atl_value) = sheet1.get_value((region_total_row as u32,col as u32)) {
+                                if let Some(s) = atl_value.get_string() {
+                                    atl_votes.push(BallotPaperCount(s.parse()?));
+                                }
+                            }
+                        }
+                        if last_line!="ATL" && last_line!="TOTAL" {
+                            let party_line = lines[lines.len()-2];
+                            let had_atl = atl_votes.len()==parties.len()+1;
+                            if parties.is_empty() || current_party_name!=party_line {
+                                current_party_name=party_line.to_string();
+                                position_in_party=1;
+                                parties.push(Party{
+                                    column_id: lines[0].to_string(),
+                                    name: if lines.len()==3 { party_line.to_string() } else {"".to_string()},
+                                    abbreviation: None,
+                                    atl_allowed: had_atl,
+                                    candidates: vec![],
+                                    tickets: vec![]
+                                });
+                                if !had_atl {
+                                    if atl_votes.len()+1!=parties.len() {
+                                        return Err(anyhow!("Could not find ATL votes for party {} in {}",lines[0],filename));
+                                    }
+                                    atl_votes.push(BallotPaperCount(0));
+                                }
+                            }
+                            parties.last_mut().unwrap().candidates.push(CandidateIndex(candidates.len()));
+                            candidates.push(Candidate{
+                                name: last_line.to_string(),
+                                party: Some(PartyIndex(parties.len()-1)),
+                                position: Some(position_in_party),
+                                ec_id: None
+                            });
+                            position_in_party+=1;
+                        }
+                    } else if lines.len()==2 && lines[0]=="Ungrouped" { // Just to make life exciting, the ungrouped candidates appear to be listed in random order, not ballot paper order! Wheee!
+                        candidates.push(Candidate{
+                            name: lines[1].to_string(),
+                            party: None,
+                            position: None,
+                            ec_id: None
+                        });
+                    }
+                }
+            }
+        }
+        let mut metadata = ElectionMetadata{
+            name: self.name(electorate),
+            candidates,
+            parties,
+            source: vec![DataSource{
+                url: self.page_url.to_string(),
+                files: vec![path.file_name().unwrap().to_string_lossy().to_string()],
+                comments: None
+            }],
+            results: None,
+            vacancies: Some(self.candidates_to_be_elected(electorate)),
+            enrolment: None,
+            secondary_vacancies: None,
+            excluded: vec![],
+            tie_resolutions: Default::default()
+        };
+        self.reorder_candidates_in_metadata_by_official_dop_transcript(&mut metadata)?;
+        Ok((metadata,atl_votes))
+    }
 
     fn election_count_not_published_yet(&self) -> bool { false }
 

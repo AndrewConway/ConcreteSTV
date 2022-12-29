@@ -13,6 +13,8 @@ use stv::tie_resolution::{TieResolutionAtom, TieResolutionsMadeByEC};
 use vic::parse_vic::{get_vic_data_loader_2014, get_vic_data_loader_2022, VicDataLoader};
 use vic::Vic2018LegislativeCouncil;
 
+const SAVE_VOTE_DATA : bool = false;
+
 fn test<Rules:PreferenceDistributionRules>(electorate:&str, loader:&VicDataLoader) {
     let mut data = loader.read_raw_data(electorate).unwrap();
     data.print_summary();
@@ -46,7 +48,15 @@ fn test<Rules:PreferenceDistributionRules>(electorate:&str, loader:&VicDataLoade
             assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
             tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
         } else {
-            return;
+            break;
+        }
+    }
+    data.metadata.tie_resolutions=tie_resolutions;
+    if SAVE_VOTE_DATA {
+        std::fs::create_dir_all("test_votes").unwrap();
+        {
+            let file = File::create(format!("test_votes/Vic {} {}.stv",data.metadata.name.year,electorate)).unwrap();
+            serde_json::to_writer(file,&data).unwrap();
         }
     }
 }
