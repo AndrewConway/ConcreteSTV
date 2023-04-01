@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -19,6 +19,22 @@ pub struct CacheDir {
     base : PathBuf,
 }
 
+pub trait Downloader {
+    // true return means file downloaded. False return means file not available yet but put in a queue to be downloaded some other time.
+    fn download(file:&PathBuf,url:&str) -> anyhow::Result<bool>;
+}
+
+pub struct DownloadWithReqwest {}
+
+impl Downloader for DownloadWithReqwest {
+    fn download(file: &PathBuf, url: &str) -> anyhow::Result<bool> {
+        println!("Downloading {} with reqwest",url);
+        let contents = reqwest::blocking::get(url)?.bytes()?; // Client::builder().build()?.get(url).send()
+        std::fs::write(&file,contents)?;
+        Ok(true)
+    }
+}
+
 impl CacheDir {
     fn rate_limit() {
         static DOWNLOAD_RATE_LIMIT_MUTEX: OnceCell<Mutex<()>> = OnceCell::new();
@@ -37,8 +53,9 @@ impl CacheDir {
     }
 
     /// Download a url using Reqwest, and store.
-    pub fn get_or_download(&self,url:&str) -> anyhow::Result<File> {
-        self.get_or_download_with_file_suffix(url,None)
+    /// If Ok(None) is returned, then this is not available now but may be later.
+    pub fn get_or_download<D:Downloader>(&self,url:&str) -> anyhow::Result<Option<File>> {
+        self.get_or_download_with_file_suffix::<D>(url,None)
     }
     /// Get the path a file should be stored to.
     pub fn get_file_path_with_extension(&self,url:&str,suffix:Option<&str>) -> PathBuf {
@@ -47,29 +64,33 @@ impl CacheDir {
         self.file(&url_path_with_extension)
     }
     /// Download a url using Reqwest, and store. Add a suffix before storing, if suffix is not None.
-    pub fn get_or_download_with_file_suffix(&self,url:&str,suffix:Option<&str>) -> anyhow::Result<File> {
+    /// If Ok(None) is returned, then this is not available now but may be later.
+    pub fn get_or_download_with_file_suffix<D:Downloader>(&self,url:&str,suffix:Option<&str>) -> anyhow::Result<Option<File>> {
         let file = self.get_file_path_with_extension(&url,suffix);
         //if file_without_extension.exists() { std::fs::rename(&file_without_extension,&file)?; } // update already downloaded files
         match File::open(&file) {
-            Ok(f) => Ok(f),
+            Ok(f) => Ok(Some(f)),
             Err(_) => {
                 // need to download it,
-                println!("Downloading {} with reqwest",url);
-                Self::rate_limit();
-                let contents = reqwest::blocking::get(url)?.bytes()?;
                 if let Some(p) = file.parent() {
                     std::fs::create_dir_all(p)?;
                 }
-                std::fs::write(&file,contents)?;
-                Ok(File::open(&file)?)
+                Self::rate_limit();
+                if D::download(&file,url)? {
+                    Ok(Some(File::open(&file)?))
+                } else { Ok(None)}
             }
         }
     }
 
     /// Download a url using Reqwest, and return as a string.
-    pub fn get_or_download_string(&self,url:&str) -> anyhow::Result<String> {
-        let mut file = self.get_or_download(url)?;
-        file_to_string(&mut file)
+    /// If Ok(None) is returned, then this is not available now but may be later.
+    pub fn get_or_download_string<D:Downloader>(&self,url:&str) -> anyhow::Result<Option<String>> {
+        if let Some(mut file) = self.get_or_download::<D>(url)? {
+            Ok(Some(file_to_string(&mut file)?))
+        } else {
+            Ok(None)
+        }
     }
 }
 
