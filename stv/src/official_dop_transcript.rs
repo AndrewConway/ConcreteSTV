@@ -131,8 +131,9 @@ pub struct OfficialDOPForOneCount {
     pub excluded : Vec<CandidateIndex>,
     pub vote_total : Option<PerCandidate<f64>>, // A NaN means unknown
     pub paper_total : Option<PerCandidate<usize>>, // an isize::MAX means unknown
-    pub vote_delta : Option<PerCandidate<f64>>, // A NaN means unknown
-    pub paper_delta : Option<PerCandidate<isize>>, // an isize::MAX means unknown
+    pub vote_delta : Option<PerCandidate<f64>>, // A NaN means unknown.
+    pub paper_delta : Option<PerCandidate<isize>>, // an isize::MAX means unknown.
+    pub paper_set_aside : Option<PerCandidate<usize>>, // an usize::MAX means unknown. This is rarely used (possibly only in the NSW randomized algorithm for legislative council and LGE prior to 2021)
     pub count_name : Option<String>,
     pub papers_came_from_counts : Option<Vec<CountIndex>>, // if present, which were the source for the counts. Should be in ascending order.
 }

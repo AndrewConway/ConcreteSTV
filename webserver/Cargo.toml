@@ -19,7 +19,7 @@ clap = {version="3.0", features = ["derive"]}
 num = {version="0.4", features=["serde"]}
 statistics = { path = "../statistics" }
 actix-web = "4.0"
-actix-files = "0.6"
+actix-files = "0.6.2"
 once_cell = "1.9"
 cacache = "10.0"
 main-app = { path = "../main-app" }

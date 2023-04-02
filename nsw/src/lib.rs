@@ -14,6 +14,7 @@
 #![doc = include_str!("../NSWLocalCouncilLegislation2021Commentary.md")]
 
 pub mod parse_lge;
+pub mod parse_lc;
 
 use std::cmp::Ordering;
 use stv::preference_distribution::{BigRational, CountNamingMethod, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};

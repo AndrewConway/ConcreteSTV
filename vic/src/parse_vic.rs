@@ -1,4 +1,4 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -849,6 +849,7 @@ impl DOPFileFormat {
                         paper_total : None,
                         vote_delta : Some(get_row(if is_first {0} else {1})),
                         paper_delta : Some(get_row(0).try_into()?),
+                        paper_set_aside: None,
                         count_name: None,
                         papers_came_from_counts,
                     });

@@ -203,7 +203,7 @@ impl NSWLGEDataLoader {
     /// parse a file like https://vtr.elections.nsw.gov.au/LG2101/albury/councillor/report/fp-by-grp-and-candidate-by-vote-type or https://vtr.elections.nsw.gov.au/LG2101/ballina/a-ward/councillor/report/fp-by-grp-and-candidate-by-vote-type
     /// or, for mayoral, like https://vtr.elections.nsw.gov.au/LG2101/ballina/mayoral/report/mayoral-fp-by-candidate
     fn parse_candidate_list(&self,mut file:File,mayoral:bool,electorate:&str) -> anyhow::Result<ElectionMetadata> {
-        let html = scraper::Html::parse_document(&file_to_string(&mut file)?);
+        let html = Html::parse_document(&file_to_string(&mut file)?);
         // the title has hypens missing - see Ballina - A Ward
         // let electorate = html.select(&Selector::parse("head > title").unwrap()).flat_map(|e|e.text()).collect::<Vec<_>>().join("")+if mayoral {" Mayoral"} else {""};
         let electorate = electorate.to_string(); // +if mayoral {" Mayoral"} else {""};
@@ -329,6 +329,7 @@ impl NSWLGEDataLoader {
                     paper_total: None,
                     vote_delta: Some(vote_delta),
                     paper_delta: Some(paper_delta),
+                    paper_set_aside: None,
                     count_name: Some(line[col_count].clone()),
                     papers_came_from_counts : None,
                 });
@@ -375,7 +376,7 @@ impl NSWLGEDataLoader {
     pub fn read_official_dop_transcript_mayoral(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let contest = &self.find_contest(&metadata.name.electorate)?.url;
         let dop_file = self.find_raw_data_file_relative(contest,"mayoral/report","mayoral-dop","mayoral/report/mayoral-dop")?;
-        let html = scraper::Html::parse_document(&std::fs::read_to_string(dop_file)?);
+        let html = Html::parse_document(&std::fs::read_to_string(dop_file)?);
         let selector_td = Selector::parse("td").unwrap();
         let mut candidates_in_order_of_exclusion : Vec<CandidateIndex> = vec![];
         let mut candidates_tallys : Vec<Vec<usize>> = vec![];
@@ -463,6 +464,7 @@ impl NSWLGEDataLoader {
                 paper_total: column(col_total),
                 vote_delta: columnf64(col_delta),
                 paper_delta: columnisize(col_delta),
+                paper_set_aside: None,
                 count_name: None,
                 papers_came_from_counts : None,
             };
@@ -502,7 +504,7 @@ fn remove_comma(s:&str) -> String { s.chars().filter(|c|*c!=',').collect() }
 /// Parse the zipped election file.
 /// The function currently ignores non-formal markings.
 /// Optionally, some particular vote types can be suppressed.
-fn parse_zip_election_file(zipfile : File, metadata:ElectionMetadata, reject_vote_type : Option<HashSet<String>>, mayoral: bool) -> anyhow::Result<ElectionData> {
+pub(crate) fn parse_zip_election_file(zipfile : File, metadata:ElectionMetadata, reject_vote_type : Option<HashSet<String>>, mayoral: bool) -> anyhow::Result<ElectionData> {
     let mut zipfile = zip::ZipArchive::new(zipfile)?;
     let zip_contents = zipfile.by_index(0)?;
     let mut reader = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(zip_contents);

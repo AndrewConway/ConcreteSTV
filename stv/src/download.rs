@@ -9,6 +9,7 @@ use std::fs::File;
 use std::thread::sleep;
 use std::time::Duration;
 use std::sync::Mutex;
+use anyhow::Context;
 use once_cell::sync::OnceCell;
 use crate::parse_util::file_to_string;
 
@@ -91,6 +92,13 @@ impl CacheDir {
         } else {
             Ok(None)
         }
+    }
+
+    /// Get a previously cached URL as a string. Like get_or_download_string, except does not download.
+    pub fn get_string(&self,url:&str) -> anyhow::Result<String> {
+        let path = self.get_file_path_with_extension(url,None);
+        let mut file = File::open(&path).with_context(||format!("Looking for file at {} containing contents of {}",path.to_string_lossy(),url))?;
+        file_to_string(&mut file)
     }
 }
 

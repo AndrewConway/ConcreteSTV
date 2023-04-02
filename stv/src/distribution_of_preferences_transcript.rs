@@ -56,6 +56,17 @@ impl <X:Default+PartialEq+Clone+Display+FromStr> Default for PerCandidate<X> {
     }
 }
 
+impl <X:Default+PartialEq+Clone+Display+FromStr> PerCandidate<X> {
+    pub fn from_num_candidates(len:usize,unknown_value:X) -> Self {
+        PerCandidate{
+            candidate: vec![unknown_value;len],
+            exhausted: X::default(),
+            rounding: Default::default(),
+            set_aside: None
+        }
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 #[error("Not an integer")]
 pub struct NotInteger {}
@@ -76,6 +87,7 @@ impl TryFrom<PerCandidate<f64>> for PerCandidate<isize> {
             set_aside:  value.set_aside.map(as_int).transpose()?,
         })
     }
+
 }
 /// Record the status of the count at the end of the count.
 #[derive(Clone,Serialize,Deserialize,PartialEq)]
