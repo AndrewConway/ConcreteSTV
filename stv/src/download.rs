@@ -61,10 +61,11 @@ impl CacheDir {
     /// Get the path a file should be stored to.
     pub fn get_file_path_with_extension(&self,url:&str,suffix:Option<&str>) -> PathBuf {
         let url_path = url.trim_start_matches("https://").trim_start_matches("http://").to_string();
-        let url_path_with_extension : String = if let Some(suffix) = suffix { url_path+suffix } else { url_path };
+        let already_has_suffix = url_path.split('/').last().map(|s|s.contains('.')).unwrap_or(false);
+        let url_path_with_extension : String = if already_has_suffix { url_path } else if let Some(suffix) = suffix { url_path+suffix } else { url_path };
         self.file(&url_path_with_extension)
     }
-    /// Download a url using Reqwest, and store. Add a suffix before storing, if suffix is not None.
+    /// Download a url using Reqwest, and store. Add a suffix before storing, if suffix is not None, unless the file already has a suffix.
     /// If Ok(None) is returned, then this is not available now but may be later.
     pub fn get_or_download_with_file_suffix<D:Downloader>(&self,url:&str,suffix:Option<&str>) -> anyhow::Result<Option<File>> {
         let file = self.get_file_path_with_extension(&url,suffix);

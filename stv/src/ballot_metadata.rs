@@ -129,7 +129,8 @@ impl ElectionMetadata {
     pub fn get_candidate_name_lookup_with_capital_letters_afterwards(&self) -> HashMap<String,CandidateIndex> {
         let mut res = HashMap::default();
         fn is_surname(s:&str) -> bool {
-            s.len()>1 && s.trim_start_matches("Mac").trim_start_matches("Mc").chars().all(|c|!c.is_lowercase()) // one letter is probably an initial.
+            let no_mac = s.trim_start_matches("Mac").trim_start_matches("Mc");
+            s.len()>1 && no_mac.len()>0 && no_mac.chars().all(|c|!c.is_lowercase()) // one letter is probably an initial.
         }
         for i in 0..self.candidates.len() {
             let name_components = self.candidates[i].name.split_ascii_whitespace().collect::<Vec<_>>();

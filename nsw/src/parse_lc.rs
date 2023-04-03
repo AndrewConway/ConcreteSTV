@@ -74,7 +74,8 @@ fn text_contents<'a>(iter: impl IntoIterator<Item=ElementRef<'a>>) -> Vec<String
     iter.into_iter().map(|e|text_content(&e)).collect::<Vec<_>>()
 }
 fn parse_with_commas(s:&str) -> anyhow::Result<usize> {
-    s.trim().replace(',',"").parse().with_context(||format!("Error trying to parse {}",s))
+    if s=="INELIGIBLE" { Ok(0) }
+    else { s.trim().replace(',',"").parse().with_context(||format!("Error trying to parse {}",s)) }
 }
 
 impl RawDataSource for NSWLCDataLoader {
@@ -146,169 +147,176 @@ impl RawDataSource for NSWLCDataLoader {
     }
 
     fn read_official_dop_transcript(&self, metadata: &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
-        // first parse the main DOP.
-        let overview_html = Html::parse_document(&self.read_cached_url_as_string(&self.dop_url)?);
-        let mut counts = vec![];
-        let base_url = url::Url::parse(&self.dop_url)?;
-        let select_td = Selector::parse("td").unwrap();
-        let select_th = Selector::parse("th").unwrap();
-        let select_a = Selector::parse("a").unwrap();
-        let select_notep = Selector::parse("p.note_p").unwrap();
-        let select_list_rows = Selector::parse("table.list tr").unwrap();
-        let regex_find_quota = regex::Regex::new(r"^\d+ / \(\d+ - \d+\) = ([\d\.]+)$").unwrap();
-        let candidate_name_lookup = metadata.get_candidate_name_lookup();
-        let mut total_formal_votes : Option<usize> = None;
-        for overview_tr in overview_html.select(&Selector::parse("div#ReportContent table.list tr, div#prccReport table.list tr").unwrap()) {
-            let tds : Vec<ElementRef> = overview_tr.select(&select_td).collect();
-            if tds.len()==4 {
-                if let Some(a) = tds[0].select(&select_a).next() {
-                    if let Some(href) = a.value().attr("href") {
-                        let resolved = base_url.join(href)?;
-                        //println!(" {}",resolved);
-                        let td_to_candidate_list = |td:&ElementRef| -> anyhow::Result<Vec<CandidateIndex>> {
-                            let mut res = vec![];
-                            for s in td.text() {
-                                let s = s.trim();
-                                if s.len()>0 && s!="*" {
-                                    if let Some(candidate) = candidate_name_lookup.get(s) { res.push(*candidate); }
-                                    else {return Err(anyhow!("Unknown candidate {}",s))}
-                                }
+        read_official_dop_transcript_html_index_page_then_one_html_page_per_count(&self.cache(),&self.dop_url,metadata)
+    }
+
+}
+
+/// Read the "old style" DoP used for the probabilistic algorithm (LC and LGE pre 2021)
+pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count(cache:&CacheDir,dop_url:&str, metadata: &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+    // first parse the main DOP.
+    let overview_html = Html::parse_document(&cache.get_string(dop_url)?);
+    let mut counts = vec![];
+    let base_url = url::Url::parse(dop_url)?;
+    let select_td = Selector::parse("td").unwrap();
+    let select_th = Selector::parse("th").unwrap();
+    let select_a = Selector::parse("a").unwrap();
+    let select_notep = Selector::parse("p.note_p").unwrap();
+    let select_list_rows = Selector::parse("table.list tr").unwrap();
+    let regex_find_quota = regex::Regex::new(r"^\d+ / \(\d+ - \d+\) = ([\d\.]+)$").unwrap();
+    let candidate_name_lookup = metadata.get_candidate_name_lookup();
+    let mut total_formal_votes : Option<usize> = None;
+    for overview_tr in overview_html.select(&Selector::parse("div#ReportContent table.list tr, div#prccReport table.list tr").unwrap()) {
+        let tds : Vec<ElementRef> = overview_tr.select(&select_td).collect();
+        if tds.len()==4 {
+            if let Some(a) = tds[0].select(&select_a).next() {
+                if let Some(href) = a.value().attr("href") {
+                    let resolved = base_url.join(href)?;
+                    //println!(" {}",resolved);
+                    let td_to_candidate_list = |td:&ElementRef| -> anyhow::Result<Vec<CandidateIndex>> {
+                        let mut res = vec![];
+                        for s in td.text() {
+                            let s = s.trim();
+                            if s.len()>0 && s!="*" {
+                                if let Some(candidate) = candidate_name_lookup.get(s) { res.push(*candidate); }
+                                else {return Err(anyhow!("Unknown candidate {}",s))}
                             }
-                            Ok(res)
-                        };
-                        let elected = td_to_candidate_list(&tds[1])?;
-                        let _candidate_distributed = td_to_candidate_list(&tds[2])?;
-                        let excluded = td_to_candidate_list(&tds[3])?;
-                        let count_html = Html::parse_document(&self.read_cached_url_as_string(&resolved.to_string())?);
-                        let mut candidate_col : Option<usize> = None;
-                        let mut progressive_total_col : Option<usize> = None;
-                        let mut transferred_col : Option<usize> = None;
-                        let mut set_aside_col : Option<usize> = None;
-                        let mut votes_col : Option<usize> = None;
-                        let mut expected_len = 0;
-                        let mut paper_total : PerCandidate<usize> = PerCandidate::from_num_candidates(metadata.candidates.len(),usize::MAX);
-                        let mut paper_delta : PerCandidate<isize> = PerCandidate::from_num_candidates(metadata.candidates.len(),isize::MAX);
-                        let mut paper_set_aside : PerCandidate<usize> = PerCandidate::from_num_candidates(metadata.candidates.len(),0);
-                        let transfer_value : Option<f64> = {
-                            text_contents(count_html.select(&select_notep)).iter().filter_map(|s|{
-                                regex_find_quota.captures(s).and_then(|c|c[1].parse::<f64>().ok())
-                            }).next()
-                        };
-                        // if let Some(transfer_value) = transfer_value { println!("Found tv {}",transfer_value); }
-                        for tr in count_html.select(&select_list_rows) {
-                            if tr.value().attr("class")==Some("t_head") {
-                                let headings = tr.select(&select_th).map(|e|e.text().next().unwrap_or("")).collect::<Vec<_>>();
-                                //println!("Found headings {:?}",headings);
-                                if headings.len()>0 && headings[0]=="Group" {
-                                    expected_len=headings.len();
-                                    candidate_col=headings.iter().position(|s|*s=="Candidates in Ballot Order");
-                                    progressive_total_col=headings.iter().position(|s|*s=="Progressive Total"); // exclusion or surplus
-                                    transferred_col=headings.iter().position(|s|*s=="Ballot Papers Transferred"); // exclusion or surplus
-                                    set_aside_col=headings.iter().position(|s|*s=="Set Aside for Quota"); // surplus
-                                    votes_col=headings.iter().position(|s|*s=="Votes" || *s=="First Preferences"); // first preferences
-                                } else { candidate_col=None }
-                            } else if let Some(candidate_col) = candidate_col {
-                                let tds : Vec<String> = text_contents(tr.select(&select_td));
-                                if tds.len()==expected_len && tds[0].is_empty() { // don't select group.
-                                    match tds[candidate_col].trim() {
-                                        "Group Total" => {}
-                                        "UNGROUPED CANDIDATES" => {}
-                                        "Exhausted" => { // comes up twice! So don't give errors if empty values
-                                            if let Some(col) = set_aside_col.or(transferred_col) {
-                                                let votes = tds[col].trim();
-                                                if !votes.is_empty() {
-                                                    let votes = parse_with_commas(votes)?;
-                                                    if set_aside_col.is_some() { paper_set_aside.exhausted = votes; }
-                                                    else { paper_delta.exhausted = votes as isize; }
-                                                }
+                        }
+                        Ok(res)
+                    };
+                    let elected = td_to_candidate_list(&tds[1])?;
+                    let _candidate_distributed = td_to_candidate_list(&tds[2])?;
+                    let excluded = td_to_candidate_list(&tds[3])?;
+                    let count_html = Html::parse_document(&cache.get_string(&resolved.to_string())?);
+                    let mut candidate_col : Option<usize> = None;
+                    let mut progressive_total_col : Option<usize> = None;
+                    let mut transferred_col : Option<usize> = None;
+                    let mut set_aside_col : Option<usize> = None;
+                    let mut votes_col : Option<usize> = None;
+                    let mut expected_len = 0;
+                    let mut paper_total : PerCandidate<usize> = PerCandidate::from_num_candidates(metadata.candidates.len(),usize::MAX);
+                    let mut paper_delta : PerCandidate<isize> = PerCandidate::from_num_candidates(metadata.candidates.len(),isize::MAX);
+                    let mut paper_set_aside : PerCandidate<usize> = PerCandidate::from_num_candidates(metadata.candidates.len(),0);
+                    let transfer_value : Option<f64> = {
+                        text_contents(count_html.select(&select_notep)).iter().filter_map(|s|{
+                            regex_find_quota.captures(s).and_then(|c|c[1].parse::<f64>().ok())
+                        }).next()
+                    };
+                    // if let Some(transfer_value) = transfer_value { println!("Found tv {}",transfer_value); }
+                    for tr in count_html.select(&select_list_rows) {
+                        if tr.value().attr("class")==Some("t_head") {
+                            let headings = tr.select(&select_th).map(|e|e.text().next().unwrap_or("")).collect::<Vec<_>>();
+                            //println!("Found headings {:?}",headings);
+                            if headings.len()>0 && headings[0]=="Group" {
+                                expected_len=headings.len();
+                                candidate_col=headings.iter().position(|s|*s=="Candidates in Ballot Order");
+                                progressive_total_col=headings.iter().position(|s|*s=="Progressive Total"); // exclusion or surplus
+                                transferred_col=headings.iter().position(|s|*s=="Ballot Papers Transferred"); // exclusion or surplus
+                                set_aside_col=headings.iter().position(|s|*s=="Set Aside for Quota"); // surplus
+                                votes_col=headings.iter().position(|s|*s=="Votes" || *s=="First Preferences"); // first preferences
+                            } else { candidate_col=None }
+                        } else if let Some(candidate_col) = candidate_col {
+                            let tds : Vec<String> = text_contents(tr.select(&select_td));
+                            if tds.len()==expected_len && tds[0].is_empty() { // don't select group.
+                                match tds[candidate_col].trim() {
+                                    "Group Total" => {}
+                                    "UNGROUPED CANDIDATES" => {}
+                                    "Exhausted" => { // comes up twice! So don't give errors if empty values
+                                        if let Some(col) = set_aside_col.or(transferred_col) {
+                                            let votes = tds[col].trim();
+                                            if !votes.is_empty() {
+                                                let votes = parse_with_commas(votes)?;
+                                                if set_aside_col.is_some() { paper_set_aside.exhausted = votes; }
+                                                else { paper_delta.exhausted = votes as isize; }
                                             }
                                         }
-                                        "Formal Votes" => {
+                                    }
+                                    "Formal Votes" => {
+                                        if let Some(votes_col) = votes_col { // first preferences
+                                            total_formal_votes = Some(parse_with_commas(&tds[votes_col])?);
+                                        }
+                                    }
+                                    "Set Aside (previous counts)" => {}
+                                    "Informal Ballot Papers" => {}
+                                    "Total Votes / Ballot Papers" => {}
+                                    "Brought Forward" | "Set Aside this Count" => {// exhausted
+                                        if let Some(progressive_total_col) = progressive_total_col {
+                                            paper_total.exhausted+=parse_with_commas(&tds[progressive_total_col])?;
+                                        }
+                                    }
+                                    "TOTAL" => {}
+                                    name => {
+                                        if let Some(&candidate) = candidate_name_lookup.get(name) {
                                             if let Some(votes_col) = votes_col { // first preferences
-                                                total_formal_votes = Some(parse_with_commas(&tds[votes_col])?);
+                                                let votes = parse_with_commas(&tds[votes_col])?;
+                                                paper_total.candidate[candidate.0] = votes;
+                                                paper_delta.candidate[candidate.0] = votes as isize;
+                                            } else if let Some(progressive_total_col) = progressive_total_col {
+                                                paper_total.candidate[candidate.0] = if "EXCLUDED"==tds[progressive_total_col] {0} else { parse_with_commas(&tds[progressive_total_col])?};
+                                                if let Some(transferred_col) = transferred_col {
+                                                    paper_delta.candidate[candidate.0] = parse_with_commas(&tds[transferred_col]).unwrap_or(isize::MAX as usize) as isize;
+                                                    if let Some(set_aside_col) = set_aside_col {
+                                                        paper_set_aside.candidate[candidate.0] = parse_with_commas(&tds[set_aside_col]).unwrap_or(usize::MAX);
+                                                    }
+                                                } else { return Err(anyhow!("No transferred_col")); }
                                             }
-                                        }
-                                        "Set Aside (previous counts)" => {}
-                                        "Informal Ballot Papers" => {}
-                                        "Total Votes / Ballot Papers" => {}
-                                        "Brought Forward" | "Set Aside this Count" => {// exhausted
-                                            if let Some(progressive_total_col) = progressive_total_col {
-                                                paper_total.exhausted+=parse_with_commas(&tds[progressive_total_col])?;
-                                            }
-                                        }
-                                        "TOTAL" => {}
-                                        name => {
-                                            if let Some(&candidate) = candidate_name_lookup.get(name) {
-                                                if let Some(votes_col) = votes_col { // first preferences
-                                                    let votes = parse_with_commas(&tds[votes_col])?;
-                                                    paper_total.candidate[candidate.0] = votes;
-                                                    paper_delta.candidate[candidate.0] = votes as isize;
-                                                } else if let Some(progressive_total_col) = progressive_total_col {
-                                                    paper_total.candidate[candidate.0] = if "EXCLUDED"==tds[progressive_total_col] {0} else { parse_with_commas(&tds[progressive_total_col])?};
-                                                    if let Some(transferred_col) = transferred_col {
-                                                        paper_delta.candidate[candidate.0] = parse_with_commas(&tds[transferred_col]).unwrap_or(isize::MAX as usize) as isize;
-                                                        if let Some(set_aside_col) = set_aside_col {
-                                                            paper_set_aside.candidate[candidate.0] = parse_with_commas(&tds[set_aside_col]).unwrap_or(usize::MAX);
-                                                        }
-                                                    } else { return Err(anyhow!("No transferred_col")); }
-                                                }
-                                                //println!("Found candidate {}",candidate);
-                                            } else { return Err(anyhow!("Could not interpret (in DoP for single count) candidate name {}",name))}
-                                        }
+                                            //println!("Found candidate {}",candidate);
+                                        } else { return Err(anyhow!("Could not interpret (in DoP for single count) candidate name {}",name))}
                                     }
                                 }
                             }
                         }
-                        //let vote_total : PerCandidate<f64> = paper_total.into();
-                        //let vote_delta : PerCandidate<f64> = paper_delta.into();
-                        counts.push(OfficialDOPForOneCount{
-                            transfer_value,
-                            elected,
-                            excluded,
-                            vote_total: None,
-                            paper_total: Some(paper_total),
-                            vote_delta: None,
-                            paper_delta: Some(paper_delta),
-                            paper_set_aside: Some(paper_set_aside),
-                            count_name: None,
-                            papers_came_from_counts: None,
-                        })
                     }
+                    //let vote_total : PerCandidate<f64> = paper_total.into();
+                    //let vote_delta : PerCandidate<f64> = paper_delta.into();
+                    counts.push(OfficialDOPForOneCount{
+                        transfer_value,
+                        elected,
+                        excluded,
+                        vote_total: None,
+                        paper_total: Some(paper_total),
+                        vote_delta: None,
+                        paper_delta: Some(paper_delta),
+                        paper_set_aside: Some(paper_set_aside),
+                        count_name: None,
+                        papers_came_from_counts: None,
+                    })
                 }
             }
         }
-        //println!("Total formal votes = {:?}",total_formal_votes);
-        let quota = if let Some(total_formal_votes) = total_formal_votes {
-            let mut vacancies : Option<NumberOfCandidates> = None;
-            let mut quota : Option<f64> = None;
-            for p in overview_html.select(&select_notep) {
-                let text = p.text().collect::<Vec<_>>();
-                if text.len()==2 {
-                    if text[0].to_lowercase()=="candidates to be elected" { vacancies=Some(NumberOfCandidates(text[1].trim_start_matches(':').trim().parse()?))}
-                    if text[0].to_lowercase()=="quota" { quota=Some(text[1].trim_start_matches(':').trim().replace(',',"").parse()?)}
-                }
-                //println!("{:?}",text);
-            }
-            //println!("quota = {:?} vacancies = {:?}",quota,vacancies);
-            if let Some(quota) = quota {
-                if let Some(vacancies) = vacancies {
-                    Some(QuotaInfo{
-                        papers : BallotPaperCount(total_formal_votes),
-                        vacancies,
-                        quota,
-                    })
-                } else { None }
-            } else { None }
-        } else {None} ;
-        Ok(OfficialDistributionOfPreferencesTranscript{
-            quota,
-            counts,
-            missing_negatives_in_papers_delta: true,
-            elected_candidates_are_in_order: false,
-            all_exhausted_go_to_rounding : false,
-        })
     }
+    //println!("Total formal votes = {:?}",total_formal_votes);
+    let quota = if let Some(total_formal_votes) = total_formal_votes {
+        let mut vacancies : Option<NumberOfCandidates> = None;
+        let mut quota : Option<f64> = None;
+        for p in overview_html.select(&select_notep) {
+            let text = p.text().collect::<Vec<_>>();
+            if text.len()==2 {
+                if text[0].to_lowercase()=="candidates to be elected" { vacancies=Some(NumberOfCandidates(text[1].trim_start_matches(':').trim().parse()?))}
+                if text[0].to_lowercase()=="quota" { quota=Some(text[1].trim_start_matches(':').trim().replace(',',"").parse()?)}
+            }
+            //println!("{:?}",text);
+        }
+        //println!("quota = {:?} vacancies = {:?}",quota,vacancies);
+        if let Some(quota) = quota {
+            if let Some(vacancies) = vacancies {
+                Some(QuotaInfo{
+                    papers : BallotPaperCount(total_formal_votes),
+                    vacancies,
+                    quota,
+                })
+            } else { None }
+        } else { None }
+    } else {None} ;
+    Ok(OfficialDistributionOfPreferencesTranscript{
+        quota,
+        counts,
+        missing_negatives_in_papers_delta: true,
+        elected_candidates_are_in_order: false,
+        all_exhausted_go_to_rounding : false,
+    })
 }
+
 
 impl NSWLCDataLoader {
 
@@ -339,11 +347,11 @@ impl NSWLCDataLoader {
     fn cache(&self) -> CacheDir {
         CacheDir::new(self.finder.path.join(&self.archive_location))
     }
-
+/*
     fn read_cached_url_as_string(&self,url:&str) -> anyhow::Result<String> {
         self.cache().get_string(url)
     }
-
+*/
 
     /// parse a xlsx file looking like
     /// ```txt
