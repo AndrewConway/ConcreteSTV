@@ -25,6 +25,8 @@ use std::fmt;
 use std::fmt::{Debug, Display};
 use std::iter::Sum;
 use std::str::FromStr;
+use rand::thread_rng;
+use crate::random_util::make_array_with_some_randomly_true;
 use crate::verify_official_transcript::OracleFromOfficialDOP;
 
 /// A number representing a count of pieces of paper.
@@ -178,6 +180,28 @@ impl <'a> VotesWithSameTransferValue<'a> {
         }
         self.num_atl_ballots-=res.num_atl_ballots;
         self.num_ballots-=res.num_ballots;
+        res
+    }
+
+    /// Set aside randomly some number of ballots, and return the ones not set aside.
+    pub fn set_aside(&self,num_to_set_aside:BallotPaperCount) -> VotesWithSameTransferValue<'a> {
+        assert!(num_to_set_aside<=self.num_ballots);
+        let mut res = VotesWithSameTransferValue::default();
+        let chosen = make_array_with_some_randomly_true(self.num_ballots.0,self.num_ballots.0-num_to_set_aside.0,&mut thread_rng());
+        let mut ballots_considered = 0;
+        for v in &self.votes {
+            let kept = chosen[ballots_considered..][..v.n.0].iter().filter(|v|**v).count();
+            ballots_considered+=v.n.0;
+            if kept>0 {
+                res.add_vote(PartiallyDistributedVote{
+                    upto : v.upto,
+                    n: BallotPaperCount(kept),
+                    prefs: v.prefs,
+                    source: v.source,
+                });
+            }
+        }
+        assert_eq!(ballots_considered,self.num_ballots.0);
         res
     }
 }

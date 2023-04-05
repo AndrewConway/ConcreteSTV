@@ -27,3 +27,4 @@ pub mod run_once_globally;
 pub mod errors_btl;
 pub mod find_vote;
 pub mod verify_official_transcript;
+pub mod random_util;

@@ -63,3 +63,15 @@ fn test_2017_loadable() {
     }
 }
 
+/*
+
+From a prior project we have estimates of probability of different candidates winning:
+
+North Sydney Wollstonecraft Ward
+Candidate	Proportion Elected	Mean position	Official Count
+BAKER Zoe	1.000000	1.000000	1
+MUTTON Ian	1.000000	2.000000	2
+GUNNING Samuel	0.789956	3.000000	3
+KELLY Tim	0.210044	3.000000
+
+ */

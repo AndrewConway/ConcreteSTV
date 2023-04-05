@@ -195,6 +195,9 @@ pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
     pub created_transfer_value : Option<TransferValueCreation<Tally>>,
     /// whether the EC needs to make any decisions
     pub decisions : Vec<DecisionMadeByEC>,
+    /// if there are any set aside votes on this distribution (at time of writing only used for old NSW)
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub set_aside : Option<PerCandidate<BallotPaperCount>>,
     /// status at end of count.
     pub status : EndCountStatus<Tally>,
     /// A special name for the count, if not 1,2,3,... Mainly used so that each exclusion or surplus distribution is a single "major" count with possibly minor counts included.

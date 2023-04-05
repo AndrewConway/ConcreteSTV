@@ -91,6 +91,7 @@ pub enum SurplusTransferMethod {
     JustOneTransferValue, // Bunch votes together and do a single transfer. E.g. Federal.
     ScaleTransferValues, // Do separate transfers based on provenance, with transfer values scaled.
     MergeSameTransferValuesAndScale, // Like ScaleTransferValues except merge transfer values and do highest first.
+    PickRandomlyAfterDistribution, // NSW stochastic method - pick a subset of the ballots randomly and all have TV 1.
 }
 
 pub trait RoundUpToUsize {
@@ -182,6 +183,7 @@ struct PendingTranscript<Tally> {
     not_continuing : Vec<CandidateIndex>,
     created_transfer_value : Option<TransferValueCreation<Tally>>,
     decisions : Vec<DecisionMadeByEC>,
+    set_aside : Option<PerCandidate<BallotPaperCount>>
 }
 
 /// The main workhorse class that does preference distribution.
@@ -257,7 +259,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 elected: vec![],
                 not_continuing: vec![],
                 created_transfer_value: None,
-                decisions: vec![]
+                decisions: vec![],
+                set_aside: None,
             },
             transcript : Transcript {
                 rules : Rules::name(),
@@ -520,6 +523,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             not_continuing: self.in_this_count.not_continuing.clone(),
             created_transfer_value: self.in_this_count.created_transfer_value.take(),
             decisions: self.in_this_count.decisions.clone(),
+            set_aside: self.in_this_count.set_aside.take(),
             status: EndCountStatus {
                 tallies: PerCandidate {
                     candidate: self.tallys.clone(),
@@ -575,7 +579,9 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// > added to the number of first preference votes of the
     /// > continuing candidate and all those ballot papers shall be
     /// > transferred to the continuing candidate;
-    pub fn distribute_surplus_all_with_same_transfer_value(&mut self,candidate_to_distribute:CandidateIndex) -> PortionOfReasonBeingDoneThisCount {
+    ///
+    /// If distribute_randomly_nsw is true, transfer a random subset with TV 1.
+    pub fn distribute_surplus_all_with_same_transfer_value(&mut self,candidate_to_distribute:CandidateIndex,distribute_randomly_nsw:bool) -> PortionOfReasonBeingDoneThisCount {
         let votes : Rules::Tally = self.tally(candidate_to_distribute);
         let surplus: Rules::Tally  = votes.clone()-self.quota.clone();
         self.tallys[candidate_to_distribute.0]=self.quota.clone();
@@ -606,7 +612,11 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             }
         }
         // println!("Parcelling out {} votes with TV {} over {} ballots",original_worth,transfer_value,tv_denom);
-        self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),distributed,Some(self.current_count),original_worth,!Rules::transfer_value_method().denom_is_just_continuing(),false,None);
+        if distribute_randomly_nsw { // this is a terrible thing.
+            self.parcel_out_votes_random_portion_set_by_transfer_value(transfer_value.clone(),distributed,BallotPaperCount(surplus.ceil()));
+        } else {
+            self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),distributed,Some(self.current_count),original_worth,!Rules::transfer_value_method().denom_is_just_continuing(),false,None);
+        }
         self.in_this_count.created_transfer_value=Some(TransferValueCreation{
             surplus,
             votes,
@@ -723,15 +733,50 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         self.tally_lost_to_rounding-= tally_distributed;
     }
 
+
+
+    /// Parcel out votes by next continuing candidate with a given transfer value.
+    fn parcel_out_votes_random_portion_set_by_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,surplus:BallotPaperCount) {
+        let (set_aside_by_candidate,ec_decision) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed);
+        if let Some(ec_decision) = ec_decision { self.in_this_count.decisions.push(ec_decision); }
+        // do the actual distribution
+        let mut total_transferred : BallotPaperCount = BallotPaperCount::zero();
+        for (candidate_index,candidate_ballots) in distributed.by_candidate.into_iter().enumerate() {
+            if candidate_ballots.num_ballots.0>0 {
+                let transfer = candidate_ballots.set_aside(set_aside_by_candidate[candidate_index]);
+                if transfer.num_ballots.0>0 {
+                    let worth = transfer.num_ballots;
+                    total_transferred +=worth;
+                    self.tallys[candidate_index]+=worth.0.into();
+                    self.papers[candidate_index].add(&transfer, TransferValue::one(), self.current_count, None, worth.0.into());
+                }
+            }
+        }
+        // If the number of transferred ballots is equal to the surplus, then all exhausted votes stay with the candidate, otherwise the difference are counted as set aside.
+        let set_aside_exhausted = surplus-total_transferred;
+
+        self.tally_set_aside = Some((set_aside_exhausted+set_aside_by_candidate.iter().cloned().sum()).0.into());
+        self.in_this_count.set_aside = Some(PerCandidate {
+            candidate: set_aside_by_candidate,
+            exhausted: set_aside_exhausted,
+            rounding: SignedVersion { negative: false, value: BallotPaperCount::zero() },
+            set_aside: None,
+        });
+    }
+
     pub fn distribute_surplus(&mut self,candidate_to_distribute:CandidateIndex) {
         // println!("Distributing surplus for {}",self.data.metadata.candidate(candidate_to_distribute).name);
         match Rules::surplus_distribution_subdivisions() {
             SurplusTransferMethod::JustOneTransferValue => {
-                let provenance = self.distribute_surplus_all_with_same_transfer_value(candidate_to_distribute);
+                let provenance = self.distribute_surplus_all_with_same_transfer_value(candidate_to_distribute,false);
                 self.end_of_count_step(ReasonForCount::ExcessDistribution(candidate_to_distribute), provenance, true);
             }
             SurplusTransferMethod::ScaleTransferValues => self.distribute_surplus_by_scaling_incoming_transfer_values(candidate_to_distribute,false),
             SurplusTransferMethod::MergeSameTransferValuesAndScale => self.distribute_surplus_by_scaling_incoming_transfer_values(candidate_to_distribute,true),
+            SurplusTransferMethod::PickRandomlyAfterDistribution => {
+                let provenance = self.distribute_surplus_all_with_same_transfer_value(candidate_to_distribute,true);
+                self.end_of_count_step(ReasonForCount::ExcessDistribution(candidate_to_distribute), provenance, true);
+            }
         }
     }
 
@@ -1007,6 +1052,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
     }
 }
+
+
 
 pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool) -> Transcript<Rules::Tally> {
     let arena = typed_arena::Arena::<CandidateIndex>::new();
