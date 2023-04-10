@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -48,6 +48,8 @@ pub enum WhenToDoElectCandidateClauseChecking {
     AfterCheckingQuotaIfExclusionNotOngoing,
     /// If the distribution of papers should be interrupted by this.
     AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers,
+    /// Like AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers, but don't interrupt for 1 of 2.
+    AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapersOrQuotaButOnlyIfContinuingCandidatesEqualsUnfilledVacanciesAndNotAfterSurplusIfMoreSurplusesAvailable,
 }
 
 #[derive(Copy,Clone,Serialize,Deserialize)]
@@ -94,6 +96,21 @@ pub enum SurplusTransferMethod {
     PickRandomlyAfterDistribution, // NSW stochastic method - pick a subset of the ballots randomly and all have TV 1.
 }
 
+/// In most STV you do surplus distributions before exclusions. But some (cough cough NSW) defer the surplus distributions under some conditions.
+pub enum DeferSurplusDistribution {
+    AlwaysDistributeAllSurplusBeforeAnyExclusions, // the thing done by almost everyone
+    DeferIfSumOfUndistributedSurplussesLessThanDifferenceBetweenTwoLowestContinuingCandidates, // NSW Randomized algorithm LC
+    DeferIfSumOfUndistributedSurplussesLessThanOrEqualToDifferenceBetweenTwoLowestContinuingCandidates, // NSW Randomized algorithm LGE
+}
+
+pub enum LastParcelUse {
+    No, // Consider all votes (normal)
+    LiterallyLast, // ACT
+    LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected, // NSW
+    LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElectedPlusOneBonus, // NSW 2012 bug
+}
+
+
 pub trait RoundUpToUsize {
     /// round up to the next integer.
     fn ceil(&self) -> usize;
@@ -111,7 +128,7 @@ pub trait PreferenceDistributionRules {
     /// Whether or not the system has a quota. False for IRV.
     fn has_quota() -> bool { true }
     /// Whether to transfer all the votes or just the last parcel.
-    fn use_last_parcel_for_surplus_distribution() -> bool;
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse;
     fn transfer_value_method() -> TransferValueMethod;
     fn convert_tally_to_rational(tally:Self::Tally) -> BigRational;
     /// convert a rational value to the tally type, rounding as if one would do after applying a transfer value.
@@ -146,8 +163,13 @@ pub trait PreferenceDistributionRules {
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking;
     /// if there are V vacancies, and the candidate ranked V highest has more votes than all lower put together plus undistributed surpluses, then elect V highest.
     fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking;
+    /// only relevant if above is chosen, in which case require V=1.
+    fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
 
     // how to do the elimination
+
+    /// Whether to defer surplus distribution and do elimination instead. This is only done in the NSW randomized algorithm, as no one else would do such a terrible thing, and so is defaulted to never.
+    fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::AlwaysDistributeAllSurplusBeforeAnyExclusions }
 
     /// Whether the Commonwealth Electoral Act 1918, Section 273, subsection 13A multiple elimination abomination should be used. This is defaulted to false as no one else would do such a terrible thing, and even the AEC has only sometimes done it.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
@@ -211,6 +233,7 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     current_minor_count : CountIndex,
     pending_surplus_distribution : VecDeque<CandidateIndex>,
     elected_candidates : Vec<CandidateIndex>,
+    candidate_elected_at_count : Vec<Option<CountIndex>>,
 
     // information about what is going on in this count.
     in_this_count : PendingTranscript<Rules::Tally>,
@@ -255,6 +278,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             current_minor_count : CountIndex(1),
             pending_surplus_distribution : VecDeque::default(),
             elected_candidates : vec![],
+            candidate_elected_at_count: vec![None;num_candidates],
             in_this_count : PendingTranscript {
                 elected: vec![],
                 not_continuing: vec![],
@@ -344,6 +368,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         self.elected_candidates.push(who);
         self.transcript.elected.push(who);
         self.no_longer_continuing(who,true);
+        self.candidate_elected_at_count[who.0]=Some(self.current_count);
     }
 
 
@@ -434,6 +459,15 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
     }
 
+    /// The total number of surplus votes for all candidates elected but not yet distributed.
+    pub fn total_undistributed_surplus_votes(&self) -> Rules::Tally {
+        let mut sum = Rules::Tally::zero();
+        for &candidate in self.pending_surplus_distribution.iter() {
+            sum+=self.tally(candidate)-self.quota.clone();
+        }
+        sum
+    }
+
     /// Implement the following, taken from NSW local government clause 11:
     /// ```text
     ///     (2)  When only one vacancy remains unfilled and the votes of one continuing candidate exceed the total of all the votes of the other continuing candidates, together with any surplus not transferred, that candidate is elected.
@@ -442,15 +476,14 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// ```
     pub fn check_if_top_few_have_overwhelming_votes(&mut self) {
         if self.remaining_to_elect().0>0 && self.continuing_candidates_sorted_by_tally.len()>=self.remaining_to_elect().0 {
+            if Rules::when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() && self.remaining_to_elect().0>1 { return; }
             let num_candidates_below_potential_winners = self.continuing_candidates_sorted_by_tally.len()-self.remaining_to_elect().0;
             let possibly_overwhelming_tally = self.tally(self.continuing_candidates_sorted_by_tally[num_candidates_below_potential_winners]);
             let mut others : Rules::Tally = Rules::Tally::zero();
             for &candidate in self.continuing_candidates_sorted_by_tally.iter().take(num_candidates_below_potential_winners) {
                 others+=self.tally(candidate);
             }
-            for &candidate in self.pending_surplus_distribution.iter() {
-                others+=self.tally(candidate)-self.quota.clone();
-            }
+            others+=self.total_undistributed_surplus_votes();
             if self.print_progress_to_stdout { println!("remaining seats {} corresponding candidate tally {} others {}", self.remaining_to_elect(), possibly_overwhelming_tally, others); }
             if possibly_overwhelming_tally>others {
                 let candidates_to_elect : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().rev().take(self.remaining_to_elect().0).cloned().collect();
@@ -469,11 +502,21 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing => reason_completed && self.pending_surplus_distribution.is_empty(),
             WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfExclusionNotOngoing => reason_completed || !reason.is_elimination(),
             WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers => true,
+            WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapersOrQuotaButOnlyIfContinuingCandidatesEqualsUnfilledVacanciesAndNotAfterSurplusIfMoreSurplusesAvailable => !(reason.is_surplus() && self.has_distributable_surplus()),
             WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists => self.pending_surplus_distribution.is_empty(),
         }
     }
     pub fn check_elected(&mut self,reason : &ReasonForCount,reason_completed : bool) {
-        self.check_elected_by_quota();
+        let check_quota = match Rules::when_to_check_if_all_remaining_should_get_elected() {
+            WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapersOrQuotaButOnlyIfContinuingCandidatesEqualsUnfilledVacanciesAndNotAfterSurplusIfMoreSurplusesAvailable =>
+                match reason {
+                    ReasonForCount::FirstPreferenceCount => true,
+                    ReasonForCount::ExcessDistribution(_) => !self.has_distributable_surplus(),
+                    ReasonForCount::Elimination(_) => reason_completed,
+                },
+            _ => true,
+        };
+        if check_quota  { self.check_elected_by_quota(); }
         if self.should_check(Rules::when_to_check_if_just_two_standing_for_shortcut_election(),reason,reason_completed) {
             self.check_elected_by_highest_of_remaining_2_when_1_needed_no_tie_resolution();
         }
@@ -560,6 +603,24 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         };
         self.tally_set_aside = Some(new_value);
     }
+
+    /// Implement the logic in NSW "Functional Requirements for Count Module", 1.4.14.1 to determine
+    /// the last count included in a NSW "last parcel" for a candidate.
+    /// * If the last count was an FirstPrefs or Exclusion, that count
+    /// * If the last n counts were surplus distributions with noone elected, then those n. Or one more if "bonus" is true (this is to match an NSWEC 2012 bug we found).
+    fn last_count_used_for_nsw_last_parcel(&self,candidate:CandidateIndex,bonus:bool) -> CountIndex {
+        let count_elected = self.candidate_elected_at_count[candidate.0].expect("Candidate was not elected");
+        match self.transcript.counts[count_elected.0].reason {
+            ReasonForCount::ExcessDistribution(_) => {
+                let mut res = count_elected;
+                while res.0>0 && self.transcript.counts[res.0-1].reason.is_surplus() && self.transcript.counts[res.0-1].elected.is_empty() { res=CountIndex(res.0-1); }
+                if bonus { res=CountIndex(res.0-1); }
+                res
+            }
+            _ => count_elected,
+        }
+    }
+
     /// Transfer votes using a single transfer value. Used for Federal and Victoria and ACT
     ///
     /// Federal Legislation:
@@ -585,12 +646,18 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let votes : Rules::Tally = self.tally(candidate_to_distribute);
         let surplus: Rules::Tally  = votes.clone()-self.quota.clone();
         self.tallys[candidate_to_distribute.0]=self.quota.clone();
-        let (ballots,provenance) =
-            if Rules::use_last_parcel_for_surplus_distribution() {self.papers[candidate_to_distribute.0].extract_last_parcel()}
-            else {
-                let (_tally,ballots,provenance) = self.papers[candidate_to_distribute.0].extract_all_ballots_ignoring_transfer_value();
-                (ballots,provenance)
-            };
+        let (_tally_here,ballots,provenance) = match Rules::use_last_parcel_for_surplus_distribution() {
+            LastParcelUse::No => self.papers[candidate_to_distribute.0].extract_all_ballots_ignoring_transfer_value(),
+            LastParcelUse::LiterallyLast => self.papers[candidate_to_distribute.0].extract_last_parcel(),
+            LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected => {
+                let first_count = self.last_count_used_for_nsw_last_parcel(candidate_to_distribute, false);
+                self.papers[candidate_to_distribute.0].parcels_starting_at_count(first_count)
+            },
+            LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElectedPlusOneBonus => { // Yay! Everyone wants a bonus.
+                let first_count = self.last_count_used_for_nsw_last_parcel(candidate_to_distribute, true);
+                self.papers[candidate_to_distribute.0].parcels_starting_at_count(first_count)
+            },
+        };
         let ballots_considered : BallotPaperCount = ballots.num_ballots;
         let distributed = self.distribute(&ballots.votes);
         let continuing_ballots = ballots_considered-distributed.exhausted;
@@ -613,7 +680,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
         // println!("Parcelling out {} votes with TV {} over {} ballots",original_worth,transfer_value,tv_denom);
         if distribute_randomly_nsw { // this is a terrible thing.
-            self.parcel_out_votes_random_portion_set_by_transfer_value(transfer_value.clone(),distributed,BallotPaperCount(surplus.ceil()));
+            self.parcel_out_votes_random_portion_set_by_transfer_value(transfer_value.clone(),distributed,BallotPaperCount(surplus.ceil()),candidate_to_distribute);
         } else {
             self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),distributed,Some(self.current_count),original_worth,!Rules::transfer_value_method().denom_is_just_continuing(),false,None);
         }
@@ -736,26 +803,34 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
 
     /// Parcel out votes by next continuing candidate with a given transfer value.
-    fn parcel_out_votes_random_portion_set_by_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,surplus:BallotPaperCount) {
+    /// Returns to the candidate being distributed the ones kept for quota.
+    fn parcel_out_votes_random_portion_set_by_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,surplus:BallotPaperCount,candidate_being_distributed:CandidateIndex)  {
         let (set_aside_by_candidate,ec_decision) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed);
         if let Some(ec_decision) = ec_decision { self.in_this_count.decisions.push(ec_decision); }
         // do the actual distribution
         let mut total_transferred : BallotPaperCount = BallotPaperCount::zero();
-        for (candidate_index,candidate_ballots) in distributed.by_candidate.into_iter().enumerate() {
+        for (candidate_index,candidate_ballots) in distributed.by_candidate.iter().enumerate() {
             if candidate_ballots.num_ballots.0>0 {
-                let transfer = candidate_ballots.set_aside(set_aside_by_candidate[candidate_index]);
-                if transfer.num_ballots.0>0 {
-                    let worth = transfer.num_ballots;
+                let (chosen,unchosen) = candidate_ballots.set_aside(set_aside_by_candidate[candidate_index]);
+                if chosen.num_ballots.0>0 {
+                    let worth = chosen.num_ballots;
                     total_transferred +=worth;
                     self.tallys[candidate_index]+=worth.0.into();
-                    self.papers[candidate_index].add(&transfer, TransferValue::one(), self.current_count, None, worth.0.into());
+                    self.papers[candidate_index].add(&chosen, TransferValue::one(), self.current_count, None, worth.0.into());
+                }
+                if unchosen.num_ballots.0>0 { // the ones not chosen are returned to the original owner so that s/he keeps a quota of ballot papers.
+                    let worth = unchosen.num_ballots;
+                    self.papers[candidate_being_distributed.0].add(&unchosen, TransferValue::one(), self.current_count, None, worth.0.into());
                 }
             }
         }
         // If the number of transferred ballots is equal to the surplus, then all exhausted votes stay with the candidate, otherwise the difference are counted as set aside.
         let set_aside_exhausted = surplus-total_transferred;
-
-        self.tally_set_aside = Some((set_aside_exhausted+set_aside_by_candidate.iter().cloned().sum()).0.into());
+        let (exhausted_retained_for_quota,exhausted_set_aside) = distributed.exhausted_votes.set_aside_arbitrarily(set_aside_exhausted);
+        self.papers[candidate_being_distributed.0].add(&exhausted_retained_for_quota, TransferValue::one(), self.current_count, None, exhausted_retained_for_quota.num_ballots.0.into());
+        assert_eq!(exhausted_set_aside.num_ballots,set_aside_exhausted);
+        self.exhausted += set_aside_exhausted;
+        self.exhausted_atl += exhausted_set_aside.num_atl_ballots;
         self.in_this_count.set_aside = Some(PerCandidate {
             candidate: set_aside_by_candidate,
             exhausted: set_aside_exhausted,
@@ -970,8 +1045,15 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             // println!("Excluding {}",self.data.metadata.candidate(candidate).name);
             self.no_longer_continuing(candidate,false);
         }
-        if Rules::when_to_check_if_all_remaining_should_get_elected()==WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers && self.number_continuing_candidates()==self.remaining_to_elect()
-           || Rules::when_to_check_if_just_two_standing_for_shortcut_election()==WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers && self.number_continuing_candidates()==NumberOfCandidates(2) && self.remaining_to_elect()==NumberOfCandidates(1) {
+        let stop_now = match Rules::when_to_check_if_all_remaining_should_get_elected() {
+            WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers=> self.number_continuing_candidates()==self.remaining_to_elect(),
+            WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapersOrQuotaButOnlyIfContinuingCandidatesEqualsUnfilledVacanciesAndNotAfterSurplusIfMoreSurplusesAvailable => self.number_continuing_candidates()==self.remaining_to_elect(),
+            _ => false,
+        } || match Rules::when_to_check_if_just_two_standing_for_shortcut_election() {
+            WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers=> self.number_continuing_candidates()==NumberOfCandidates(2) && self.remaining_to_elect()==NumberOfCandidates(1),
+            _ => false,
+        };
+        if stop_now {
             self.end_of_count_step(ReasonForCount::Elimination(candidates_to_exclude.clone()), PortionOfReasonBeingDoneThisCount {
                 transfer_value: None,
                 when_tv_created : None,
@@ -1014,7 +1096,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 if let Some((from,votes)) = self.papers[candidate.0].extract_all_ballots_with_given_provenance(&key) {
                     when_tv_created.add(from.when_tv_created);
                     original_worth+=from.tally.clone();
-                    papers_came_from_counts.extend(from.counts_comes_from.into_iter());
+                    papers_came_from_counts.extend(from.source_counts.iter().map(|p|p.count_index));
                     self.tallys[candidate.0]-=from.tally;
                     if all_votes.num_ballots.0==0 { all_votes=votes; }
                     else { all_votes.add(&votes.votes); }
@@ -1034,20 +1116,38 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 
 
-    pub fn distribute_lowest(&mut self) {
+    pub fn exclude_lowest(&mut self) {
         let candidates_to_exclude : Vec<CandidateIndex> =
             if Rules::should_eliminate_multiple_candidates_federal_rule_13a() { self.find_candidates_for_multiple_elimination_federal_rule_13a().unwrap_or_else(||self.find_lowest_candidate()) }
             else { self.find_lowest_candidate() };
         self.exclude(candidates_to_exclude);
     }
+    pub fn has_distributable_surplus(&self) -> bool {
+        !(self.pending_surplus_distribution.is_empty() || self.should_defer_surplus())
+    }
+    pub fn should_defer_surplus(&self) -> bool {
+        match Rules::when_should_surplus_distribution_be_deferred() {
+            DeferSurplusDistribution::AlwaysDistributeAllSurplusBeforeAnyExclusions => false,
+            DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanDifferenceBetweenTwoLowestContinuingCandidates => {
+                self.continuing_candidates_sorted_by_tally.len()>=2 && self.total_undistributed_surplus_votes() < self.tally(self.continuing_candidates_sorted_by_tally[1])-self.tally(self.continuing_candidates_sorted_by_tally[0])
+            }
+            DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanOrEqualToDifferenceBetweenTwoLowestContinuingCandidates => {
+                self.continuing_candidates_sorted_by_tally.len()>=2 && self.total_undistributed_surplus_votes() <= self.tally(self.continuing_candidates_sorted_by_tally[1])-self.tally(self.continuing_candidates_sorted_by_tally[0])
+            }
+        }
+    }
     pub fn go(&mut self) {
         if self.print_progress_to_stdout { self.print_candidates_names(); }
         self.distribute_first_preferences();
         while (self.remaining_to_elect()>NumberOfCandidates(0) && self.continuing_candidates.len()>0) || (Rules::finish_all_surplus_distributions_when_all_elected() && (!self.continuing_candidates_sorted_by_tally.is_empty()) && !self.pending_surplus_distribution.is_empty()) {
-            if let Some(candidate) = self.pending_surplus_distribution.pop_front() {
-                self.distribute_surplus(candidate);
+            if self.should_defer_surplus() {
+                self.exclude_lowest();
             } else {
-                self.distribute_lowest();
+                if let Some(candidate) = self.pending_surplus_distribution.pop_front() {
+                    self.distribute_surplus(candidate);
+                } else {
+                    self.exclude_lowest();
+                }
             }
         }
     }

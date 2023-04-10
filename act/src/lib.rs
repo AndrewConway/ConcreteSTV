@@ -1,10 +1,10 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
-use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational, SurplusTransferMethod};
+use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational, SurplusTransferMethod, LastParcelUse};
 use stv::tie_resolution::MethodOfTieResolution;
 use stv::transfer_value::{TransferValue, convert_usize_to_rational, round_rational_down_to_usize};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber, SplitByWhenTransferValueWasCreated};
@@ -22,7 +22,7 @@ impl PreferenceDistributionRules for ACTPre2020 {
     type SplitByNumber = DoNotSplitByCountNumber;
 
     /// See below comment, (5)
-    fn use_last_parcel_for_surplus_distribution() -> bool { true }
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LiterallyLast }
 
     /// Electoral Act 1992, Schedule 4, 1C
     /// ```text
@@ -171,7 +171,7 @@ impl PreferenceDistributionRules for ACT2021 {
     type Tally = FixedPrecisionDecimal<6>;
     type SplitByNumber = DoNotSplitByCountNumber;
 
-    fn use_last_parcel_for_surplus_distribution() -> bool { true }
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LiterallyLast }
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverContinuingBallotsLimitedToPriorTransferValue }
     fn make_transfer_value(surplus: Self::Tally, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus.get_scaled_value() as usize,BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize)))
@@ -220,7 +220,7 @@ impl PreferenceDistributionRules for ACT2020 {
     /// E.g. Ginninderra Count 39
     type SplitByNumber = SplitByWhenTransferValueWasCreated;
 
-    fn use_last_parcel_for_surplus_distribution() -> bool { true }
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LiterallyLast }
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverContinuingBallotsLimitedToPriorTransferValue }
     fn make_transfer_value(surplus: Self::Tally, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus.get_scaled_value() as usize,BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize)))

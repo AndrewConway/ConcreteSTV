@@ -1,11 +1,11 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-use crate::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, SurplusTransferMethod};
+use crate::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, SurplusTransferMethod, LastParcelUse};
 use crate::election_data::ElectionData;
 use crate::distribution_of_preferences_transcript::{Transcript, TranscriptWithMetadata};
 use std::fs::File;
@@ -83,7 +83,7 @@ impl CompareRules {
                 type Tally = R::Tally;
                 type SplitByNumber = R::SplitByNumber;
 
-                fn use_last_parcel_for_surplus_distribution() -> bool { R::use_last_parcel_for_surplus_distribution() }
+                fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { R::use_last_parcel_for_surplus_distribution() }
                 fn transfer_value_method() -> TransferValueMethod { R::transfer_value_method() }
                 fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { R::convert_tally_to_rational(tally) }
                 fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { R::convert_rational_to_tally_after_applying_transfer_value(rational) }
@@ -124,7 +124,7 @@ impl CompareRules {
             impl <R:PreferenceDistributionRules> PreferenceDistributionRules for AltRule<R> {
                 type Tally = R::Tally;
                 type SplitByNumber = R::SplitByNumber;
-                fn use_last_parcel_for_surplus_distribution() -> bool { R::use_last_parcel_for_surplus_distribution() }
+                fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { R::use_last_parcel_for_surplus_distribution() }
                 fn transfer_value_method() -> TransferValueMethod { R::transfer_value_method() }
                 fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { R::convert_tally_to_rational(tally) }
                 fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { R::convert_rational_to_tally_after_applying_transfer_value(rational) }

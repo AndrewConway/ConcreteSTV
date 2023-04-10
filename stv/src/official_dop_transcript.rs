@@ -321,7 +321,7 @@ impl OfficialDistributionOfPreferencesTranscript {
             if paper_delta.rounding.resolve()!=my_change_rounding as isize { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperDeltaRounding(paper_delta.rounding.resolve(),my_change_rounding))}
             for candidate in 0..paper_delta.candidate.len() {
                 let my_change_candidate = my_count.status.papers.candidate[candidate].0 as isize-my_prior_count.map(|c|c.status.papers.candidate[candidate].0 as isize).unwrap_or(0);
-                if paper_delta.candidate[candidate]!=my_change_candidate && !(self.missing_negatives_in_papers_delta && my_change_candidate < 0) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperDeltaCandidate(paper_delta.candidate[candidate],my_change_candidate,CandidateIndex(candidate)))}
+                if paper_delta.candidate[candidate]!=isize::MAX && paper_delta.candidate[candidate]!=my_change_candidate && !(self.missing_negatives_in_papers_delta && my_change_candidate < 0) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperDeltaCandidate(paper_delta.candidate[candidate],my_change_candidate,CandidateIndex(candidate)))}
             }
         }
         if let Some(papers_came_from_counts) = &official_count.papers_came_from_counts {

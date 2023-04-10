@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -15,9 +15,10 @@
 
 pub mod parse_lge;
 pub mod parse_lc;
+pub mod nsw_random_rules;
 
 use std::cmp::Ordering;
-use stv::preference_distribution::{BigRational, CountNamingMethod, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
+use stv::preference_distribution::{BigRational, CountNamingMethod, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber, FullySplitByCountNumber, HowSplitByCountNumber};
 use stv::distribution_of_preferences_transcript::{CountIndex, Transcript};
 use stv::transfer_value::{convert_usize_to_rational, round_rational_down_to_usize, TransferValue};
@@ -34,7 +35,7 @@ impl PreferenceDistributionRules for NSWLocalCouncilLegislation2021MyGuessAtHigh
     type Tally = usize;
     type SplitByNumber = FullySplitByCountNumber;
 
-    fn use_last_parcel_for_surplus_distribution() -> bool { false }
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::No }
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverContinuingBallots }
 
     fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
@@ -111,7 +112,7 @@ impl PreferenceDistributionRules for NSWECLocalGov2021 {
     type Tally = usize;
     type SplitByNumber = FullySplitByCountNumber;
 
-    fn use_last_parcel_for_surplus_distribution() -> bool { false }
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::No }
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverContinuingBallots }
 
     fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
@@ -263,7 +264,7 @@ impl PreferenceDistributionRules for SimpleIRVAnyDifferenceBreaksTies {
     /// MAKE IT IRV!
     fn has_quota() -> bool { false }
     // a bunch of not applicable functions.
-    fn use_last_parcel_for_surplus_distribution() -> bool { false }
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::No }
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverContinuingBallots }
     fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
     fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_usize(rational)  }

@@ -115,17 +115,32 @@ impl<'a>  PartiallyDistributedVote<'a> {
         }
     }
 }
+
+/// Store the state at the start of each count, which enables working out which votes arrived on which count.
+#[derive(Clone)]
+pub struct TrackParcelsInEachCount<Tally> {
+    pub count_index:CountIndex,
+    state_at_start_of_count:StateBeforeAddition,
+    tally_at_start_of_count:Tally,
+}
+
 #[derive(Clone)]
 pub struct PileProvenance<Tally> {
-    pub counts_comes_from : HashSet<CountIndex>,
+    pub source_counts : Vec<TrackParcelsInEachCount<Tally>>,
     pub when_tv_created:Option<CountIndex>, // if there is a unique time the TV was created, hold it.
     /// The number of actual votes this translated to.
     pub tally : Tally,
 }
 
-impl <Tally:AddAssign> PileProvenance<Tally> {
-    pub fn add(&mut self,count_index:CountIndex,when_tv_created:Option<CountIndex>,tally:Tally) {
-        self.counts_comes_from.insert(count_index);
+impl <Tally:AddAssign+Clone> PileProvenance<Tally> {
+    pub fn add(&mut self,count_index:CountIndex,when_tv_created:Option<CountIndex>,tally:Tally,state_prior_to_add:StateBeforeAddition) {
+        if self.source_counts.last().map(|s|s.count_index)!=Some(count_index) {
+            self.source_counts.push(TrackParcelsInEachCount{
+                count_index,
+                state_at_start_of_count: state_prior_to_add,
+                tally_at_start_of_count: self.tally.clone(),
+            })
+        }
         if self.when_tv_created!=when_tv_created { self.when_tv_created=None} // conflicting -> None.
         self.tally+=tally
     }
@@ -151,6 +166,7 @@ impl <'a> Default for VotesWithSameTransferValue<'a> {
 }
 
 /// For jurisdictions that use a last parcel, sufficient information to revert to an earlier state. Used with struct [VotesWithSameTransferValue]
+#[derive(Copy, Clone,Debug)]
 pub struct StateBeforeAddition {
     votes_len : usize, // length of the votes vector
 }
@@ -183,32 +199,75 @@ impl <'a> VotesWithSameTransferValue<'a> {
         res
     }
 
-    /// Set aside randomly some number of ballots, and return the ones not set aside.
-    pub fn set_aside(&self,num_to_set_aside:BallotPaperCount) -> VotesWithSameTransferValue<'a> {
+    /// Set aside randomly some number of ballots, and return (the chosen ones,the ones set aside).
+    pub fn set_aside(&self,num_to_set_aside:BallotPaperCount) -> (VotesWithSameTransferValue<'a>,VotesWithSameTransferValue<'a>) {
         assert!(num_to_set_aside<=self.num_ballots);
-        let mut res = VotesWithSameTransferValue::default();
+        let mut the_chosen_ones = VotesWithSameTransferValue::default();
+        let mut the_unchosen_ones = VotesWithSameTransferValue::default();
         let chosen = make_array_with_some_randomly_true(self.num_ballots.0,self.num_ballots.0-num_to_set_aside.0,&mut thread_rng());
         let mut ballots_considered = 0;
         for v in &self.votes {
             let kept = chosen[ballots_considered..][..v.n.0].iter().filter(|v|**v).count();
             ballots_considered+=v.n.0;
             if kept>0 {
-                res.add_vote(PartiallyDistributedVote{
+                the_chosen_ones.add_vote(PartiallyDistributedVote{
                     upto : v.upto,
                     n: BallotPaperCount(kept),
                     prefs: v.prefs,
                     source: v.source,
                 });
             }
+            let unkept = v.n.0-kept;
+            if unkept>0 {
+                the_unchosen_ones.add_vote(PartiallyDistributedVote{
+                    upto : v.upto,
+                    n: BallotPaperCount(unkept),
+                    prefs: v.prefs,
+                    source: v.source,
+                });
+            }
         }
         assert_eq!(ballots_considered,self.num_ballots.0);
-        res
+        (the_chosen_ones,the_unchosen_ones)
     }
+
+    /// Take some (non-random) set of ballots and return them. Similar to set_aside but without randomness. Choice has no meaning. Slightly faster than set_aside
+    pub fn set_aside_arbitrarily(&self,num_to_set_aside:BallotPaperCount) -> (VotesWithSameTransferValue<'a>,VotesWithSameTransferValue<'a>) {
+        assert!(num_to_set_aside<=self.num_ballots);
+        let mut the_chosen_ones = VotesWithSameTransferValue::default();
+        let mut the_unchosen_ones = VotesWithSameTransferValue::default();
+        let mut togo = self.num_ballots-num_to_set_aside;
+        for v in &self.votes {
+            let kept = togo.max(v.n);
+            togo-=kept;
+            if kept.0>0 {
+                the_chosen_ones.add_vote(PartiallyDistributedVote{
+                    upto : v.upto,
+                    n: kept,
+                    prefs: v.prefs,
+                    source: v.source,
+                });
+            }
+            let unkept = v.n-kept;
+            if unkept.0>0 {
+                the_unchosen_ones.add_vote(PartiallyDistributedVote{
+                    upto : v.upto,
+                    n: unkept,
+                    prefs: v.prefs,
+                    source: v.source,
+                });
+            }
+        }
+        assert_eq!(togo,BallotPaperCount(0));
+        (the_chosen_ones,the_unchosen_ones)
+    }
+
 }
 
 /// Votes distributed amongst continuing candidates.
 pub struct DistributedVotes<'a> {
     pub(crate) by_candidate : Vec<VotesWithSameTransferValue<'a>>,
+    pub(crate) exhausted_votes : VotesWithSameTransferValue<'a>,
     pub(crate) exhausted : BallotPaperCount,
     pub(crate) exhausted_atl : BallotPaperCount,
 }
@@ -218,15 +277,17 @@ impl <'a> DistributedVotes<'a> {
         let mut by_candidate = vec![VotesWithSameTransferValue::default();num_candidates];
         let mut exhausted = BallotPaperCount(0);
         let mut exhausted_atl = BallotPaperCount(0);
+        let mut exhausted_votes = VotesWithSameTransferValue::default();
         for vote in votes {
             if let Some(next) = vote.next(continuing_candidates) {
                 by_candidate[next.candidate().0].add_vote(next);
             } else {
+                exhausted_votes.add_vote(vote.clone());
                 exhausted+=vote.n;
                 if vote.is_atl() { exhausted_atl+=vote.n; }
             }
         }
-        DistributedVotes{by_candidate,exhausted,exhausted_atl}
+        DistributedVotes{by_candidate, exhausted_votes, exhausted,exhausted_atl}
     }
 
     /// distribute votes ignoring the preferences totally, using an oracle that tells you how many votes to put where.
@@ -269,6 +330,7 @@ impl <'a> DistributedVotes<'a> {
     pub fn distribute_by_oracle(votes:&Vec<PartiallyDistributedVote<'a>>,continuing_candidates:&HashSet<CandidateIndex>,num_candidates:usize,oracle_by_candidate:&mut [BallotPaperCount]) -> Self {
         assert_eq!(num_candidates+1,oracle_by_candidate.len()); // extra one is exhausted.
         let mut by_candidate = vec![VotesWithSameTransferValue::default();num_candidates];
+        let mut exhausted_votes = VotesWithSameTransferValue::default();
         let mut exhausted = BallotPaperCount(0);
         let exhausted_atl = BallotPaperCount(0);
         let mut upto_candidate = CandidateIndex(0);
@@ -283,11 +345,12 @@ impl <'a> DistributedVotes<'a> {
                     by_candidate[upto_candidate.0].add_vote(PartiallyDistributedVote{upto:0,n,prefs:&[],source:v.source.clone()});
                 } else {
                     exhausted+=nv;
+                    exhausted_votes.add_vote(PartiallyDistributedVote{upto:0,n:nv,prefs:&[],source:v.source.clone()});
                     nv=BallotPaperCount(0);
                 }
             }
         }
-        DistributedVotes{by_candidate,exhausted,exhausted_atl}
+        DistributedVotes{by_candidate, exhausted_votes, exhausted,exhausted_atl}
     }
 }
 
@@ -323,7 +386,10 @@ impl HowSplitByCountNumber for SplitByWhenTransferValueWasCreated {
     fn key(_count_index: CountIndex, when_tv_created: Option<CountIndex>) -> Self::KeyToDivide { when_tv_created.unwrap() }
 }
 
-struct LastParcelInfo {
+
+
+struct LastParcelInfo<Tally> {
+    tally : Tally,
     prior_state : StateBeforeAddition,
     transfer_value : TransferValue,
     when_tv_created:Option<CountIndex>,
@@ -332,10 +398,8 @@ struct LastParcelInfo {
 /// A set of votes potentially with multiple transfer values or sources.
 /// These would typically be the votes given to a particular individual.
 pub struct VotesWithMultipleTransferValues<'a,S:HowSplitByCountNumber,Tally> {
-
-    last_parcel : Option<LastParcelInfo>,
+    last_parcel : Option<LastParcelInfo<Tally>>, // This is literally the last time add() was called. There may conceivably be multiple in a single count.
     by_provenance : HashMap<(S::KeyToDivide,TransferValue),(PileProvenance<Tally>,VotesWithSameTransferValue<'a>)>
-
 }
 
 impl <'a,S:HowSplitByCountNumber,Tally> Default for VotesWithMultipleTransferValues<'a,S,Tally> {
@@ -344,14 +408,15 @@ impl <'a,S:HowSplitByCountNumber,Tally> Default for VotesWithMultipleTransferVal
     }
 }
 
-impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero+Clone+Display+FromStr+PartialEq+Debug> VotesWithMultipleTransferValues<'a,S,Tally> {
+impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero+Clone+Display+FromStr+PartialEq+Debug+Sub<Output=Tally>> VotesWithMultipleTransferValues<'a,S,Tally> {
     pub fn add(& mut self,votes:&'_ VotesWithSameTransferValue<'a>,transfer_value:TransferValue,count_index:CountIndex,when_tv_created:Option<CountIndex>,tally:Tally) {
         let key = (S::key(count_index,when_tv_created),transfer_value.clone());
         let entry = self.by_provenance.entry(key).or_insert_with(||
-            (PileProvenance{ counts_comes_from: Default::default(),when_tv_created,tally:Tally::zero()}, VotesWithSameTransferValue::default()));
-        entry.0.add(count_index,when_tv_created,tally);
+            (PileProvenance{ source_counts: Default::default(),when_tv_created,tally:Tally::zero()}, VotesWithSameTransferValue::default()));
         let prior_state = entry.1.add(&votes.votes);
+        entry.0.add(count_index,when_tv_created,tally.clone(),prior_state);
         self.last_parcel = Some(LastParcelInfo{
+            tally,
             prior_state,
             transfer_value,
             when_tv_created,
@@ -383,7 +448,7 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero+Clone+Display+FromStr+Part
     }
 
     /// Removes the last parcel from this object, returning the object created.
-    pub fn extract_last_parcel(&'_ mut self) -> (VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount) {
+    pub fn extract_last_parcel(&'_ mut self) -> (Tally,VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount) {
         if let Some(last_parcel) = self.last_parcel.take() {
             let key = (S::key(last_parcel.count_index,last_parcel.when_tv_created),last_parcel.transfer_value.clone());
             let (_,votes) = self.by_provenance.get_mut(&key).expect("Last parcel has vanished!");
@@ -393,10 +458,18 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero+Clone+Display+FromStr+Part
                 when_tv_created: last_parcel.when_tv_created,
                 papers_came_from_counts: vec![last_parcel.count_index],
             };
-            (res,provenance)
+            (last_parcel.tally,res,provenance)
         } else {
             panic!("No last parcel");
         }
+    }
+    /// Like extract_last_parcel, except parcels that arrived at first_count_wanted or later.
+    pub fn parcels_starting_at_count(&'_ mut self,first_count_wanted:CountIndex) -> (Tally,VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount) {
+        let mut helper = MergeVotesHelper::default();
+        for ((_,tv),(prov,votes)) in self.by_provenance.iter_mut() {
+            helper.add_from_specific_count(tv.clone(),prov,votes,first_count_wanted);
+        }
+        helper.extract()
     }
     /// Extracts all the ballots, adding all with same transfer value together. Sort highest to lowest.
     /// Clears this object.
@@ -425,7 +498,7 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero+Clone+Display+FromStr+Part
             let provenance = PortionOfReasonBeingDoneThisCount{
                 transfer_value: Some(tv.clone()),
                 when_tv_created: prov.when_tv_created,
-                papers_came_from_counts: prov.counts_comes_from.iter().cloned().collect(),
+                papers_came_from_counts: prov.source_counts.iter().map(|p|p.count_index).collect(),
             };
             res.push((tv.clone(),(prov.tally,votes,provenance)));
         }
@@ -467,16 +540,31 @@ impl <'a,Tally : Zero> Default for MergeVotesHelper<'a,Tally> {
         }
     }
 }
-impl <'a,Tally : AddAssign> MergeVotesHelper<'a,Tally> {
+impl <'a,Tally : AddAssign+Clone+Sub<Output=Tally>> MergeVotesHelper<'a,Tally> {
     /// add a set of votes to the data structure.
     fn add(&mut self,tv:TransferValue,prov:PileProvenance<Tally>,votes:VotesWithSameTransferValue<'a>) {
         self.tally+=prov.tally;
-        self.papers_came_from_counts.extend(prov.counts_comes_from.iter());
+        self.papers_came_from_counts.extend(prov.source_counts.iter().map(|p|p.count_index));
         self.transfer_value.add(tv);
         self.tv_came_from_count.add(prov.when_tv_created);
         match &mut self.sum {
             None => { self.sum=Some(votes);  }
             Some(accum) => { accum.add(&votes.votes); }
+        }
+    }
+    fn add_from_specific_count(&mut self, tv:TransferValue,prov:&mut PileProvenance<Tally>, votes:&mut VotesWithSameTransferValue<'a>, starting_count:CountIndex) {
+        let counts : Vec<_>= prov.source_counts.iter().filter(|p|p.count_index>=starting_count).collect();
+        if !counts.is_empty() {
+            self.tally+=prov.tally.clone()-counts[0].tally_at_start_of_count.clone();
+            prov.tally=counts[0].tally_at_start_of_count.clone();
+            self.papers_came_from_counts.extend(counts.iter().map(|p|p.count_index));
+            self.transfer_value.add(tv);
+            self.tv_came_from_count.add(prov.when_tv_created);
+            let votes = votes.extract_last_parcel(counts[0].state_at_start_of_count);
+            match &mut self.sum {
+                None => { self.sum=Some(votes);  }
+                Some(accum) => { accum.add(&votes.votes); }
+            }
         }
     }
     fn extract(mut self) -> (Tally,VotesWithSameTransferValue<'a>, PortionOfReasonBeingDoneThisCount) {

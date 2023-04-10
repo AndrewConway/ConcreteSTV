@@ -1,4 +1,4 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -7,7 +7,7 @@
 extern crate core;
 
 use stv::ballot_pile::{BallotPaperCount, SplitFirstCount};
-use stv::preference_distribution::{BigRational, CountNamingMethod, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
+use stv::preference_distribution::{BigRational, CountNamingMethod, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
 use stv::tie_resolution::MethodOfTieResolution;
 use stv::transfer_value::{convert_usize_to_rational, round_rational_down_to_usize, TransferValue};
 
@@ -30,7 +30,7 @@ impl PreferenceDistributionRules for Vic2018LegislativeCouncil {
     /// expect the legislators probably intended based on the wording of (12).
     type SplitByNumber = SplitFirstCount;
 
-    fn use_last_parcel_for_surplus_distribution() -> bool { false }
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::No }
     /// (7)(a)
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
 

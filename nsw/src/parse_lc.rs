@@ -197,6 +197,7 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                     let mut paper_total : PerCandidate<usize> = PerCandidate::from_num_candidates(metadata.candidates.len(),usize::MAX);
                     let mut paper_delta : PerCandidate<isize> = PerCandidate::from_num_candidates(metadata.candidates.len(),isize::MAX);
                     let mut paper_set_aside : PerCandidate<usize> = PerCandidate::from_num_candidates(metadata.candidates.len(),0);
+                    let mut first_prefs_atl : Option<usize> = None;
                     let transfer_value : Option<f64> = {
                         text_contents(count_html.select(&select_notep)).iter().filter_map(|s|{
                             regex_find_quota.captures(s).and_then(|c|c[1].parse::<f64>().ok())
@@ -217,7 +218,14 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                             } else { candidate_col=None }
                         } else if let Some(candidate_col) = candidate_col {
                             let tds : Vec<String> = text_contents(tr.select(&select_td));
-                            if tds.len()==expected_len && tds[0].is_empty() { // don't select group.
+                            if tds.len()==expected_len && !tds[0].is_empty() { // This is a group line. For first preferences, above the line is included here,
+                                if let Some(votes_col) = votes_col {
+                                    let s = tds[votes_col].trim();
+                                    if !s.is_empty() {
+                                        first_prefs_atl = Some(parse_with_commas(s)?);
+                                    }
+                                }
+                            } else if tds.len()==expected_len && tds[0].is_empty() { // don't select group.
                                 match tds[candidate_col].trim() {
                                     "Group Total" => {}
                                     "UNGROUPED CANDIDATES" => {}
@@ -248,7 +256,7 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                                     name => {
                                         if let Some(&candidate) = candidate_name_lookup.get(name) {
                                             if let Some(votes_col) = votes_col { // first preferences
-                                                let votes = parse_with_commas(&tds[votes_col])?;
+                                                let votes = parse_with_commas(&tds[votes_col])?+first_prefs_atl.take().unwrap_or(0); // add in ATL group votes if present.
                                                 paper_total.candidate[candidate.0] = votes;
                                                 paper_delta.candidate[candidate.0] = votes as isize;
                                             } else if let Some(progressive_total_col) = progressive_total_col {

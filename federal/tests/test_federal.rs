@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -32,7 +32,7 @@ mod tests {
         let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
-        let file = File::create(format!("test_transcripts/transcript{}2019.json",state))?;
+        let file = File::create(format!("test_transcripts/transcript{}2022.json",state))?;
         serde_json::to_writer_pretty(file,&transcript)?;
         let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
 

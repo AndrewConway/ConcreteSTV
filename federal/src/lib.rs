@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -7,7 +7,7 @@
 //! Describe the rules used for Federal elections, as best I can tell.
 
 use std::marker::PhantomData;
-use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational, SurplusTransferMethod};
+use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational, SurplusTransferMethod, LastParcelUse};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber};
 use stv::transfer_value::{TransferValue, round_rational_down_to_usize, convert_usize_to_rational};
 use stv::tie_resolution::MethodOfTieResolution;
@@ -34,7 +34,7 @@ impl <V:FederalVariations> PreferenceDistributionRules for FederalVariant<V> {
     type Tally = usize;
     type SplitByNumber = DoNotSplitByCountNumber;
 
-    fn use_last_parcel_for_surplus_distribution() -> bool { false }
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::No }
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
 
     fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
