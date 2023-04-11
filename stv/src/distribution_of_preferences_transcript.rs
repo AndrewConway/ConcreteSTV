@@ -89,6 +89,35 @@ impl TryFrom<PerCandidate<f64>> for PerCandidate<isize> {
     }
 
 }
+
+impl From<PerCandidate<isize>> for PerCandidate<f64> {
+    fn from(value: PerCandidate<isize>) -> Self {
+        let from_int = |f:isize| -> f64 {
+            if f==isize::MAX { f64::NAN }
+            else { f as f64 }
+        };
+        PerCandidate::<f64>{
+            candidate: value.candidate.into_iter().map(from_int).collect(),
+            exhausted: from_int(value.exhausted),
+            rounding: SignedVersion{ negative: value.rounding.negative, value: from_int(value.rounding.value) },
+            set_aside:  value.set_aside.map(from_int),
+        }
+    }
+}
+impl From<PerCandidate<usize>> for PerCandidate<f64> {
+    fn from(value: PerCandidate<usize>) -> Self {
+        let from_int = |f:usize| -> f64 {
+            if f==usize::MAX { f64::NAN }
+            else { f as f64 }
+        };
+        PerCandidate::<f64>{
+            candidate: value.candidate.into_iter().map(from_int).collect(),
+            exhausted: from_int(value.exhausted),
+            rounding: SignedVersion{ negative: value.rounding.negative, value: from_int(value.rounding.value) },
+            set_aside:  value.set_aside.map(from_int),
+        }
+    }
+}
 /// Record the status of the count at the end of the count.
 #[derive(Clone,Serialize,Deserialize,PartialEq)]
 pub struct EndCountStatus<Tally:PartialEq+Clone+Display+FromStr> {

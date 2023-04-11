@@ -71,29 +71,29 @@ pub enum DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally:Display+
     PaperTotalCandidate(BallotPaperCount,BallotPaperCount,CandidateIndex),
     #[error("The change in number of exhausted papers is {0} in the official DoP and {1} in ConcreteSTV.")]
     PaperDeltaExhausted(isize,usize),
-    #[error("The change in number of lost to rounding papers is {0} in the official DoP and {1} in ConcreteSTV.")]
+    #[error("The change in number of papers lost to rounding papers is {0} in the official DoP and {1} in ConcreteSTV.")]
     PaperDeltaRounding(isize,usize), // should be 0 in all cases???
     #[error("The change in number of papers is {0} in the official DoP and {1} in ConcreteSTV for candidate #{2}.")]
     PaperDeltaCandidate(isize,isize,CandidateIndex),
-    #[error("The total number of papers lost to exhaustion or rounding is {0} in the official DoP and {1} from exhaustion and {2} from rounding ConcreteSTV.")]
+    #[error("The total number of votes lost to exhaustion or rounding is {0} in the official DoP and {1} from exhaustion and {2} from rounding ConcreteSTV.")]
     TallyTotalExhaustedAndRounding(ECTally,Tally,SignedVersion<Tally>),
-    #[error("The total number of exhausted papers is {0} in the official DoP and {1} in ConcreteSTV.")]
+    #[error("The total number of exhausted votes is {0} in the official DoP and {1} in ConcreteSTV.")]
     TallyTotalExhausted(ECTally,Tally),
-    #[error("The total number of lost to rounding papers is {0} in the official DoP and {1} in ConcreteSTV.")]
+    #[error("The total number of lost to rounding votes is {0} in the official DoP and {1} in ConcreteSTV.")]
     TallyTotalRounding(ECTally,SignedVersion<Tally>), // should be 0 in all cases???
-    #[error("The total number of papers is {0} in the official DoP and {1} in ConcreteSTV for candidate #{2}.")]
+    #[error("The total number of votes is {0} in the official DoP and {1} in ConcreteSTV for candidate #{2}.")]
     TallyTotalCandidate(ECTally,Tally,CandidateIndex),
-    #[error("The change in number of exhausted papers is {0} in the official DoP and {2}-{1} in ConcreteSTV.")]
+    #[error("The change in number of exhausted votes is {0} in the official DoP and {2}-{1} in ConcreteSTV.")]
     TallyDeltaExhausted(ECTally,Tally,Tally),
-    #[error("The change in number of lost to rounding papers is {0} in the official DoP and {1} in ConcreteSTV.")]
+    #[error("The change in number of votes lost to rounding is {0} in the official DoP and {1} in ConcreteSTV.")]
     TallyDeltaRounding(ECTally,SignedVersion<Tally>), // should be 0 in all cases???
-    #[error("The change in number of papers is {0} in the official DoP and {2}-{1} in ConcreteSTV for candidate #{3}.")]
+    #[error("The change in number of votes is {0} in the official DoP and {2}-{1} in ConcreteSTV for candidate #{3}.")]
     TallyDeltaCandidate(ECTally,Tally,Tally,CandidateIndex),
 }
 
 /// A vote that is a finite, comparable, not-NaN value
 #[derive(Copy,Clone)]
-pub struct ECTally(f64);
+pub struct ECTally(pub f64);
 
 impl Display for ECTally {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

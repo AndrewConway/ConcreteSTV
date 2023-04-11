@@ -238,7 +238,7 @@ impl <'a> VotesWithSameTransferValue<'a> {
         let mut the_unchosen_ones = VotesWithSameTransferValue::default();
         let mut togo = self.num_ballots-num_to_set_aside;
         for v in &self.votes {
-            let kept = togo.max(v.n);
+            let kept = togo.min(v.n);
             togo-=kept;
             if kept.0>0 {
                 the_chosen_ones.add_vote(PartiallyDistributedVote{

@@ -95,6 +95,11 @@ pub struct MissingFile {
     pub where_to_get_is_exact_url : bool,
 }
 
+#[derive(Debug)]
+pub struct MissingAlternateNamedFiles {
+    pub alternates : Vec<MissingFile>,
+}
+
 impl Display for MissingFile {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.where_to_get_is_exact_url {
@@ -106,6 +111,18 @@ impl Display for MissingFile {
 }
 impl Error for MissingFile {
 }
+impl Display for MissingAlternateNamedFiles {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"There is a missing file which may have alternate names.")?;
+        for mf in &self.alternates {
+            write!(f," May be file {} from {}",mf.file_name,mf.where_to_get)?;
+        }
+        Ok(())
+    }
+}
+impl Error for MissingAlternateNamedFiles {
+}
+
 
 
 pub trait RawDataSource : KnowsAboutRawMarkings {

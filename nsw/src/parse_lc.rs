@@ -156,14 +156,14 @@ impl RawDataSource for NSWLCDataLoader {
 pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count(cache:&CacheDir,dop_url:&str, metadata: &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
     // first parse the main DOP.
     let overview_html = Html::parse_document(&cache.get_string(dop_url)?);
-    let mut counts = vec![];
+    let mut counts: Vec<OfficialDOPForOneCount> = vec![];
     let base_url = url::Url::parse(dop_url)?;
     let select_td = Selector::parse("td").unwrap();
     let select_th = Selector::parse("th").unwrap();
     let select_a = Selector::parse("a").unwrap();
     let select_notep = Selector::parse("p.note_p").unwrap();
     let select_list_rows = Selector::parse("table.list tr").unwrap();
-    let regex_find_quota = regex::Regex::new(r"^\d+ / \(\d+ - \d+\) = ([\d\.]+)$").unwrap();
+    let regex_find_transfer_value = regex::Regex::new(r"^\d+ / \(\d+ - \d+\) = ([\d\.]+)$").unwrap();
     let candidate_name_lookup = metadata.get_candidate_name_lookup();
     let mut total_formal_votes : Option<usize> = None;
     for overview_tr in overview_html.select(&Selector::parse("div#ReportContent table.list tr, div#prccReport table.list tr").unwrap()) {
@@ -198,34 +198,37 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                     let mut paper_delta : PerCandidate<isize> = PerCandidate::from_num_candidates(metadata.candidates.len(),isize::MAX);
                     let mut paper_set_aside : PerCandidate<usize> = PerCandidate::from_num_candidates(metadata.candidates.len(),0);
                     let mut first_prefs_atl : Option<usize> = None;
+                    let mut groups_col : Option<usize> = None;
                     let transfer_value : Option<f64> = {
                         text_contents(count_html.select(&select_notep)).iter().filter_map(|s|{
-                            regex_find_quota.captures(s).and_then(|c|c[1].parse::<f64>().ok())
+                            regex_find_transfer_value.captures(s).and_then(|c|c[1].parse::<f64>().ok())
                         }).next()
                     };
                     // if let Some(transfer_value) = transfer_value { println!("Found tv {}",transfer_value); }
                     for tr in count_html.select(&select_list_rows) {
                         if tr.value().attr("class")==Some("t_head") {
                             let headings = tr.select(&select_th).map(|e|e.text().next().unwrap_or("")).collect::<Vec<_>>();
-                            //println!("Found headings {:?}",headings);
-                            if headings.len()>0 && headings[0]=="Group" {
+                            // println!("Found headings {:?}",headings);
+                            if headings.len()>0 && (headings[0]=="Group" || headings[0]=="Candidates in Ballot Order") {
                                 expected_len=headings.len();
+                                groups_col=headings.iter().position(|s|*s=="Group");
                                 candidate_col=headings.iter().position(|s|*s=="Candidates in Ballot Order");
                                 progressive_total_col=headings.iter().position(|s|*s=="Progressive Total"); // exclusion or surplus
                                 transferred_col=headings.iter().position(|s|*s=="Ballot Papers Transferred"); // exclusion or surplus
                                 set_aside_col=headings.iter().position(|s|*s=="Set Aside for Quota"); // surplus
-                                votes_col=headings.iter().position(|s|*s=="Votes" || *s=="First Preferences"); // first preferences
+                                votes_col=headings.iter().position(|s|*s=="Votes").or(headings.iter().position(|s|*s=="First Preferences")); // first preferences count. Sometimes there are both columns, when someone is ineligible. In this case we want the votes column.
+                                // println!("Found votes_col {:?} candidate_col {:?} groups_col {:?}",votes_col,candidate_col,groups_col);
                             } else { candidate_col=None }
                         } else if let Some(candidate_col) = candidate_col {
                             let tds : Vec<String> = text_contents(tr.select(&select_td));
-                            if tds.len()==expected_len && !tds[0].is_empty() { // This is a group line. For first preferences, above the line is included here,
+                            if tds.len()==expected_len && groups_col.map(|c|!tds[c].is_empty()).unwrap_or(false)  { // This is a group line. For first preferences, above the line is included here,
                                 if let Some(votes_col) = votes_col {
                                     let s = tds[votes_col].trim();
                                     if !s.is_empty() {
                                         first_prefs_atl = Some(parse_with_commas(s)?);
                                     }
                                 }
-                            } else if tds.len()==expected_len && tds[0].is_empty() { // don't select group.
+                            } else if tds.len()==expected_len {
                                 match tds[candidate_col].trim() {
                                     "Group Total" => {}
                                     "UNGROUPED CANDIDATES" => {}
@@ -236,6 +239,14 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                                                 let votes = parse_with_commas(votes)?;
                                                 if set_aside_col.is_some() { paper_set_aside.exhausted = votes; }
                                                 else { paper_delta.exhausted = votes as isize; }
+                                            }
+                                        }
+                                        if let Some(col) = votes_col.or(progressive_total_col) {
+                                            let votes = tds[col].trim();
+                                            if !votes.is_empty() {
+                                                let votes = parse_with_commas(votes)?;
+                                                paper_total.exhausted=votes;
+                                                if votes_col.is_some() { paper_delta.exhausted = votes as isize; }
                                             }
                                         }
                                     }
@@ -255,6 +266,7 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                                     "TOTAL" => {}
                                     name => {
                                         if let Some(&candidate) = candidate_name_lookup.get(name) {
+                                            // println!("Found candidate {} tds {:?}",candidate,tds);
                                             if let Some(votes_col) = votes_col { // first preferences
                                                 let votes = parse_with_commas(&tds[votes_col])?+first_prefs_atl.take().unwrap_or(0); // add in ATL group votes if present.
                                                 paper_total.candidate[candidate.0] = votes;
@@ -267,6 +279,8 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                                                         paper_set_aside.candidate[candidate.0] = parse_with_commas(&tds[set_aside_col]).unwrap_or(usize::MAX);
                                                     }
                                                 } else { return Err(anyhow!("No transferred_col")); }
+                                            } else {
+                                                println!("I don't know how to get anything from the row for candidate {}",candidate)
                                             }
                                             //println!("Found candidate {}",candidate);
                                         } else { return Err(anyhow!("Could not interpret (in DoP for single count) candidate name {}",name))}
@@ -275,15 +289,22 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                             }
                         }
                     }
-                    //let vote_total : PerCandidate<f64> = paper_total.into();
-                    //let vote_delta : PerCandidate<f64> = paper_delta.into();
+                    // println!("Found ballot papers {:?}",paper_total);
+                    let exhausted_round_1 = if counts.is_empty() {0} else if let Some(pt) = &counts[0].paper_total { pt.exhausted} else {0};
+                    // exhausted votes in round 1 are not kept in the official tally of cumulative exhausted votes. ConcreteSTV does. It is not clear what the right thing to
+                    // do is; at least the ConcreteSTV choice has the property that the sum of ballot papers in each round is the same (formal votes). The NSWEC has the advantage of having
+                    // the total sum be the same as the value used in the quota computation for all rounds other than the first.
+                    // The line below converts the NSWEC choice to the ConcreteSTV choice.
+                    paper_total.exhausted+=exhausted_round_1;
+                    let vote_total : PerCandidate<f64> = paper_total.clone().into();
+                    let vote_delta : PerCandidate<f64> = paper_delta.clone().into();
                     counts.push(OfficialDOPForOneCount{
                         transfer_value,
                         elected,
                         excluded,
-                        vote_total: None,
+                        vote_total: Some(vote_total),
                         paper_total: Some(paper_total),
-                        vote_delta: None,
+                        vote_delta: Some(vote_delta),
                         paper_delta: Some(paper_delta),
                         paper_set_aside: Some(paper_set_aside),
                         count_name: None,

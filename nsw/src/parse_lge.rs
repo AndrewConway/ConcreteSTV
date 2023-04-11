@@ -15,7 +15,7 @@ use stv::election_data::ElectionData;
 use anyhow::{anyhow, Context};
 use scraper::{ElementRef, Html, Selector};
 use stv::ballot_paper::PreferencesComingOutOfOrderHelper;
-use stv::parse_util::{file_to_string, FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
+use stv::parse_util::{file_to_string, FileFinder, KnowsAboutRawMarkings, MissingAlternateNamedFiles, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
 use stv::tie_resolution::{TieResolutionsMadeByEC};
 use serde::{Serialize,Deserialize};
 use url::Url;
@@ -35,16 +35,21 @@ pub fn get_nsw_lge_data_loader_2021(finder:&FileFinder) -> anyhow::Result<NSWLGE
 pub fn get_nsw_lge_data_loader_2017(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
     NSWLGEDataLoader::new(finder,"2017","https://pastvtr.elections.nsw.gov.au/LGE2017/index.htm","/LGE2017")
 }
+pub fn get_nsw_lge_data_loader_2016(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
+    NSWLGEDataLoader::new(finder,"2016","https://pastvtr.elections.nsw.gov.au/LGE2016/lge-index.htm","/LGE2016")
+}
 pub struct NSWLGEDataSource {}
 
 impl ElectionDataSource for NSWLGEDataSource {
     fn name(&self) -> Cow<'static, str> { "NSW Local Government".into() }
     fn ec_name(&self) -> Cow<'static, str> { "NSW Electoral Commission".into() }
     fn ec_url(&self) -> Cow<'static, str> { "https://www.elections.nsw.gov.au/".into() }
-    fn years(&self) -> Vec<String> { vec!["2017".to_string(),"2021".to_string()] }
+    fn years(&self) -> Vec<String> { vec!["2016".to_string(),"2017".to_string(),"2021".to_string()] }
     fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
         match year {
             "2021" => Ok(Box::new(get_nsw_lge_data_loader_2021(finder)?)),
+            "2017" => Ok(Box::new(get_nsw_lge_data_loader_2017(finder)?)),
+            "2016" => Ok(Box::new(get_nsw_lge_data_loader_2016(finder)?)),
             _ => Err(anyhow!("Not a valid year")),
         }
     }
@@ -116,7 +121,7 @@ impl RawDataSource for NSWLGEDataLoader {
         let contest = &self.find_contest(electorate)?.url;
         let mayoral = electorate.ends_with(" Mayoral");
         let metadata_data_file = match self.year.as_str() {
-            "2017" => {
+            "2017" | "2016" => {
                 self.find_raw_data_file_relative(contest,"","fp_by_grp_and_candidate_by_vote_type.htm","fp_by_grp_and_candidate_by_vote_type.htm")?
             }
             "2021" => {
@@ -160,7 +165,7 @@ impl RawDataSource for NSWLGEDataLoader {
 
     fn read_official_dop_transcript(&self, metadata: &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         match self.year.as_str() {
-            "2017" => {
+            "2017" | "2016" => {
                 let cache = CacheDir::new(self.finder.path.join("NSW/LGE".to_string()+&self.year));
                 let contest = &self.find_contest(&metadata.name.electorate)?.url;
                 let dop_url = Url::parse(&self.page_url)?.join(&(contest.to_string()+"/dop_index.htm"))?;
@@ -182,6 +187,9 @@ impl NSWLGEDataLoader {
         let mayoral = electorate.ends_with(" Mayoral");
         let mut metadata = self.read_raw_metadata(electorate)?;
         let winner_info_file = match self.year.as_str() {
+            "2016" => {
+                self.find_raw_data_file_relative_may_have_alt_names(contest,"",&vec!["summary.htm","index.htm"])? // TODO could be index.htm
+            }
             "2017" => {
                 self.find_raw_data_file_relative(contest,"","summary.htm","summary.htm")?
             }
@@ -204,7 +212,7 @@ impl NSWLGEDataLoader {
         // get excluded candidates
         if !mayoral {
             let ineligible_info_file = match self.year.as_str() {
-                "2017" => {
+                "2017" | "2016" => {
                     self.find_raw_data_file_relative(contest,"","grp_and_candidates_result.htm","grp_and_candidates_result.htm")?
                 }
                 "2021" => {
@@ -224,6 +232,7 @@ impl NSWLGEDataLoader {
 
         let archive_location = "NSW/LGE".to_string()+year+"/pastvtr.elections.nsw.gov.au"+archive_location_prefix;
         let contest_list = match year {
+            "2016" => include_str!("NSWLGE2016_contest_list.json"),
             "2017" => include_str!("NSWLGE2017_contest_list.json"),
             "2021" => include_str!("NSWLGE2021_contest_list.json"),
             _ => return Err(anyhow!("Illegal year {}",year)),
@@ -243,8 +252,18 @@ impl NSWLGEDataLoader {
 
     pub fn find_raw_data_file_relative(&self,contest:&str,relfolder:&str,filename:&str,url_relative:&str) -> Result<PathBuf,MissingFile> {
         let archive_location = self.archive_location.clone()+"/"+contest+(if relfolder.is_empty() {""} else {"/"})+relfolder;
-        println!("Archive location {}",archive_location);
+        //println!("Archive location {}",archive_location);
         self.finder.find_raw_data_file_with_extra_url_info(filename,&archive_location,&self.page_url,&(contest.to_string()+"/"+url_relative))
+    }
+    pub fn find_raw_data_file_relative_may_have_alt_names(&self,contest:&str,relfolder:&str,alternate_names:&[&str]) -> Result<PathBuf,MissingAlternateNamedFiles> {
+        let mut alternates = vec![];
+        for name in alternate_names {
+            match self.find_raw_data_file_relative(contest,relfolder,name,name) {
+                Ok(path) => { return Ok(path); }
+                Err(e) => { alternates.push(e); }
+            }
+        }
+        Err(MissingAlternateNamedFiles{alternates})
     }
     /// parse a file like https://vtr.elections.nsw.gov.au/LG2101/albury/councillor/report/fp-by-grp-and-candidate-by-vote-type or https://vtr.elections.nsw.gov.au/LG2101/ballina/a-ward/councillor/report/fp-by-grp-and-candidate-by-vote-type
     /// or, for mayoral, like https://vtr.elections.nsw.gov.au/LG2101/ballina/mayoral/report/mayoral-fp-by-candidate
@@ -256,7 +275,7 @@ impl NSWLGEDataLoader {
         if electorate.is_empty() { return Err(anyhow!("Empty page title")); }
         let table = html.select(&Selector::parse("table").unwrap()).next().ok_or_else(||anyhow!("No table element"))?;
         let headings_in_tbody = match self.year.as_str() {
-            "2017" => true,
+            "2017" | "2016" => true,
             "2021" => false,
             _ => return Err(anyhow!("Illegal Year"))
         };
@@ -663,8 +682,8 @@ impl NSWLGESingleContestMainPageInfo {
             let e = e.trim();
             if let Some(rest) = e.strip_prefix("There") {
                 let rest=rest.trim();
-                if rest.starts_with("is") || rest.starts_with("are") {
-                    let num : String = rest.trim_start_matches("is").trim_start_matches("are").trim_start().chars().take_while(|&c|c.is_ascii_digit()).collect();
+                if rest.starts_with("is") || rest.starts_with("are") || rest.starts_with("was") || rest.starts_with("were") {
+                    let num : String = rest.trim_start_matches("is").trim_start_matches("are").trim_start_matches("was").trim_start_matches("were").trim_start().chars().take_while(|&c|c.is_ascii_digit()).collect();
                     res.to_be_elected=Some(num.parse()?);
                 }
             }
@@ -677,7 +696,13 @@ impl NSWLGESingleContestMainPageInfo {
             res.elected_candidates.push(e.inner_html());
         }
         if let Some(to_be_elected) = res.to_be_elected {
-            if res.elected_candidates.len()!=to_be_elected { return Err(anyhow!("Wrong number of candidates elected."))}
+            if res.elected_candidates.len()!=to_be_elected {
+                // there is an error in the 2016 shire of Bourke page, "There were 0 Councillors to be elected from 13 candidates." A similar error in Campbelltown City Council 5 instead of 15 means they probably just enter the last digit.
+                if res.elected_candidates.len()%10==to_be_elected { res.to_be_elected=Some(res.elected_candidates.len()); }
+                else {
+                    return Err(anyhow!("Wrong number of candidates elected."));
+                }
+            }
         }
         Ok(res)
     }

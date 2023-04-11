@@ -187,6 +187,10 @@ pub trait PreferenceDistributionRules {
     /// (this happens in the case of candidates ruled ineligible).
     fn should_exhausted_votes_count_for_quota_computation() -> bool { false }
 
+    /// Instead of doing exact computations using transfer values, use f64 approximate floating point computations. Needed to emulate an NSWEC bug.
+    /// Only currently implemented for the NSWEC randomized algorithm.
+    fn use_f64_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
+
     //
     // Things just to support weird bugs. Defaults are given as who would otherwise do these?
     //
@@ -805,7 +809,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// Parcel out votes by next continuing candidate with a given transfer value.
     /// Returns to the candidate being distributed the ones kept for quota.
     fn parcel_out_votes_random_portion_set_by_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,surplus:BallotPaperCount,candidate_being_distributed:CandidateIndex)  {
-        let (set_aside_by_candidate,ec_decision) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed);
+        let (set_aside_by_candidate,ec_decision) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed,Rules::use_f64_arithmetic_when_applying_transfer_values_instead_of_exact(),self.ec_resolutions);
         if let Some(ec_decision) = ec_decision { self.in_this_count.decisions.push(ec_decision); }
         // do the actual distribution
         let mut total_transferred : BallotPaperCount = BallotPaperCount::zero();
@@ -825,6 +829,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             }
         }
         // If the number of transferred ballots is equal to the surplus, then all exhausted votes stay with the candidate, otherwise the difference are counted as set aside.
+        // println!("Surplus={} Total transferred={} TV={} set_aside={:?},distributed={:?}",surplus,total_transferred,transfer_value,set_aside_by_candidate,distributed.by_candidate.iter().map(|v|v.num_ballots).collect::<Vec<_>>());
         let set_aside_exhausted = surplus-total_transferred;
         let (exhausted_retained_for_quota,exhausted_set_aside) = distributed.exhausted_votes.set_aside_arbitrarily(set_aside_exhausted);
         self.papers[candidate_being_distributed.0].add(&exhausted_retained_for_quota, TransferValue::one(), self.current_count, None, exhausted_retained_for_quota.num_ballots.0.into());

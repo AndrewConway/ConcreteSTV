@@ -15,7 +15,7 @@ use std::str::FromStr;
 use num::rational::{ParseRatioError, Ratio};
 use crate::ballot_metadata::CandidateIndex;
 use crate::distribution_of_preferences_transcript::{DecisionMadeByEC, Transcript};
-use crate::tie_resolution::{MethodOfTieResolution, TieResolutionGranularityNeeded};
+use crate::tie_resolution::{MethodOfTieResolution, TieResolutionGranularityNeeded, TieResolutionsMadeByEC};
 
 #[derive(Clone,Debug,Serialize,Deserialize,Ord, PartialOrd, Eq, PartialEq,Hash)]
 #[serde(into = "String")]
@@ -137,16 +137,24 @@ impl TransferValue {
     /// are transferred.
     ///
     /// Returns an array of candidates
-    pub fn calculate_number_of_ballot_papers_to_be_set_aside<Tally:Clone+Hash+Ord+Display+FromStr+Debug>(&self,surplus:BallotPaperCount,num_candidates:usize,transcript:&Transcript<Tally>,distributed:&DistributedVotes<'_>) -> (Vec<BallotPaperCount>,Option<DecisionMadeByEC>)  {
+    pub fn calculate_number_of_ballot_papers_to_be_set_aside<Tally:Clone+Hash+Ord+Display+FromStr+Debug>(&self,surplus:BallotPaperCount,num_candidates:usize,transcript:&Transcript<Tally>,distributed:&DistributedVotes<'_>,use_f64_instead_of_exact:bool,ec_resolutions: &TieResolutionsMadeByEC) -> (Vec<BallotPaperCount>,Option<DecisionMadeByEC>)  {
         let mut ec_decision : Option<DecisionMadeByEC> = None;
         let set_aside_by_candidate = if self.is_one() { // work out how to distribute.
             vec![BallotPaperCount::zero();num_candidates]
         } else {
             let mut compute_transferred = vec![];
-            let mut extra_to_distribute : usize = surplus.0;
+            let mut extra_to_distribute : usize = surplus.min(distributed.by_candidate.iter().map(|c|c.num_ballots).sum()).0;
+            // println!("Transfer value : {}",self.0);
             for candidate in 0..num_candidates {
                 let n_distributed = distributed.by_candidate[candidate].num_ballots;
-                let (integer_portion,fractional_portion) = self.mul_rounding_down_and_remainder(n_distributed);
+                let (integer_portion,fractional_portion) = if use_f64_instead_of_exact {
+                    let portion = self.mul(n_distributed).to_f64().unwrap(); // conversion to fp has to be after multiplication to replicate NSWEC bug.
+                    let integer_portion = portion.floor();
+                    let fractional_portion = portion-integer_portion;
+                    let fractional_portion = BigRational::from_float(fractional_portion).unwrap();
+                    // println!("Candidate {} integer {} fractional {} ~ {}",candidate,integer_portion,fractional_portion,fractional_portion.to_f64().unwrap());
+                    (integer_portion as usize,fractional_portion)
+                } else { self.mul_rounding_down_and_remainder(n_distributed) };
                 compute_transferred.push(SelectVotesToSetAsideByTV{
                     candidate: CandidateIndex(candidate),
                     distributed: n_distributed,
@@ -170,6 +178,9 @@ impl TransferValue {
                     let mut tied_candidates : Vec<CandidateIndex> = compute_transferred[start_tied_index..end_tied_index_exclusive].iter().map(|v|v.candidate).collect();
                     let num_missing_out_on_rounding_up = end_tied_index_exclusive-extra_to_distribute;
                     ec_decision = MethodOfTieResolution::AnyDifferenceIsADiscriminator.resolve(&mut tied_candidates,transcript,TieResolutionGranularityNeeded::LowestSeparated(num_missing_out_on_rounding_up));
+                    if ec_decision.is_some() {
+                        ec_resolutions.resolve(&mut tied_candidates,TieResolutionGranularityNeeded::LowestSeparated(num_missing_out_on_rounding_up));
+                    }
                     for i in 0..tied_candidates.len() {
                         compute_transferred[i+start_tied_index].candidate=tied_candidates[tied_candidates.len()-1-i]; // tied_candidates is sorted low to high.
                     }
