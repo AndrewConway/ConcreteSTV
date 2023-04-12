@@ -71,6 +71,8 @@ function Render() {
     document.getElementById("NothingChosen").className="hidden";
     if (document_to_show.transcript) {
         document.getElementById("TranscriptOnly").className="";
+        const has_set_aside = document_to_show.transcript.counts.some(a=>a.set_aside);
+        document.getElementById("ShowSetAside").className=has_set_aside?"":"hidden";
         RenderTranscript(document_to_show,render_div);
     } else if (document_to_show.original && document_to_show.changes) {
         document.getElementById("ChangeOnly").className="";
@@ -154,6 +156,7 @@ function RenderChanges(vote_changes_document,render_div) {
 function RenderTranscript(full_transcript,render_div) {
     let heading_orientation = document.getElementById("heading-orientation").value;
     let show_papers = document.getElementById("ShowPapers").checked;
+    let show_set_aside = document.getElementById("ShowSetAside").checked;
     const metadata = full_transcript.metadata;
     const transcript = full_transcript.transcript;
     const rounding_ever_used = transcript.counts.some(c=>c.status.papers.rounding || c.status.tallies.rounding);
@@ -177,11 +180,11 @@ function RenderTranscript(full_transcript,render_div) {
         for (const party of metadata.parties) {
             // assume party.candidates is a contiguous sequence, after any previous ones.
             if (party.candidates[0]>num_candidates_done) { // there were some candidates not part of a party in between
-                add(party_row,"td","PartyName").colSpan=(party.candidates[0]-num_candidates_done)*(show_papers?2:1);
+                add(party_row,"td","PartyName").colSpan=(party.candidates[0]-num_candidates_done)*(1+(show_papers?1:0)+(show_set_aside?1:0));
             }
             let td = add(party_row,"td","PartyName");
             td.innerText=party.abbreviation||party.name;
-            td.colSpan=party.candidates.length*(show_papers?2:1);
+            td.colSpan=party.candidates.length*(1+(show_papers?1:0)+(show_set_aside?1:0));
             num_candidates_done=party.candidates[party.candidates.length-1]+1;
             FirstCandidate.add(party.candidates[0]);
             LastCandidate.add(party.candidates[party.candidates.length-1]);
@@ -200,12 +203,12 @@ function RenderTranscript(full_transcript,render_div) {
         const candidate = metadata.candidates[i];
         let td = name_td((FirstCandidate.has(i)?" FirstCandidate":"")+(LastCandidate.has(i)?" LastCandidate":""));
         td.text.innerText=candidate.name;
-        if (show_papers) td.td.colSpan=2;
+        if (show_papers||show_set_aside) td.td.colSpan=1+(show_papers?1:0)+(show_set_aside?1:0);
     }
     if (exhausted_ever_used) {
         const exhausted_name_td = name_td();
         exhausted_name_td.text.innerText="Exhausted";
-        if (show_papers) exhausted_name_td.td.colSpan=2;
+        if (show_papers||show_set_aside) exhausted_name_td.td.colSpan=1+(show_papers?1:0)+(show_set_aside?1:0);
     }
     if (rounding_ever_used) {
         name_td().text.innerText="Rounding";
@@ -248,6 +251,12 @@ function RenderTranscript(full_transcript,render_div) {
                 const papers = add(row,"td",status+" BallotPapers");
                 papers.innerText=zero_is_blank(count.status.papers.candidate[i]);
             }
+            if (show_set_aside) {
+                if (deltarow) {
+                    add(deltarow,"td",status+" SetAside").innerText=count.set_aside?zero_is_blank(count.set_aside.candidate[i]):"";
+                }
+                const papers = add(row,"td",status);
+            }
             let tally = count.status.tallies.candidate[i];
             let text = zero_is_blank(tally);
             td.innerText=text;
@@ -269,6 +278,10 @@ function RenderTranscript(full_transcript,render_div) {
             if (show_papers) {
                 if (deltarow) add(deltarow,"td","Continuing BallotPapers").innerText=delta(count.status.papers.exhausted,last_count.status.papers.exhausted);
                 add(row,"td","Continuing BallotPapers").innerText=zero_is_blank(count.status.papers.exhausted);
+            }
+            if (show_set_aside) {
+                if (deltarow) add(deltarow,"td","Continuing SetAside").innerText=count.set_aside?zero_is_blank(count.set_aside.exhausted):"";
+                add(row,"td","Continuing");
             }
         }
         if (rounding_ever_used) {
@@ -343,6 +356,7 @@ function MainViewerOnLoadFunction() {
         document.getElementById("ChooseTranscript").onchange = ChooseTranscript;
     }
     document.getElementById("ShowPapers").onchange = Render;
+    document.getElementById("ShowSetAside").onchange = Render;
     document.getElementById("heading-orientation").onchange = Render;
     // function got_std(data) { document_to_show=data; Render(); }
     // getWebJSON("../transcript.json",data=>{full_transcript=data; Render();},null);

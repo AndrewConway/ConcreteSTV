@@ -91,6 +91,9 @@ td.Continuing,td.Elected,td.Eliminated {
 td.BallotPapers {
     color: grey;
 }
+td.SetAside {
+    color: lightgray;
+}
 
 table {
     border-collapse: collapse;
