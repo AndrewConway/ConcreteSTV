@@ -660,11 +660,12 @@ impl NSWLGESingleContestMainPageInfo {
                 if href.ends_with("dopfulldetails.xlsx") { self.dop=Some(href.to_string()); }
                 if href.contains("dop_index") { self.dop_index=Some(href.to_string()); }
                 if href.ends_with("finalpreferencedatafile.zip") { self.preferences=Some(href.to_string()); }
+                if href.ends_with("11 - Details Preference for Count.zip") { self.preferences=Some(href.to_string()); }
                 if href.ends_with("fp-by-grp-and-candidate-by-vote-type") || href.ends_with("fp_by_grp_and_candidate_by_vote_type.htm") { self.candidates_page=Some(href.to_string()); }
                 if href.ends_with("mayoral-fp-by-candidate") { self.candidates_page=Some(href.to_string()); }
                 if href.ends_with("mayoral-dop") { self.mayoral_dop=Some(href.to_string()); }
                 if href.ends_with("grp-and-candidates-result") || href.ends_with("grp_and_candidates_result.htm") { self.candidate_results=Some(href.to_string()); }
-                if href.contains("final-results.htm") { self.final_results_page=Some(href.to_string()); }
+                if href.contains("final-results") { self.final_results_page=Some(href.to_string()); }
             }
         }
     }
@@ -700,13 +701,19 @@ impl NSWLGESingleContestMainPageInfo {
         }
         if res.to_be_elected==Some(usize::MAX) { return Err(anyhow!("Could not find the number of people to be elected."))}
         // find elected councillors
-        for e in html.select(&Selector::parse("span.candidate-name").unwrap()) {
-            res.elected_candidates.push(e.inner_html());
+        for e in html.select(&Selector::parse("span.candidate-name, span.candidate_name").unwrap()) {
+            let name = e.inner_html();
+            let name = if name.ends_with(')') {
+                if let Some(ind) = name.find('(') { name[..ind].to_string() }
+                else { name }
+            } else { name };
+            res.elected_candidates.push(name);
         }
         if let Some(to_be_elected) = res.to_be_elected {
             if res.elected_candidates.len()!=to_be_elected {
                 // there is an error in the 2016 shire of Bourke page, "There were 0 Councillors to be elected from 13 candidates." A similar error in Campbelltown City Council 5 instead of 15 means they probably just enter the last digit.
                 if res.elected_candidates.len()%10==to_be_elected { res.to_be_elected=Some(res.elected_candidates.len()); }
+                else if res.name=="Leeton Shire Council" && to_be_elected==9 {} // There are only 8 candidates
                 else {
                     return Err(anyhow!("Wrong number of candidates elected."));
                 }
