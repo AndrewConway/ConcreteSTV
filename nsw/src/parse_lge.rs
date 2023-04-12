@@ -16,7 +16,7 @@ use anyhow::{anyhow, Context};
 use scraper::{ElementRef, Html, Selector};
 use stv::ballot_paper::PreferencesComingOutOfOrderHelper;
 use stv::parse_util::{file_to_string, FileFinder, KnowsAboutRawMarkings, MissingAlternateNamedFiles, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
-use stv::tie_resolution::{TieResolutionsMadeByEC};
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
 use serde::{Serialize,Deserialize};
 use url::Url;
 use stv::ballot_pile::BallotPaperCount;
@@ -132,7 +132,52 @@ impl RawDataSource for NSWLGEDataLoader {
             }
             _ => { return Err(anyhow!("Invalid year")); }
         };
-        let metadata = self.parse_candidate_list(File::open(metadata_data_file)?, mayoral, electorate)?;
+        let mut metadata = self.parse_candidate_list(File::open(metadata_data_file)?, mayoral, electorate)?;
+        // get winners
+        let winner_info_file = match self.year.as_str() {
+            "2016" => {
+                self.find_raw_data_file_relative_may_have_alt_names(contest,"",&vec!["summary.htm","index.htm"])? // TODO could be index.htm
+            }
+            "2017" => {
+                self.find_raw_data_file_relative(contest,"","summary.htm","summary.htm")?
+            }
+            "2021" => {
+                self.find_raw_data_file_relative(contest,"",
+                                                 if mayoral {"mayoral.html"} else {"councillor.html"},
+                                                 if mayoral {"mayoral"} else {"councillor"})?
+            }
+            _ => { return Err(anyhow!("Invalid year")); }
+        };
+        let winner_info = NSWLGESingleContestMainPageInfo::extract_file(winner_info_file)?;
+        if !winner_info.elected_candidates.is_empty() {
+            let candidates = metadata.get_candidate_name_lookup_with_capital_letters_afterwards();
+            fn remove_excess_whitespace(s:&str) -> String {
+                s.split_ascii_whitespace().collect::<Vec<_>>().join(" ")
+            }
+            let winners: anyhow::Result<Vec<_>> = winner_info.elected_candidates.iter().map(|c|candidates.get(&remove_excess_whitespace(c)).cloned().ok_or_else(||anyhow!("Could not find winning candidate {} in candidate list after converting to {}",c,remove_excess_whitespace(c)))).collect();
+            metadata.results=Some(winners?);
+        }
+        // get excluded candidates
+        if !mayoral {
+            let ineligible_info_file = match self.year.as_str() {
+                "2017" | "2016" => {
+                    self.find_raw_data_file_relative(contest,"","grp_and_candidates_result.htm","grp_and_candidates_result.htm")?
+                }
+                "2021" => {
+                    self.find_raw_data_file_relative(contest,"councillor/report","grp-and-candidates-result.html","councillor/report/grp-and-candidates-result")?
+                }
+                _ => { return Err(anyhow!("Invalid year")); }
+            };
+            let ineligible = get_ineligible_candidates(&Html::parse_document(&std::fs::read_to_string(ineligible_info_file)?))?;
+            metadata.excluded=ineligible;
+        }
+        if electorate=="Port Stephens - Central Ward" && self.year.as_str()=="2017" {
+            metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{
+                favoured: vec![CandidateIndex(1)],
+                disfavoured: vec![CandidateIndex(2),CandidateIndex(13),CandidateIndex(14),CandidateIndex(15)],
+                came_up_in: Some("2".to_string()),
+            }))
+        }
         Ok(metadata)
     }
 
@@ -185,44 +230,7 @@ impl NSWLGEDataLoader {
     pub fn read_raw_data_possibly_rejecting_some_types(&self, electorate: &str, reject_vote_type : Option<HashSet<String>>) -> anyhow::Result<ElectionData> {
         let contest = &self.find_contest(electorate)?.url;
         let mayoral = electorate.ends_with(" Mayoral");
-        let mut metadata = self.read_raw_metadata(electorate)?;
-        let winner_info_file = match self.year.as_str() {
-            "2016" => {
-                self.find_raw_data_file_relative_may_have_alt_names(contest,"",&vec!["summary.htm","index.htm"])? // TODO could be index.htm
-            }
-            "2017" => {
-                self.find_raw_data_file_relative(contest,"","summary.htm","summary.htm")?
-            }
-            "2021" => {
-                self.find_raw_data_file_relative(contest,"",
-                                                 if mayoral {"mayoral.html"} else {"councillor.html"},
-                                                 if mayoral {"mayoral"} else {"councillor"})?
-            }
-            _ => { return Err(anyhow!("Invalid year")); }
-        };
-        let winner_info = NSWLGESingleContestMainPageInfo::extract_file(winner_info_file)?;
-        if !winner_info.elected_candidates.is_empty() {
-            let candidates = metadata.get_candidate_name_lookup_with_capital_letters_afterwards();
-            fn remove_excess_whitespace(s:&str) -> String {
-                s.split_ascii_whitespace().collect::<Vec<_>>().join(" ")
-            }
-            let winners: anyhow::Result<Vec<_>> = winner_info.elected_candidates.iter().map(|c|candidates.get(&remove_excess_whitespace(c)).cloned().ok_or_else(||anyhow!("Could not find winning candidate {} in candidate list after converting to {}",c,remove_excess_whitespace(c)))).collect();
-            metadata.results=Some(winners?);
-        }
-        // get excluded candidates
-        if !mayoral {
-            let ineligible_info_file = match self.year.as_str() {
-                "2017" | "2016" => {
-                    self.find_raw_data_file_relative(contest,"","grp_and_candidates_result.htm","grp_and_candidates_result.htm")?
-                }
-                "2021" => {
-                    self.find_raw_data_file_relative(contest,"councillor/report","grp-and-candidates-result.html","councillor/report/grp-and-candidates-result")?
-                }
-                _ => { return Err(anyhow!("Invalid year")); }
-            };
-            let ineligible = get_ineligible_candidates(&Html::parse_document(&std::fs::read_to_string(ineligible_info_file)?))?;
-            metadata.excluded=ineligible;
-        }
+        let metadata = self.read_raw_metadata(electorate)?;
         let zip_name = if mayoral {"mayoral-finalpreferencedatafile.zip"} else {"finalpreferencedatafile.zip"};
         let zip_preferences_list = self.find_raw_data_file_relative(contest,if self.year=="2021"{"download"} else {""},zip_name,&((if self.year=="2021"{"download/"} else {""}).to_string()+zip_name))?;
         parse_zip_election_file(File::open(zip_preferences_list)?,metadata,reject_vote_type,mayoral)

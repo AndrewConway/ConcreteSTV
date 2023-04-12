@@ -244,7 +244,7 @@ pub fn distribute_preferences_using_official_results<Rules:PreferenceDistributio
         btl_types: vec![],
         informal: 0,
     };
-    let ec_resolutions = TieResolutionsMadeByEC::default(); // TODO make EC resolutions correct.
+    let ec_resolutions = metadata.tie_resolutions.clone(); // TODO make EC resolutions correct.
     let arena = typed_arena::Arena::<CandidateIndex>::new();
     let votes = data.resolve_atl(&arena,None);
     let oracle = OracleFromOfficialDOP{official, tie_resolutions: Default::default() };
@@ -265,7 +265,15 @@ impl <'a> OracleFromOfficialDOP<'a> {
         if current_count.0>=self.official.counts.len() { return None }
         let count = &self.official.counts[current_count.0];
         if let Some(paper_delta) = &count.paper_delta {
-            let res : Vec<BallotPaperCount> = paper_delta.candidate.iter().chain(iter::once(&paper_delta.exhausted)).map(|v|if *v>=0 {BallotPaperCount(*v as usize)} else {BallotPaperCount(0)}).collect();
+            let mut res : Vec<BallotPaperCount> = paper_delta.candidate.iter().chain(iter::once(&paper_delta.exhausted)).map(|v|if *v>=0 {BallotPaperCount(*v as usize)} else {BallotPaperCount(0)}).collect();
+            if let Some(paper_set_aside) = &count.paper_set_aside {
+                for (candidate_index,set_aside) in paper_set_aside.candidate.iter().enumerate() {
+                    if *set_aside!=usize::MAX {
+                        res[candidate_index]+=BallotPaperCount(*set_aside);
+                    }
+                }
+                *res.last_mut().unwrap()+=BallotPaperCount(paper_set_aside.exhausted);
+            }
             Some(res)
         } else {
             None

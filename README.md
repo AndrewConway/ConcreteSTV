@@ -275,7 +275,7 @@ extent.
   [New South Wales Legislation website](https://legislation.nsw.gov.au/view/whole/html/2020-10-27/sl-2005-0487#sch.5) at 3 Dec 2021. 
   For the latest information on New South Wales Government legislation please go to https://www.legislation.nsw.gov.au.
   It is licensed under a Creative Commons Attribution 4.0 International licence (CC BY 4.0).
-* nsw/src/NSWLGE2017_contest_list.json, nsw/src/NSWLGE2021_contest_list.json and nsw/examples/putative_lost_ivotes.csv. 
+* nsw/src/NSWLGE2016_contest_list.json, nsw/src/NSWLGE2017_contest_list.json, nsw/src/NSWLGE2021_contest_list.json and nsw/examples/putative_lost_ivotes.csv. 
   These lists are partially derived from data on the 
   [NSW Electoral Commission website](https://www.elections.nsw.gov.au), which
   is © State of New South Wales through the NSW Electoral Commission 

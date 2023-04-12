@@ -7,26 +7,26 @@
 
 use std::fs::File;
 use nsw::nsw_random_rules::{NSWECrandomLGE2017};
-use nsw::parse_lge::{get_nsw_lge_data_loader_2017, NSWLGEDataLoader};
-use stv::ballot_metadata::CandidateIndex;
+use nsw::parse_lge::{get_nsw_lge_data_loader_2017, NSWLGEDataLoader, NSWLGEDataSource};
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
-use stv::official_dop_transcript::DifferenceBetweenOfficialDoPAndComputed;
+use stv::official_dop_transcript::{DifferenceBetweenOfficialDoPAndComputed, test_official_dop_without_actual_votes};
 use stv::parse_util::{FileFinder, RawDataSource};
 use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
-use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision};
 
 
 fn test<Rules:PreferenceDistributionRules>(electorate:&str,loader:&NSWLGEDataLoader) {
     let data = loader.read_raw_data(electorate).unwrap();
     data.print_summary();
-    let mut tie_resolutions = TieResolutionsMadeByEC::default();
+    let mut tie_resolutions = data.metadata.tie_resolutions.clone();
+    /*
     if electorate=="Port Stephens - Central Ward" {
         tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{
             favoured: vec![CandidateIndex(1)],
             disfavoured: vec![CandidateIndex(2),CandidateIndex(13),CandidateIndex(14),CandidateIndex(15)],
             came_up_in: Some("2".to_string()),
         }))
-    }
+    }*/
     let official_transcript = loader.read_official_dop_transcript(&data.metadata).unwrap();
     loop {
         let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &data.metadata.excluded.iter().cloned().collect(), &tie_resolutions,None,false);
@@ -120,4 +120,26 @@ fn test_wollstonecraft_run_1000_times_and_check_probabilistic_winners_reasonably
     }
 }
 
+
+
+#[test]
+fn test_2017_internally_consistent() {
+    let finder = FileFinder::find_ec_data_repository();
+    let loader = get_nsw_lge_data_loader_2017(&finder).unwrap();
+    for electorate in &loader.all_electorates() {
+        // there is something bizarre in the Federation DoP. On the NSWEC website, Federation, count 35, the second candidate WALES Norm ended the count with 623 votes. But on count 36, Wales Norm started the count with 630 votes. Other people also magically change tally. There seems no plausible way to emulate this.
+        // there is something bizarre in the Inner West - Marrickville Ward DoP. On the NSWEC website, count 12, the webpage is not a count webpage but rather a duplicate of the DoP summary page.
+        if electorate!="Federation" && electorate!="Inner West - Marrickville Ward" {
+            println!("Testing electorate {}",electorate);
+            assert_eq!(test_internally_consistent::<NSWECrandomLGE2017>("2017",electorate).unwrap(),Ok(None));
+        }
+    }
+}
+
+/// Test a particular year & electorate against a particular set of rules.
+/// Outermost error is IO type errors.
+/// Innermost error is discrepancies with the official DoP.
+fn test_internally_consistent<Rules:PreferenceDistributionRules>(year:&str,state:&str) -> anyhow::Result<Result<Option<TieResolutionExplicitDecision>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
+    test_official_dop_without_actual_votes::<Rules,_>(&NSWLGEDataSource{},year,state,false)
+}
 

@@ -91,7 +91,7 @@ fn test_2016_internally_consistent() {
     let loader = get_nsw_lge_data_loader_2016(&finder).unwrap();
     for electorate in &loader.all_electorates() {
         println!("Testing electorate {}",electorate);
-        // assert_eq!(test_internally_consistent::<NSWECrandomLGE2016>("2016",electorate).unwrap(),Ok(None));
+        assert_eq!(test_internally_consistent::<NSWECrandomLGE2016>("2016",electorate).unwrap(),Ok(None));
     }
 }
 

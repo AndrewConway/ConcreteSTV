@@ -187,9 +187,9 @@ pub trait PreferenceDistributionRules {
     /// (this happens in the case of candidates ruled ineligible).
     fn should_exhausted_votes_count_for_quota_computation() -> bool { false }
 
-    /// Instead of doing exact computations using transfer values, use f64 approximate floating point computations. Needed to emulate an NSWEC bug.
+    /// Instead of doing exact computations using transfer values, use f32 approximate floating point computations. Needed to emulate an NSWEC bug.
     /// Only currently implemented for the NSWEC randomized algorithm.
-    fn use_f64_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
+    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
 
     //
     // Things just to support weird bugs. Defaults are given as who would otherwise do these?
@@ -809,7 +809,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// Parcel out votes by next continuing candidate with a given transfer value.
     /// Returns to the candidate being distributed the ones kept for quota.
     fn parcel_out_votes_random_portion_set_by_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,surplus:BallotPaperCount,candidate_being_distributed:CandidateIndex)  {
-        let (set_aside_by_candidate,ec_decision) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed,Rules::use_f64_arithmetic_when_applying_transfer_values_instead_of_exact(),self.ec_resolutions);
+        let (set_aside_by_candidate,ec_decision) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed,Rules::use_f32_arithmetic_when_applying_transfer_values_instead_of_exact(),self.ec_resolutions);
         if let Some(ec_decision) = ec_decision { self.in_this_count.decisions.push(ec_decision); }
         // do the actual distribution
         let mut total_transferred : BallotPaperCount = BallotPaperCount::zero();
@@ -835,6 +835,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         self.papers[candidate_being_distributed.0].add(&exhausted_retained_for_quota, TransferValue::one(), self.current_count, None, exhausted_retained_for_quota.num_ballots.0.into());
         assert_eq!(exhausted_set_aside.num_ballots,set_aside_exhausted);
         self.exhausted += set_aside_exhausted;
+        self.tally_exhausted += set_aside_exhausted.0.into();
         self.exhausted_atl += exhausted_set_aside.num_atl_ballots;
         self.in_this_count.set_aside = Some(PerCandidate {
             candidate: set_aside_by_candidate,

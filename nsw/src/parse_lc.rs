@@ -258,9 +258,15 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                                     "Set Aside (previous counts)" => {}
                                     "Informal Ballot Papers" => {}
                                     "Total Votes / Ballot Papers" => {}
-                                    "Brought Forward" | "Set Aside this Count" => {// exhausted
+                                    "Brought Forward" => {// exhausted
                                         if let Some(progressive_total_col) = progressive_total_col {
                                             paper_total.exhausted+=parse_with_commas(&tds[progressive_total_col])?;
+                                        }
+                                    }
+                                    "Set Aside this Count" => {// exhausted
+                                        if let Some(progressive_total_col) = progressive_total_col {
+                                            paper_total.exhausted+=parse_with_commas(&tds[progressive_total_col])?;
+                                            paper_delta.exhausted=parse_with_commas(&tds[progressive_total_col])? as isize;
                                         }
                                     }
                                     "TOTAL" => {}

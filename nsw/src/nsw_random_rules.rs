@@ -83,7 +83,7 @@ pub trait NSWRandomVariations {
 
     /// Whether computations should be done exactly or approximately. Needed to emulate the bug in the 2016 Bland Shire Council results,
     /// described in report "2016 NSW LGE Errors.pdf".
-    fn use_f64_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool;
+    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool;
 
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool;
 }
@@ -105,7 +105,7 @@ impl NSWRandomVariations for NSWLGE {
     fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanOrEqualToDifferenceBetweenTwoLowestContinuingCandidates }
     /// This is the error in our report "LSWLGE2012CountErrorTechReport.pdf", fixed after 2012.
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected }
-    fn use_f64_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
+    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
 }
 /// How we think it should be - at least based upon the "Functional Requirements for Count Module"
@@ -122,7 +122,7 @@ impl NSWRandomVariations for NSWECLGE2012 {
 
     /// This is the error in our report "LSWLGE2012CountErrorTechReport.pdf"
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElectedPlusOneBonus }
-    fn use_f64_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
+    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
 }
 pub type NSWECrandomLGE2012 = NSWRandomSamplingVariant<NSWECLGE2012>;
@@ -135,13 +135,14 @@ impl NSWRandomVariations for NSWECLGE2016 {
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::None }
     fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanOrEqualToDifferenceBetweenTwoLowestContinuingCandidates }
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected }
-    fn use_f64_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
+    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
 }
 pub type NSWECrandomLGE2016 = NSWRandomSamplingVariant<NSWECLGE2016>;
 
 /// The count used by the NSWEC in 2017, as far as I can tell.
 /// Currently the same as NSWLGE.
+/// It does not emulate the bizarre tally changes between the end of count 35 and the start of count 36 in "Federation"
 pub struct NSWECLGE2017{}
 impl NSWRandomVariations for NSWECLGE2017 {
     fn name() -> String { "NSWECrandomLGE2017".to_string() }
@@ -149,7 +150,7 @@ impl NSWRandomVariations for NSWECLGE2017 {
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
     fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanOrEqualToDifferenceBetweenTwoLowestContinuingCandidates }
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected }
-    fn use_f64_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
+    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
 }
 pub type NSWECrandomLGE2017 = NSWRandomSamplingVariant<NSWECLGE2017>;
@@ -169,7 +170,7 @@ impl NSWRandomVariations for NSWLC {
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::None }
     fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanDifferenceBetweenTwoLowestContinuingCandidates }
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected }
-    fn use_f64_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
+    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { true }
 }
 /// How we think it should be - at least based upon the "Functional Requirements for Count Module"
@@ -240,7 +241,7 @@ impl <V:NSWRandomVariations> PreferenceDistributionRules for NSWRandomSamplingVa
 
     /// 2016 LGE Ballina Shire Council - C Ward there is one vote that is exhausted on round 1, and if it were used the quota would be 1 higher.
     fn should_exhausted_votes_count_for_quota_computation() -> bool { false }
-    fn use_f64_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { V::use_f64_arithmetic_when_applying_transfer_values_instead_of_exact() }
+    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { V::use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() }
 
     fn name() -> String { V::name() }
 }

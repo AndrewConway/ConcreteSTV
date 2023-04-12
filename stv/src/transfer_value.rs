@@ -34,6 +34,18 @@ impl TransferValue {
     pub fn mul(&self,papers:BallotPaperCount) -> BigRational {
         BigRational::new(self.0.numer().clone()*BigInt::from(papers.0),self.0.denom().clone())
     }
+    pub fn round_to_decimal_digits(&self,digits:u32) -> TransferValue {
+        assert!(digits<18);
+        let factor = (10 as u64).pow(digits);
+        let r = BigRational::new(self.0.numer().clone()*BigInt::from(factor),self.0.denom().clone()).round().to_integer();
+        TransferValue::new(r,BigInt::from(factor))
+    }
+    pub fn round_down_to_decimal_digits(&self,digits:u32) -> TransferValue {
+        assert!(digits<18);
+        let factor = (10 as u64).pow(digits);
+        let r = BigRational::new(self.0.numer().clone()*BigInt::from(factor),self.0.denom().clone()).to_integer();
+        TransferValue::new(r,BigInt::from(factor))
+    }
 
     pub fn mul_rounding_down(&self,papers:BallotPaperCount) -> usize {
         let exact = self.mul(papers);
@@ -99,7 +111,7 @@ impl TryFrom<String> for TransferValue {
 #[serde(into = "String")]
 #[serde(try_from = "String")]
 /// A rational number that should be serialized/deserialized as a string. Equivalent to TransferValue in most ways, except without the TransferValue specific methods and name.
-pub struct StringSerializedRational(pub num::rational::BigRational);
+pub struct StringSerializedRational(pub BigRational);
 
 impl Display for StringSerializedRational {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -137,7 +149,7 @@ impl TransferValue {
     /// are transferred.
     ///
     /// Returns an array of candidates
-    pub fn calculate_number_of_ballot_papers_to_be_set_aside<Tally:Clone+Hash+Ord+Display+FromStr+Debug>(&self,surplus:BallotPaperCount,num_candidates:usize,transcript:&Transcript<Tally>,distributed:&DistributedVotes<'_>,use_f64_instead_of_exact:bool,ec_resolutions: &TieResolutionsMadeByEC) -> (Vec<BallotPaperCount>,Option<DecisionMadeByEC>)  {
+    pub fn calculate_number_of_ballot_papers_to_be_set_aside<Tally:Clone+Hash+Ord+Display+FromStr+Debug>(&self, surplus:BallotPaperCount, num_candidates:usize, transcript:&Transcript<Tally>, distributed:&DistributedVotes<'_>, use_f32_instead_of_exact:bool, ec_resolutions: &TieResolutionsMadeByEC) -> (Vec<BallotPaperCount>, Option<DecisionMadeByEC>)  {
         let mut ec_decision : Option<DecisionMadeByEC> = None;
         let set_aside_by_candidate = if self.is_one() { // work out how to distribute.
             vec![BallotPaperCount::zero();num_candidates]
@@ -145,10 +157,14 @@ impl TransferValue {
             let mut compute_transferred = vec![];
             let mut extra_to_distribute : usize = surplus.min(distributed.by_candidate.iter().map(|c|c.num_ballots).sum()).0;
             // println!("Transfer value : {}",self.0);
+            // Notes on trying to emulate
             for candidate in 0..num_candidates {
                 let n_distributed = distributed.by_candidate[candidate].num_ballots;
-                let (integer_portion,fractional_portion) = if use_f64_instead_of_exact {
-                    let portion = self.mul(n_distributed).to_f64().unwrap(); // conversion to fp has to be after multiplication to replicate NSWEC bug.
+                let (integer_portion,fractional_portion) = if use_f32_instead_of_exact {
+                    // let tv_rounded_to_six_decimal_places = self.round_to_decimal_digits(6);
+                    // let portion = tv_rounded_to_six_decimal_places.0.to_f64().unwrap()*(n_distributed.0 as f64);
+                    // let portion = tv_rounded_to_six_decimal_places.mul(n_distributed).to_f64().unwrap(); // conversion to fp has to be after multiplication to replicate NSWEC bug.
+                    let portion = self.0.to_f32().unwrap()*(n_distributed.0 as f32); // it took quite a while to replicate this NSWEC bug.
                     let integer_portion = portion.floor();
                     let fractional_portion = portion-integer_portion;
                     let fractional_portion = BigRational::from_float(fractional_portion).unwrap();
