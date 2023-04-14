@@ -329,6 +329,7 @@ impl FileFinder {
         let expect = self.path.join(filename);
         if expect.exists() { return Ok(expect) }
         let expect = self.path.join(archive_location).join(filename);
+        // println!("Looking in {}",expect.to_string_lossy());
         if expect.exists() { return Ok(expect) }
         let where_to_get : String = if source_url_relative.is_empty() { source_url_base.to_string() } else {
             let url = Url::parse(source_url_base).unwrap().join(source_url_relative).unwrap();
@@ -368,6 +369,17 @@ pub fn file_to_string(file:&mut File) -> anyhow::Result<String> {
     file.read_to_string(&mut res)?;
     Ok(res)
 }
+
+// Read a file to a string. Like file_to_string but Windows 1252 character encoding instead of utf-8.
+pub fn file_to_string_windows_1252(file:&mut File) -> anyhow::Result<String> {
+    let mut bytes = Vec::new();
+    file.read_to_end( &mut bytes)?;
+    let (cow,_,had_errors) = encoding_rs::WINDOWS_1252.decode(&bytes);
+    if had_errors { return Err(anyhow!("Had errors decoding")) }
+    Ok(cow.to_string())
+}
+
+
 use once_cell::sync::Lazy;
 // The openoffice CLI seems to be unreliable if running multiple simultaneously. This is used as a lock.
 static OPENOFFICE_CLI_LOCK: Lazy<Mutex<u64>> = Lazy::new(||Mutex::new(1u64));
