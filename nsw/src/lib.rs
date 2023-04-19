@@ -16,6 +16,7 @@
 pub mod parse_lge;
 pub mod parse_lc;
 pub mod nsw_random_rules;
+pub mod run_election_multiple_times;
 
 use std::cmp::Ordering;
 use stv::preference_distribution::{BigRational, CountNamingMethod, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};

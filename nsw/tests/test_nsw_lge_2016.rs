@@ -6,7 +6,7 @@
 
 
 use std::fs::File;
-use nsw::nsw_random_rules::{NSWECrandomLGE2016, NSWrandomLGE};
+use nsw::nsw_random_rules::{NSWECrandomLGE2016, NSWECrandomLGE2017};
 use nsw::parse_lge::{get_nsw_lge_data_loader_2016, NSWLGEDataLoader, NSWLGEDataSource};
 use stv::ballot_metadata::CandidateIndex;
 use stv::distribution_of_preferences_transcript::{CountIndex, TranscriptWithMetadata};
@@ -78,7 +78,7 @@ fn test_bland_shire_nswec_bug() {
     let data = loader.read_raw_data("Bland Shire Council").unwrap();
     let official_dop = loader.read_official_dop_transcript(&data.metadata).unwrap();
     let used_rules = data.distribute_preferences::<NSWECrandomLGE2016>();
-    let without_rounding_errors = data.distribute_preferences::<NSWrandomLGE>();
+    let without_rounding_errors = data.distribute_preferences::<NSWECrandomLGE2017>();
     assert_eq!(Err(DifferenceBetweenOfficialDoPAndComputed::DifferentOnCount(CountIndex(1),None,DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalCandidate(ECTally(260.),259,CandidateIndex(0)))),
                official_dop.compare_with_transcript_checking_for_ec_decisions(&without_rounding_errors,false));
     assert_ne!(Err(DifferenceBetweenOfficialDoPAndComputed::DifferentOnCount(CountIndex(1),None,DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalCandidate(ECTally(260.),259,CandidateIndex(0)))),

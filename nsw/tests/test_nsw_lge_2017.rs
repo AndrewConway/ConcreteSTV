@@ -8,6 +8,8 @@
 use std::fs::File;
 use nsw::nsw_random_rules::{NSWECrandomLGE2017};
 use nsw::parse_lge::{get_nsw_lge_data_loader_2017, NSWLGEDataLoader, NSWLGEDataSource};
+use nsw::run_election_multiple_times::PossibleResults;
+use stv::ballot_metadata::CandidateIndex;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::official_dop_transcript::{DifferenceBetweenOfficialDoPAndComputed, test_official_dop_without_actual_votes};
 use stv::parse_util::{FileFinder, RawDataSource};
@@ -99,27 +101,26 @@ fn test_wollstonecraft() {
 /// ```
 ///
 /// Note that there is a chance that this will fail if we are absurdly unlucky.
-fn test_wollstonecraft_run_1000_times_and_check_probabilistic_winners_reasonably_close_to_expected() {
+fn test_wollstonecraft_run_10000_times_and_check_probabilistic_winners_reasonably_close_to_expected() {
     let finder = FileFinder::find_ec_data_repository();
     let loader = get_nsw_lge_data_loader_2017(&finder).unwrap();
     let data = loader.read_raw_data("North Sydney - Wollstonecraft Ward").unwrap();
-    let mut num_times_elected = vec![0;data.metadata.candidates.len()];
-    for _ in 0..1000 {
-        let result = data.distribute_preferences::<NSWECrandomLGE2017>();
-        for e in result.elected { num_times_elected[e.0]+=1; }
-    }
-    assert_eq!(1000,num_times_elected[3]);
-    assert_eq!(1000,num_times_elected[9]);
-    assert_eq!(1000,num_times_elected[0]+num_times_elected[6]);
-    assert!(100<num_times_elected[6]);
-    assert!(350>num_times_elected[6]);
-    for candidate_index in 0..num_times_elected.len() {
-        if num_times_elected[candidate_index]>0 {
-            println!("Candidate {} : {} elected {} times ",candidate_index,data.metadata.candidates[candidate_index].name,num_times_elected[candidate_index]);
-        }
-    }
+    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2017>(&data,10000);
+    results.print_table_results(&data.metadata);
+    assert_eq!(10000,results.candidates[9].num_times_elected);
+    assert!(results.is_close_to_expected_prob_winning(CandidateIndex(9),1.0));
+    assert_eq!(10000,results.candidates[3].num_times_elected);
+    assert!(results.is_close_to_expected_prob_winning(CandidateIndex(3),1.0));
+    assert_eq!(10000,results.candidates[0].num_times_elected+results.candidates[6].num_times_elected);
+    assert!(results.is_close_to_expected_prob_winning(CandidateIndex(0),0.789956));
+    assert!(results.is_close_to_expected_prob_winning(CandidateIndex(6),0.210044));
+    assert!(1000<results.candidates[6].num_times_elected);
+    assert!(3500>results.candidates[6].num_times_elected);
+    assert_eq!("1",results.candidates[9].mean_position_elected().to_string());
+    assert_eq!("2",results.candidates[3].mean_position_elected().to_string());
+    assert_eq!("3",results.candidates[0].mean_position_elected().to_string());
+    assert_eq!("3",results.candidates[6].mean_position_elected().to_string());
 }
-
 
 
 #[test]

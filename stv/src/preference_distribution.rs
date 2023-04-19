@@ -107,7 +107,7 @@ pub enum LastParcelUse {
     No, // Consider all votes (normal)
     LiterallyLast, // ACT
     LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected, // NSW
-    LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElectedPlusOneBonus, // NSW 2012 bug
+    LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElectedPlusSimilarBonusIfExclusion, // NSW 2012 bug
 }
 
 
@@ -610,19 +610,21 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
     /// Implement the logic in NSW "Functional Requirements for Count Module", 1.4.14.1 to determine
     /// the last count included in a NSW "last parcel" for a candidate.
+    /// * if bonus, and the last count was an exclusion, and the prior n-1 counts were surplus distributions with no-one elected, then those n (this is to match an NSWEC 2012 bug we found).
     /// * If the last count was an FirstPrefs or Exclusion, that count
-    /// * If the last n counts were surplus distributions with noone elected, then those n. Or one more if "bonus" is true (this is to match an NSWEC 2012 bug we found).
+    /// * If the last n counts were surplus distributions with no-one elected, then those n.
     fn last_count_used_for_nsw_last_parcel(&self,candidate:CandidateIndex,bonus:bool) -> CountIndex {
         let count_elected = self.candidate_elected_at_count[candidate.0].expect("Candidate was not elected");
-        match self.transcript.counts[count_elected.0].reason {
-            ReasonForCount::ExcessDistribution(_) => {
-                let mut res = count_elected;
-                while res.0>0 && self.transcript.counts[res.0-1].reason.is_surplus() && self.transcript.counts[res.0-1].elected.is_empty() { res=CountIndex(res.0-1); }
-                if bonus { res=CountIndex(res.0-1); }
-                res
-            }
-            _ => count_elected,
+        let should_do_lookback = match self.transcript.counts[count_elected.0].reason {
+             ReasonForCount::ExcessDistribution(_) => true,
+             ReasonForCount::Elimination(_) => bonus,
+             ReasonForCount::FirstPreferenceCount => false,
+        };
+        let mut res = count_elected;
+        if should_do_lookback {
+            while res.0>0 && self.transcript.counts[res.0-1].reason.is_surplus() && self.transcript.counts[res.0-1].elected.is_empty() { res=CountIndex(res.0-1); }
         }
+        res
     }
 
     /// Transfer votes using a single transfer value. Used for Federal and Victoria and ACT
@@ -657,7 +659,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 let first_count = self.last_count_used_for_nsw_last_parcel(candidate_to_distribute, false);
                 self.papers[candidate_to_distribute.0].parcels_starting_at_count(first_count)
             },
-            LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElectedPlusOneBonus => { // Yay! Everyone wants a bonus.
+            LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElectedPlusSimilarBonusIfExclusion => { // Yay! Everyone wants a bonus.
                 let first_count = self.last_count_used_for_nsw_last_parcel(candidate_to_distribute, true);
                 self.papers[candidate_to_distribute.0].parcels_starting_at_count(first_count)
             },

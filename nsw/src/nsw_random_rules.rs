@@ -94,23 +94,6 @@ pub trait NSWRandomVariations {
  *
  */
 
-
-/// How we think it should be - at least based upon the "Functional Requirements for Count Module"
-pub struct NSWLGE{}
-impl NSWRandomVariations for NSWLGE {
-    fn name() -> String { "NSWrandomLGE".to_string() }
-    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
-    /// This is one of the errors (and the only one I can emulate) in our report "2016 NSW LGE Errors.pdf", presumably present in 2012 and fixed in 2017.
-    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
-    fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanOrEqualToDifferenceBetweenTwoLowestContinuingCandidates }
-    /// This is the error in our report "LSWLGE2012CountErrorTechReport.pdf", fixed after 2012.
-    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected }
-    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
-    fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
-}
-/// How we think it should be - at least based upon the "Functional Requirements for Count Module"
-pub type NSWrandomLGE = NSWRandomSamplingVariant<NSWLGE>;
-
 /// The count used by the NSWEC in 2012, as far as I can tell.
 pub struct NSWECLGE2012{}
 impl NSWRandomVariations for NSWECLGE2012 {
@@ -121,13 +104,13 @@ impl NSWRandomVariations for NSWECLGE2012 {
     fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanOrEqualToDifferenceBetweenTwoLowestContinuingCandidates }
 
     /// This is the error in our report "LSWLGE2012CountErrorTechReport.pdf"
-    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElectedPlusOneBonus }
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElectedPlusSimilarBonusIfExclusion }
     fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
 }
 pub type NSWECrandomLGE2012 = NSWRandomSamplingVariant<NSWECLGE2012>;
 
-/// The count used by the NSWEC in 2016, as far as I can tell, other than the fact that they also sometimes got rounding wrong but not in a way I can predict and emulate.
+/// The count used by the NSWEC in 2016, as far as I can tell.
 pub struct NSWECLGE2016{}
 impl NSWRandomVariations for NSWECLGE2016 {
     fn name() -> String { "NSWECrandomLGE2016".to_string() }
@@ -141,7 +124,6 @@ impl NSWRandomVariations for NSWECLGE2016 {
 pub type NSWECrandomLGE2016 = NSWRandomSamplingVariant<NSWECLGE2016>;
 
 /// The count used by the NSWEC in 2017, as far as I can tell.
-/// Currently the same as NSWLGE.
 /// It does not emulate the bizarre tally changes between the end of count 35 and the start of count 36 in "Federation"
 pub struct NSWECLGE2017{}
 impl NSWRandomVariations for NSWECLGE2017 {
@@ -166,7 +148,7 @@ pub struct NSWLC{}
 impl NSWRandomVariations for NSWLC {
     fn name() -> String { "NSWrandomLC".to_string() }
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::None }
-    /// This is one of the errors (and the only one I can emulate) in our report "2016 NSW LGE Errors.pdf", presumably present in 2012 and fixed in 2017.
+    /// This is one of the errors in our report "2016 NSW LGE Errors.pdf", presumably present in 2012 and fixed in 2017.
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::None }
     fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanDifferenceBetweenTwoLowestContinuingCandidates }
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected }
