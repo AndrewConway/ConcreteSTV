@@ -8,6 +8,7 @@
 use std::fs::File;
 use nsw::nsw_random_rules::{NSWECrandomLGE2016, NSWECrandomLGE2017};
 use nsw::parse_lge::{get_nsw_lge_data_loader_2016, NSWLGEDataLoader, NSWLGEDataSource};
+use nsw::run_election_multiple_times::PossibleResults;
 use stv::ballot_metadata::CandidateIndex;
 use stv::distribution_of_preferences_transcript::{CountIndex, TranscriptWithMetadata};
 use stv::official_dop_transcript::{DifferenceBetweenOfficialDoPAndComputed, DifferenceBetweenOfficialDoPAndComputedOnParticularCount, ECTally, test_official_dop_without_actual_votes};
@@ -100,5 +101,32 @@ fn test_2016_internally_consistent() {
 /// Innermost error is discrepancies with the official DoP.
 fn test_internally_consistent<Rules:PreferenceDistributionRules>(year:&str,state:&str) -> anyhow::Result<Result<Option<TieResolutionExplicitDecision>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
     test_official_dop_without_actual_votes::<Rules,_>(&NSWLGEDataSource{},year,state,false)
+}
+
+#[test]
+/// From a prior project we have estimates of probability of different candidates winning for Blue Mountains City Council Ward 2:
+/// ```text
+///Candidate	Proportion Elected	Mean position	Official Count
+///HOLLYWOOD Romola	1.000000	1.000000	1
+///VAN DER KLEY Chris	1.000000	2.000000	2
+///HOARE Brent	0.683126	3.000000	3
+///THOMPSON Rob	0.316874	3.000000
+/// ```
+///
+/// Note that there is a chance that this will fail if we are absurdly unlucky.
+fn test_blue_mountains_run_10000_times_and_check_probabilistic_winners_reasonably_close_to_expected_using_less_buggy_count() {
+    let finder = FileFinder::find_ec_data_repository();
+    let loader = get_nsw_lge_data_loader_2016(&finder).unwrap();
+    let data = loader.read_raw_data("Blue Mountains City Council - Ward 2").unwrap();
+    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2017>(&data,10000);
+    results.print_table_results(&data.metadata);
+    assert!(results.is_close_to_expected_prob_winning(CandidateIndex(6),1.0));
+    assert!(results.is_close_to_expected_prob_winning(CandidateIndex(9),1.0));
+    assert!(results.is_close_to_expected_prob_winning(CandidateIndex(0),0.683126));
+    assert!(results.is_close_to_expected_prob_winning(CandidateIndex(3),0.316874));
+    assert_eq!("1",results.candidates[6].mean_position_elected().to_string());
+    assert_eq!("2",results.candidates[9].mean_position_elected().to_string());
+    assert_eq!("3",results.candidates[0].mean_position_elected().to_string());
+    assert_eq!("3",results.candidates[3].mean_position_elected().to_string());
 }
 
