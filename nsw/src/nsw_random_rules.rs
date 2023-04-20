@@ -144,19 +144,35 @@ pub type NSWECrandomLGE2017 = NSWRandomSamplingVariant<NSWECLGE2017>;
  *
  */
 
-pub struct NSWLC{}
-impl NSWRandomVariations for NSWLC {
-    fn name() -> String { "NSWrandomLC".to_string() }
+pub struct NSWECLC2015{}
+impl NSWRandomVariations for NSWECLC2015 {
+    fn name() -> String { "NSWECRandomLC2015".to_string() }
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::None }
-    /// This is one of the errors in our report "2016 NSW LGE Errors.pdf", presumably present in 2012 and fixed in 2017.
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::None }
     fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanDifferenceBetweenTwoLowestContinuingCandidates }
-    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected }
-    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
+    // We didn't notice (and report to the NSWEC) the error in 2012 until 2016, so this error is still presumably present in 2015.
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElectedPlusSimilarBonusIfExclusion }
+    /// In count 5, the correct rounding is done for MASON-COX Matthew (should & does get 1,439,106) NILE Fred (should & does get 18) whereas with the 2016 LGE fp computation MASON-COX Matthew would get 1 more and NILE Fred 1 fewer.
+    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { true }
 }
+
+pub struct NSWECLC2019{}
+impl NSWRandomVariations for NSWECLC2019 {
+    fn name() -> String { "NSWECRandomLC2019".to_string() }
+    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::None }
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::None }
+    fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanDifferenceBetweenTwoLowestContinuingCandidates }
+    // Presumably this was fixed by 2019.
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected }
+    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
+    fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { true }
+}
+
 /// How we think it should be - at least based upon the "Functional Requirements for Count Module"
-pub type NSWrandomLC = NSWRandomSamplingVariant<NSWLC>;
+pub type NSWECRandomLC2015 = NSWRandomSamplingVariant<NSWECLC2015>;
+pub type NSWECRandomLC2019 = NSWRandomSamplingVariant<NSWECLC2019>;
+pub type NSWECRandomLC2023 = NSWRandomSamplingVariant<NSWECLC2019>;
 
 
 

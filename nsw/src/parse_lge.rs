@@ -324,84 +324,15 @@ impl NSWLGEDataLoader {
         }
         Err(MissingAlternateNamedFiles{alternates})
     }
-    /// parse a file like https://vtr.elections.nsw.gov.au/LG2101/albury/councillor/report/fp-by-grp-and-candidate-by-vote-type or https://vtr.elections.nsw.gov.au/LG2101/ballina/a-ward/councillor/report/fp-by-grp-and-candidate-by-vote-type
+    /// parse a file like https://pastvtr.elections.nsw.gov.au/LG2101/albury/councillor/fp-by-grp-and-candidate-by-vote-type or https://pastvtr.elections.nsw.gov.au/LG2101/ballina/a-ward/councillor/fp-by-grp-and-candidate-by-vote-type
     /// or, for mayoral, like https://vtr.elections.nsw.gov.au/LG2101/ballina/mayoral/report/mayoral-fp-by-candidate
-    fn parse_candidate_list(&self,mut file:File,mayoral:bool,electorate:&str) -> anyhow::Result<ElectionMetadata> {
-        let html = Html::parse_document(&file_to_string(&mut file)?);
-        // the title has hypens missing - see Ballina - A Ward
-        // let electorate = html.select(&Selector::parse("head > title").unwrap()).flat_map(|e|e.text()).collect::<Vec<_>>().join("")+if mayoral {" Mayoral"} else {""};
-        let electorate = electorate.to_string(); // +if mayoral {" Mayoral"} else {""};
-        if electorate.is_empty() { return Err(anyhow!("Empty page title")); }
-        let table = html.select(&Selector::parse("table").unwrap()).next().ok_or_else(||anyhow!("No table element"))?;
+    fn parse_candidate_list(&self,file:File,mayoral:bool,electorate:&str) -> anyhow::Result<ElectionMetadata> {
         let headings_in_tbody = match self.year.as_str() {
             "2017" | "2016" => true,
             "2021" => false,
             _ => return Err(anyhow!("Illegal Year"))
         };
-        let thead_first = table.select(&Selector::parse(if headings_in_tbody {"tbody > tr > th"} else {"thead > tr > th"}).unwrap()).next().ok_or_else(||anyhow!("No table headings"))?;
-        let has_groups = thead_first.inner_html()=="Group";
-        let selector_td = Selector::parse("td").unwrap();
-        let mut candidates = vec![];
-        let mut parties = vec![];
-        let mut current_position = 0;
-        // parse <div><strong>A</strong>B</div> into (A,B) if possible.
-        fn parse_note(e:ElementRef) -> Option<(String,String)> {
-            let text = e.text().map(|s|s.trim()).filter(|s|!s.is_empty()).collect::<Vec<_>>();
-            if text.len()==2 { Some((text[0].to_string(),text[1].to_string()))} else { None }
-        }
-        let notes : Vec<(String,String)> = html.select(&Selector::parse("div.note, p.note_p").unwrap()).map(|e|parse_note(e)).flatten().collect::<Vec<_>>();
-        let get_note = |note_name:&str| notes.iter().find(|(name,_)|name.starts_with(note_name)).map(|(_,v)|v.clone()).ok_or_else(||anyhow!("Could not find note {}",note_name));
-        let vacancies = NumberOfCandidates(if mayoral {1} else {get_note("Candidates to be Elected:")?.chars().filter(|&c|c!=',').collect::<String>().parse()?});
-        let enrolment = NumberOfCandidates(get_note(if mayoral {"Electors Enrolled as on"} else {"Enrolment:"})?.chars().filter(|&c|c!=',').collect::<String>().parse()?);
-        let select_rows = Selector::parse("tbody tr").unwrap();
-        let mut rows = table.select(&select_rows);
-        let rows = if headings_in_tbody { rows.next(); rows } else { rows }; // skip first row.
-        for row in rows {
-            let mut cols = row.select(&selector_td);
-            let col1 = cols.next().ok_or_else(||anyhow!("No first column"))?;
-            let col2 = cols.next().ok_or_else(||anyhow!("No second column"))?;
-            let col1_text = col1.text().map(|s|s.trim()).collect::<Vec<_>>().join("");
-            let col2_text = col2.text().map(|s|s.trim()).collect::<Vec<_>>().join("");
-            if let Some(_row_class) = row.value().attr("class") {
-                if /* row_class == "tr-total" &&*/ has_groups && (col2_text == "UNGROUPED CANDIDATES" || !col1_text.is_empty()) { // a party!
-                    parties.push(Party {
-                        column_id: (if col1_text.is_empty() { "UG" } else { &col1_text }).to_string(),
-                        name: col2_text,
-                        abbreviation: None,
-                        atl_allowed: !col1_text.is_empty(),
-                        candidates: vec![],
-                        tickets: vec![],
-                    });
-                    current_position = 0;
-                }
-            } else if mayoral && col1.value().attr("class").is_some() {
-                // this is a footnote. Do nothing.
-            } else { // it is a candidate
-                let name = if has_groups { col2_text } else { col1_text };
-                if name.is_empty() { return Err(anyhow!("Empty candidate name")); }
-                // could at this point get the second column of the mayoral table to get a party, although it is not so important for a Mayoral contest.
-                current_position+=1;
-                if let Some(current_party)=parties.last_mut() { current_party.candidates.push(CandidateIndex(candidates.len()))}
-                candidates.push(Candidate{
-                    name,
-                    party: if parties.is_empty() { None } else { Some(PartyIndex(parties.len()-1))},
-                    position: Some(current_position),
-                    ec_id: None
-                })
-            }
-        }
-        Ok(ElectionMetadata{
-            name: self.name(&electorate),
-            candidates,
-            parties,
-            source: vec![],
-            results: None,
-            vacancies: Some(vacancies),
-            enrolment: Some(enrolment),
-            secondary_vacancies: None,
-            excluded: vec![],
-            tie_resolutions: Default::default()
-        })
+        parse_fp_by_grp_and_candidate_by_vote_type(file,mayoral,None,headings_in_tbody,self.name(electorate))
     }
 
     /// Parse the 2012 election preferences zip file, extracting the candidates list.
@@ -671,6 +602,94 @@ impl NSWLGEDataLoader {
         })
     }
 
+}
+
+/// parse a file like https://pastvtr.elections.nsw.gov.au/LG2101/albury/councillor/fp-by-grp-and-candidate-by-vote-type or https://pastvtr.elections.nsw.gov.au/LG2101/ballina/a-ward/councillor/fp-by-grp-and-candidate-by-vote-type
+/// or, for mayoral, like https://pastvtr.elections.nsw.gov.au/LG2101/ballina/mayoral/mayoral-fp-by-candidate
+/// or for LC, https://vtr.elections.nsw.gov.au/SG2301/LC/state/dop/fp_by_grp_and_candidate_by_vote_type
+pub(crate) fn parse_fp_by_grp_and_candidate_by_vote_type(mut file:File,mayoral:bool,vacancies_if_known:Option<NumberOfCandidates>,headings_in_tbody:bool,election_name:ElectionName) -> anyhow::Result<ElectionMetadata> {
+    let html = Html::parse_document(&file_to_string(&mut file)?);
+    // the title has hypens missing - see Ballina - A Ward
+    // let electorate = html.select(&Selector::parse("head > title").unwrap()).flat_map(|e|e.text()).collect::<Vec<_>>().join("")+if mayoral {" Mayoral"} else {""};
+    // let electorate = electorate.to_string(); // +if mayoral {" Mayoral"} else {""};
+    // if electorate.is_empty() { return Err(anyhow!("Empty page title")); }
+    let tables = html.select(&Selector::parse("table").unwrap()).collect::<Vec<_>>();
+    if tables.is_empty() { return Err(anyhow!("No table element"))};
+    let thead_first = tables[0].select(&Selector::parse(if headings_in_tbody {"tbody > tr > th"} else {"thead > tr > th"}).unwrap()).next().ok_or_else(||anyhow!("No table headings"))?;
+    let has_groups = thead_first.inner_html()=="Group";
+    let selector_td = Selector::parse("td").unwrap();
+    let mut candidates = vec![];
+    let mut parties = vec![];
+    let mut current_position = 0;
+    // parse <div><strong>A</strong>B</div> into (A,B) if possible.
+    fn parse_note(e:ElementRef) -> Option<(String,String)> {
+        let text = e.text().map(|s|s.trim()).filter(|s|!s.is_empty()).collect::<Vec<_>>();
+        if text.len()==2 { Some((text[0].to_string(),text[1].to_string()))} else { None }
+    }
+    let notes : Vec<(String,String)> = html.select(&Selector::parse("div.note, p.note_p").unwrap()).map(|e|parse_note(e)).flatten().collect::<Vec<_>>();
+    let get_note = |note_name:&str| notes.iter().find(|(name,_)|name.starts_with(note_name)).map(|(_,v)|v.clone()).ok_or_else(||anyhow!("Could not find note {}",note_name));
+    let vacancies =
+        if let Some(vacancies) = vacancies_if_known { vacancies }
+        else { NumberOfCandidates(if mayoral {1} else {get_note("Candidates to be Elected:")?.chars().filter(|&c|c!=',').collect::<String>().parse()?})};
+    let enrolment =
+        if let Ok(s) = get_note(if mayoral {"Electors Enrolled as on"} else {"Enrolment:"}) {
+            Some(NumberOfCandidates(remove_comma(&s).parse()?))
+        } else { None };
+    let select_rows = Selector::parse("tbody tr").unwrap();
+    for table in tables {
+        let mut rows = table.select(&select_rows);
+        let rows = if headings_in_tbody { rows.next(); rows } else { rows }; // skip first row.
+        for row in rows {
+            let mut cols = row.select(&selector_td);
+            let col1 = cols.next().ok_or_else(||anyhow!("No first column"))?;
+            let col1_text = col1.text().map(|s|s.trim()).collect::<Vec<_>>().join("");
+            if mayoral && col1_text=="Polling Place" { break; } // LGE2021, starting a new table of irrelevant stuff.
+            let col2 = cols.next().ok_or_else(||anyhow!("No second column"))?;
+            let col2_text = col2.text().map(|s|s.trim()).collect::<Vec<_>>().join("");
+            // println!("col1={} col2={}",col1_text,col2_text);
+            let is_group_row = row.value().attr("class").is_some() // LGE
+                      || col1.value().attr("class").map(|s|s=="bold_highlight").unwrap_or(false); // LC 2023
+            if is_group_row { // let Some(_row_class) = row.value().attr("class").or_else(||col1.value().attr("class")) { // LC has attributes in td, LGE has in row
+                if /* row_class == "tr-total" &&*/ has_groups && (col2_text == "UNGROUPED CANDIDATES" || (col1_text!="Group Total" && !col1_text.is_empty())) { // a party!
+                    parties.push(Party {
+                        column_id: (if col1_text.is_empty() { "UG" } else { &col1_text }).to_string(),
+                        name: col2_text,
+                        abbreviation: None,
+                        atl_allowed: !col1_text.is_empty(),
+                        candidates: vec![],
+                        tickets: vec![],
+                    });
+                    current_position = 0;
+                }
+            } else if mayoral && col1.value().attr("class").is_some() {
+                // this is a footnote. Do nothing.
+            } else { // it is a candidate
+                let name = if has_groups { col2_text } else { col1_text };
+                if name.is_empty() { return Err(anyhow!("Empty candidate name")); }
+                // could at this point get the second column of the mayoral table to get a party, although it is not so important for a Mayoral contest.
+                current_position+=1;
+                if let Some(current_party)=parties.last_mut() { current_party.candidates.push(CandidateIndex(candidates.len()))}
+                candidates.push(Candidate{
+                    name,
+                    party: if parties.is_empty() { None } else { Some(PartyIndex(parties.len()-1))},
+                    position: Some(current_position),
+                    ec_id: None
+                })
+            }
+        }
+    }
+    Ok(ElectionMetadata{
+        name: election_name,
+        candidates,
+        parties,
+        source: vec![],
+        results: None,
+        vacancies: Some(vacancies),
+        enrolment,
+        secondary_vacancies: None,
+        excluded: vec![],
+        tie_resolutions: Default::default()
+    })
 }
 
 fn parse_number_blank_as_nan(s:&str) -> f64 {

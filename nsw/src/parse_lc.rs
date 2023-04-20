@@ -15,13 +15,13 @@ use stv::election_data::ElectionData;
 use anyhow::{anyhow, Context};
 use scraper::{ElementRef, Html, Selector};
 use stv::parse_util::{FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource};
-use stv::tie_resolution::{TieResolutionsMadeByEC};
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
 use stv::ballot_pile::BallotPaperCount;
 use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
 use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
 use stv::download::CacheDir;
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
-use crate::parse_lge::parse_zip_election_file;
+use crate::parse_lge::{parse_fp_by_grp_and_candidate_by_vote_type, parse_zip_election_file};
 
 
 // 2011 data files are at http://www.pastvtr.elections.nsw.gov.au/SGE2011/lc_prefdata.htm
@@ -31,6 +31,10 @@ pub fn get_nsw_lc_data_loader_2015(finder:&FileFinder) -> anyhow::Result<NSWLCDa
 
 pub fn get_nsw_lc_data_loader_2019(finder:&FileFinder) -> anyhow::Result<NSWLCDataLoader> {
     NSWLCDataLoader::new(finder,"2019","https://pastvtr.elections.nsw.gov.au/SG1901/LC/results","https://pastvtr.elections.nsw.gov.au/SG1901/LC/state/dop/index","https://pastvtr.elections.nsw.gov.au/SG1901/LC/state/preferences")
+}
+
+pub fn get_nsw_lc_data_loader_2023(finder:&FileFinder) -> anyhow::Result<NSWLCDataLoader> {
+    NSWLCDataLoader::new(finder,"2023","https://vtr.elections.nsw.gov.au/SG2301/LC/results","https://vtr.elections.nsw.gov.au/SG2301/LC/state/dop/index","")
 }
 
 
@@ -43,11 +47,12 @@ impl ElectionDataSource for NSWLCDataSource {
     fn name(&self) -> Cow<'static, str> { "NSW Legislative Council".into() }
     fn ec_name(&self) -> Cow<'static, str> { "NSW Electoral Commission".into() }
     fn ec_url(&self) -> Cow<'static, str> { "https://www.elections.nsw.gov.au/".into() }
-    fn years(&self) -> Vec<String> { vec!["2015,2019".to_string()] }
+    fn years(&self) -> Vec<String> { vec!["2015".to_string(),"2019".to_string(),"2023".to_string()] }
     fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
         match year {
             "2015" => Ok(Box::new(get_nsw_lc_data_loader_2015(finder)?)),
             "2019" => Ok(Box::new(get_nsw_lc_data_loader_2019(finder)?)),
+            "2023" => Ok(Box::new(get_nsw_lc_data_loader_2023(finder)?)),
             _ => Err(anyhow!("Not a valid year")),
         }
     }
@@ -115,14 +120,24 @@ impl RawDataSource for NSWLCDataLoader {
     fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> { self.read_raw_data(electorate) }
 
     fn read_raw_metadata(&self, electorate: &str) -> anyhow::Result<ElectionMetadata> {
-        let metadata_data_file_name = match self.year.as_str() {
-            "2015" => "SGE2015 LC Candidates v1.xlsx",
-            "2019" => "SGE2019 LC Candidates.xlsx",
+        match self.year.as_str() {
+            "2015" => self.read_raw_metadata_from_excel_file(electorate,"SGE2015 LC Candidates v1.xlsx"),
+            "2019" => self.read_raw_metadata_from_excel_file(electorate,"SGE2019 LC Candidates.xlsx"),
+            "2023" => {
+                let cache = self.cache();
+                let base_url = url::Url::parse(&self.dop_url)?;
+                let fp_by_grp_and_candidate_by_vote_type = base_url.join("fp_by_grp_and_candidate_by_vote_type")?;
+                let file = cache.get_file(fp_by_grp_and_candidate_by_vote_type.as_str())?;
+                let mut metadata = parse_fp_by_grp_and_candidate_by_vote_type(file,false,Some(NumberOfCandidates(21)),false,self.name(electorate))?;
+                metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{
+                    favoured: vec![5,12,28,30,34,37,48,52,54,60,61,62,80,85,103,109,111,148,171,192,193,196,198,240,241,243].into_iter().map(|i|CandidateIndex(i)).collect(),
+                    disfavoured: vec![36,72,73,74,90,139,142,143,195,213,217,236,242,249,252,254].into_iter().map(|i|CandidateIndex(i)).collect(),
+                    came_up_in: Some("4".to_string()),
+                }));
+                Ok(metadata)
+            }
             _ => {return Err(anyhow!("Invalid Year"))}
-        };
-        let metadata_path = self.finder.find_raw_data_file(metadata_data_file_name,&self.archive_location,&self.pref_url)?;
-        let metadata = self.parse_candidate_list(&metadata_path,electorate)?;
-        Ok(metadata)
+        }
     }
 
     fn copyright(&self) -> Copyright {
@@ -161,12 +176,12 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
     let select_td = Selector::parse("td").unwrap();
     let select_th = Selector::parse("th").unwrap();
     let select_a = Selector::parse("a").unwrap();
-    let select_notep = Selector::parse("p.note_p").unwrap();
-    let select_list_rows = Selector::parse("table.list tr").unwrap();
+    let select_notep = Selector::parse("p.note_p, div.note").unwrap();
+    let select_list_rows = Selector::parse("table tr").unwrap(); // Before 2023, it was "table.list tr". 2023 LC version could be "div#prccReport div.prcc-report div.prcc-data table tr". 2015 LC version could be "div#prcc-report table.list tr".
     let regex_find_transfer_value = regex::Regex::new(r"^\d+ / \(\d+ - \d+\) = ([\d\.]+)$").unwrap();
     let candidate_name_lookup = metadata.get_candidate_name_lookup();
     let mut total_formal_votes : Option<usize> = None;
-    for overview_tr in overview_html.select(&Selector::parse("div#ReportContent table.list tr, div#prccReport table.list tr").unwrap()) {
+    for overview_tr in overview_html.select(&Selector::parse("div#ReportContent table.list tr, div#prccReport table.list tr, div.prcc-data table tr").unwrap()) {
         let tds : Vec<ElementRef> = overview_tr.select(&select_td).collect();
         if tds.len()==4 {
             if let Some(a) = tds[0].select(&select_a).next() {
@@ -206,7 +221,11 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                     };
                     // if let Some(transfer_value) = transfer_value { println!("Found tv {}",transfer_value); }
                     for tr in count_html.select(&select_list_rows) {
-                        if tr.value().attr("class")==Some("t_head") {
+                        let is_headings_row = match tr.value().attr("class") {
+                            Some("t_head") | Some("tr-title") => true,
+                            _ => false,
+                        };
+                        if is_headings_row {
                             let headings = tr.select(&select_th).map(|e|e.text().next().unwrap_or("")).collect::<Vec<_>>();
                             // println!("Found headings {:?}",headings);
                             if headings.len()>0 && (headings[0]=="Group" || headings[0]=="Candidates in Ballot Order") {
@@ -320,12 +339,13 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
             }
         }
     }
-    //println!("Total formal votes = {:?}",total_formal_votes);
+    println!("Total formal votes = {:?}",total_formal_votes);
     let quota = if let Some(total_formal_votes) = total_formal_votes {
         let mut vacancies : Option<NumberOfCandidates> = None;
         let mut quota : Option<f64> = None;
         for p in overview_html.select(&select_notep) {
             let text = p.text().collect::<Vec<_>>();
+            println!("Found text {:?}",text);
             if text.len()==2 {
                 if text[0].to_lowercase()=="candidates to be elected" { vacancies=Some(NumberOfCandidates(text[1].trim_start_matches(':').trim().parse()?))}
                 if text[0].to_lowercase()=="quota" { quota=Some(text[1].trim_start_matches(':').trim().replace(',',"").parse()?)}
@@ -387,6 +407,11 @@ impl NSWLCDataLoader {
         self.cache().get_string(url)
     }
 */
+    fn read_raw_metadata_from_excel_file(&self, electorate: &str,excel_file_name:&str) -> anyhow::Result<ElectionMetadata> {
+        let metadata_path = self.finder.find_raw_data_file(excel_file_name,&self.archive_location,&self.pref_url)?;
+        let metadata = self.parse_candidate_list(&metadata_path,electorate)?;
+        Ok(metadata)
+    }
 
     /// parse a xlsx file looking like
     /// ```txt
@@ -431,12 +456,13 @@ impl NSWLCDataLoader {
                 current_group = group.to_string();
             }
             current_position+=1;
+            if let Some(party) = parties.last_mut() { party.candidates.push(CandidateIndex(candidates.len()))}
             candidates.push(Candidate{
                 name : name.to_string(),
                 party: if parties.is_empty() { None } else { Some(PartyIndex(parties.len()-1))},
                 position: Some(current_position),
                 ec_id: None
-            })
+            });
         }
         // load groups, second tab.
         let sheet2 = workbook1.worksheet_range_at(1).ok_or_else(||anyhow!("No group sheet in {}",path.to_string_lossy()))??;

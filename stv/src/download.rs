@@ -96,11 +96,15 @@ impl CacheDir {
         }
     }
 
+    /// Get a previously cached URL as a file. Like get_or_download, except does not download.
+    pub fn get_file(&self,url:&str) -> anyhow::Result<File> {
+        let path = self.get_file_path_with_extension(url,None);
+        File::open(&path).with_context(||format!("Looking for file at {} containing contents of {}",path.to_string_lossy(),url))
+    }
+
     /// Get a previously cached URL as a string. Like get_or_download_string, except does not download.
     pub fn get_string(&self,url:&str) -> anyhow::Result<String> {
-        let path = self.get_file_path_with_extension(url,None);
-        let mut file = File::open(&path).with_context(||format!("Looking for file at {} containing contents of {}",path.to_string_lossy(),url))?;
-        file_to_string(&mut file)
+        file_to_string(&mut self.get_file(url)?)
     }
 
     /// Download a url using Reqwest, and return as a string.
