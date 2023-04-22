@@ -100,7 +100,7 @@ fn test_2016_internally_consistent() {
 /// Outermost error is IO type errors.
 /// Innermost error is discrepancies with the official DoP.
 fn test_internally_consistent<Rules:PreferenceDistributionRules>(year:&str,state:&str) -> anyhow::Result<Result<Option<TieResolutionExplicitDecision>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
-    test_official_dop_without_actual_votes::<Rules,_>(&NSWLGEDataSource{},year,state,false)
+    test_official_dop_without_actual_votes::<Rules,_>(&NSWLGEDataSource{},year,state,true)
 }
 
 #[test]

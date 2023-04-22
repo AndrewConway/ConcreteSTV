@@ -69,6 +69,12 @@ pub enum DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally:Display+
     PaperTotalRounding(BallotPaperCount,BallotPaperCount), // should be 0 in all cases???
     #[error("The total number of papers is {0} in the official DoP and {1} in ConcreteSTV for candidate #{2}.")]
     PaperTotalCandidate(BallotPaperCount,BallotPaperCount,CandidateIndex),
+    #[error("The total number of exhausted set aside for quota papers is {0} in the official DoP and {1} in ConcreteSTV.")]
+    PaperSetAsideForQuotaExhausted(BallotPaperCount,BallotPaperCount),
+    #[error("The total number of lost to rounding set aside for quota papers is {0} in the official DoP and {1} in ConcreteSTV.")]
+    PaperSetAsideForQuotaRounding(BallotPaperCount,BallotPaperCount), // should be 0 in all cases???
+    #[error("The number of papers set aside for quota is {0} in the official DoP and {1} in ConcreteSTV for candidate #{2}.")]
+    PaperSetAsideForQuotaCandidate(BallotPaperCount,BallotPaperCount,CandidateIndex),
     #[error("The change in number of exhausted papers is {0} in the official DoP and {1} in ConcreteSTV.")]
     PaperDeltaExhausted(isize,usize),
     #[error("The change in number of papers lost to rounding papers is {0} in the official DoP and {1} in ConcreteSTV.")]
@@ -89,6 +95,8 @@ pub enum DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally:Display+
     TallyDeltaRounding(ECTally,SignedVersion<Tally>), // should be 0 in all cases???
     #[error("The change in number of votes is {0} in the official DoP and {2}-{1} in ConcreteSTV for candidate #{3}.")]
     TallyDeltaCandidate(ECTally,Tally,Tally,CandidateIndex),
+    #[error("The official dop has a set aside count but the ConcreteSTV transcript does not.")]
+    OfficialCountHasSetAsideButComputedDoesnt,
 }
 
 /// A vote that is a finite, comparable, not-NaN value
@@ -133,7 +141,7 @@ pub struct OfficialDOPForOneCount {
     pub paper_total : Option<PerCandidate<usize>>, // an isize::MAX means unknown
     pub vote_delta : Option<PerCandidate<f64>>, // A NaN means unknown.
     pub paper_delta : Option<PerCandidate<isize>>, // an isize::MAX means unknown.
-    pub paper_set_aside : Option<PerCandidate<usize>>, // an usize::MAX means unknown. This is rarely used (possibly only in the NSW randomized algorithm for legislative council and LGE prior to 2021)
+    pub paper_set_aside_for_quota: Option<PerCandidate<usize>>, // an usize::MAX means unknown. This is rarely used (possibly only in the NSW randomized algorithm for legislative council and LGE prior to 2021)
     pub count_name : Option<String>,
     pub papers_came_from_counts : Option<Vec<CountIndex>>, // if present, which were the source for the counts. Should be in ascending order.
 }
@@ -323,6 +331,29 @@ impl OfficialDistributionOfPreferencesTranscript {
                 let my_change_candidate = my_count.status.papers.candidate[candidate].0 as isize-my_prior_count.map(|c|c.status.papers.candidate[candidate].0 as isize).unwrap_or(0);
                 if paper_delta.candidate[candidate]!=isize::MAX && paper_delta.candidate[candidate]!=my_change_candidate && !(self.missing_negatives_in_papers_delta && my_change_candidate < 0) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperDeltaCandidate(paper_delta.candidate[candidate],my_change_candidate,CandidateIndex(candidate)))}
             }
+        }
+        if let Some(paper_set_aside) = & official_count.paper_set_aside_for_quota { // compare to
+            if verbose { println!("Checking set aside count {}", count_number.0 + 1); }
+            if let Some(my_set_aside) = &my_count.set_aside_for_quota {
+                if paper_set_aside.exhausted!=my_set_aside.exhausted.0 {
+                    // the NSW values are sometimes inaccurate
+                    if paper_set_aside.exhausted==my_set_aside.exhausted.0+official_count.paper_delta.as_ref().map(|v|v.exhausted as usize).unwrap_or(0) && official_count.transfer_value==Some(1.0) {
+                        println!("The official DoP set aside for quota of exhausted votes includes votes that do not contribute to the quota.");
+                        // It could be better to correct the buggy NSWEC data in the DoP parse code where this comes up, but that would make this brittle if NSWEC gets it correct.
+                    } else {
+                        return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperSetAsideForQuotaExhausted(BallotPaperCount(paper_set_aside.exhausted),my_set_aside.exhausted))
+                    }
+                }
+                for candidate in 0..paper_set_aside.candidate.len() {
+                    if paper_set_aside.candidate[candidate]!=my_set_aside.candidate[candidate].0 { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperSetAsideForQuotaCandidate(BallotPaperCount(paper_set_aside.candidate[candidate]),my_set_aside.candidate[candidate],CandidateIndex(candidate)))}
+                }
+
+            } else {
+                if !paper_set_aside.is_empty() {
+                    return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::OfficialCountHasSetAsideButComputedDoesnt);
+                }
+            }
+
         }
         if let Some(papers_came_from_counts) = &official_count.papers_came_from_counts {
             if papers_came_from_counts!=&my_count.portion.papers_came_from_counts { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::FromCounts(papers_came_from_counts.clone(),my_count.portion.papers_came_from_counts.clone()))}

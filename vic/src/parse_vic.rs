@@ -849,7 +849,7 @@ impl DOPFileFormat {
                         paper_total : None,
                         vote_delta : Some(get_row(if is_first {0} else {1})),
                         paper_delta : Some(get_row(0).try_into()?),
-                        paper_set_aside: None,
+                        paper_set_aside_for_quota: None,
                         count_name: None,
                         papers_came_from_counts,
                     });

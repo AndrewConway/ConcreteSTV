@@ -178,7 +178,7 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
     let select_a = Selector::parse("a").unwrap();
     let select_notep = Selector::parse("p.note_p, div.note").unwrap();
     let select_list_rows = Selector::parse("table tr").unwrap(); // Before 2023, it was "table.list tr". 2023 LC version could be "div#prccReport div.prcc-report div.prcc-data table tr". 2015 LC version could be "div#prcc-report table.list tr".
-    let regex_find_transfer_value = regex::Regex::new(r"^\d+ / \(\d+ - \d+\) = ([\d\.]+)$").unwrap();
+    let regex_find_transfer_value = regex::Regex::new(r"^\d+ / \( ?\d+ - \d+\) = ([\d\.]+)$").unwrap();
     let candidate_name_lookup = metadata.get_candidate_name_lookup();
     let mut total_formal_votes : Option<usize> = None;
     for overview_tr in overview_html.select(&Selector::parse("div#ReportContent table.list tr, div#prccReport table.list tr, div.prcc-data table tr").unwrap()) {
@@ -216,7 +216,7 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                     let mut groups_col : Option<usize> = None;
                     let transfer_value : Option<f64> = {
                         text_contents(count_html.select(&select_notep)).iter().filter_map(|s|{
-                            regex_find_transfer_value.captures(s).and_then(|c|c[1].parse::<f64>().ok())
+                            regex_find_transfer_value.captures(s.trim_end_matches(" (Note: the Transfer Value cannot be greater than 1)")).and_then(|c|c[1].parse::<f64>().ok())
                         }).next()
                     };
                     // if let Some(transfer_value) = transfer_value { println!("Found tv {}",transfer_value); }
@@ -256,7 +256,15 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                                             let votes = tds[col].trim();
                                             if !votes.is_empty() {
                                                 let votes = parse_with_commas(votes)?;
-                                                if set_aside_col.is_some() { paper_set_aside.exhausted = votes; }
+                                                if set_aside_col.is_some() {
+                                                    paper_set_aside.exhausted = votes;
+                                                    if transfer_value==Some(1.0) {
+                                                        // Note that in 2016, Ballina Shire Council - A Ward, count 3, there is a TV of 208/(213-125) which means 125 were exhausted, of which 5 counted as set aside for quota, and 120 as exhausted. But all 125 were in the "Set Aside for Quota" column.
+                                                        // the exhausted set aside values are not accurate if the transfer value is 1.0.
+                                                        // It could be better to correct the buggy NSWEC data as below, but this is currently handled by a special case is the compare official to computed code.
+                                                        // paper_set_aside.exhausted = usize::MAX;
+                                                    }
+                                                }
                                                 else { paper_delta.exhausted = votes as isize; }
                                             }
                                         }
@@ -284,8 +292,10 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                                     }
                                     "Set Aside this Count" => {// exhausted
                                         if let Some(progressive_total_col) = progressive_total_col {
-                                            paper_total.exhausted+=parse_with_commas(&tds[progressive_total_col])?;
-                                            paper_delta.exhausted=parse_with_commas(&tds[progressive_total_col])? as isize;
+                                            let num = parse_with_commas(&tds[progressive_total_col])?;
+                                            paper_total.exhausted+=num;
+                                            paper_delta.exhausted=num as isize;
+                                            // paper_set_aside.exhausted-=num; // double counted in the "Exhausted" column above here.
                                         }
                                     }
                                     "TOTAL" => {}
@@ -301,7 +311,7 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                                                 if let Some(transferred_col) = transferred_col {
                                                     paper_delta.candidate[candidate.0] = parse_with_commas(&tds[transferred_col]).unwrap_or(isize::MAX as usize) as isize;
                                                     if let Some(set_aside_col) = set_aside_col {
-                                                        paper_set_aside.candidate[candidate.0] = parse_with_commas(&tds[set_aside_col]).unwrap_or(usize::MAX);
+                                                        paper_set_aside.candidate[candidate.0] = parse_with_commas(&tds[set_aside_col]).unwrap_or(0);
                                                     }
                                                 } else { return Err(anyhow!("No transferred_col")); }
                                             } else {
@@ -331,7 +341,7 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                         paper_total: Some(paper_total),
                         vote_delta: Some(vote_delta),
                         paper_delta: Some(paper_delta),
-                        paper_set_aside: Some(paper_set_aside),
+                        paper_set_aside_for_quota: Some(paper_set_aside),
                         count_name: None,
                         papers_came_from_counts: None,
                     })
@@ -339,13 +349,13 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
             }
         }
     }
-    println!("Total formal votes = {:?}",total_formal_votes);
+    // println!("Total formal votes = {:?}",total_formal_votes);
     let quota = if let Some(total_formal_votes) = total_formal_votes {
         let mut vacancies : Option<NumberOfCandidates> = None;
         let mut quota : Option<f64> = None;
         for p in overview_html.select(&select_notep) {
             let text = p.text().collect::<Vec<_>>();
-            println!("Found text {:?}",text);
+            // println!("Found text {:?}",text);
             if text.len()==2 {
                 if text[0].to_lowercase()=="candidates to be elected" { vacancies=Some(NumberOfCandidates(text[1].trim_start_matches(':').trim().parse()?))}
                 if text[0].to_lowercase()=="quota" { quota=Some(text[1].trim_start_matches(':').trim().replace(',',"").parse()?)}

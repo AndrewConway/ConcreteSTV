@@ -442,7 +442,7 @@ impl NSWLGEDataLoader {
                     paper_total: None,
                     vote_delta: Some(vote_delta),
                     paper_delta: Some(paper_delta),
-                    paper_set_aside: None,
+                    paper_set_aside_for_quota: None,
                     count_name: Some(line[col_count].clone()),
                     papers_came_from_counts : None,
                 });
@@ -577,7 +577,7 @@ impl NSWLGEDataLoader {
                 paper_total: column(col_total),
                 vote_delta: columnf64(col_delta),
                 paper_delta: columnisize(col_delta),
-                paper_set_aside: None,
+                paper_set_aside_for_quota: None,
                 count_name: None,
                 papers_came_from_counts : None,
             };

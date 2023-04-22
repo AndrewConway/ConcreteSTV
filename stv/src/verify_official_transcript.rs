@@ -266,7 +266,7 @@ impl <'a> OracleFromOfficialDOP<'a> {
         let count = &self.official.counts[current_count.0];
         if let Some(paper_delta) = &count.paper_delta {
             let mut res : Vec<BallotPaperCount> = paper_delta.candidate.iter().chain(iter::once(&paper_delta.exhausted)).map(|v|if *v>=0 {BallotPaperCount(*v as usize)} else {BallotPaperCount(0)}).collect();
-            if let Some(paper_set_aside) = &count.paper_set_aside {
+            if let Some(paper_set_aside) = &count.paper_set_aside_for_quota {
                 for (candidate_index,set_aside) in paper_set_aside.candidate.iter().enumerate() {
                     if *set_aside!=usize::MAX {
                         res[candidate_index]+=BallotPaperCount(*set_aside);

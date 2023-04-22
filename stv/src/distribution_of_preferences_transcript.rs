@@ -90,6 +90,14 @@ impl TryFrom<PerCandidate<f64>> for PerCandidate<isize> {
 
 }
 
+impl PerCandidate<usize> {
+    /// See if every field is either 0 or usize::MAX (often meaning unknown).
+    pub fn is_empty(&self) -> bool {
+        fn zero(i:usize) -> bool { i==0 || i==usize::MAX}
+        zero(self.exhausted) && self.candidate.iter().all(|v|zero(*v)) && self.set_aside.iter().all(|v|zero(*v)) && zero(self.rounding.value)
+    }
+}
+
 impl From<PerCandidate<isize>> for PerCandidate<f64> {
     fn from(value: PerCandidate<isize>) -> Self {
         let from_int = |f:isize| -> f64 {
@@ -224,9 +232,9 @@ pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
     pub created_transfer_value : Option<TransferValueCreation<Tally>>,
     /// whether the EC needs to make any decisions
     pub decisions : Vec<DecisionMadeByEC>,
-    /// if there are any set aside votes on this distribution (at time of writing only used for old NSW)
+    /// if there are any set aside for quota votes on this distribution (at time of writing only used for old NSW)
     #[serde(skip_serializing_if = "Option::is_none",default)]
-    pub set_aside : Option<PerCandidate<BallotPaperCount>>,
+    pub set_aside_for_quota: Option<PerCandidate<BallotPaperCount>>,
     /// status at end of count.
     pub status : EndCountStatus<Tally>,
     /// A special name for the count, if not 1,2,3,... Mainly used so that each exclusion or surplus distribution is a single "major" count with possibly minor counts included.

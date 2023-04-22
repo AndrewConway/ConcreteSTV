@@ -209,7 +209,7 @@ struct PendingTranscript<Tally> {
     not_continuing : Vec<CandidateIndex>,
     created_transfer_value : Option<TransferValueCreation<Tally>>,
     decisions : Vec<DecisionMadeByEC>,
-    set_aside : Option<PerCandidate<BallotPaperCount>>
+    set_aside_for_quota: Option<PerCandidate<BallotPaperCount>>
 }
 
 /// The main workhorse class that does preference distribution.
@@ -288,7 +288,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 not_continuing: vec![],
                 created_transfer_value: None,
                 decisions: vec![],
-                set_aside: None,
+                set_aside_for_quota: None,
             },
             transcript : Transcript {
                 rules : Rules::name(),
@@ -570,7 +570,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             not_continuing: self.in_this_count.not_continuing.clone(),
             created_transfer_value: self.in_this_count.created_transfer_value.take(),
             decisions: self.in_this_count.decisions.clone(),
-            set_aside: self.in_this_count.set_aside.take(),
+            set_aside_for_quota: self.in_this_count.set_aside_for_quota.take(),
             status: EndCountStatus {
                 tallies: PerCandidate {
                     candidate: self.tallys.clone(),
@@ -832,16 +832,18 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
         // If the number of transferred ballots is equal to the surplus, then all exhausted votes stay with the candidate, otherwise the difference are counted as set aside.
         // println!("Surplus={} Total transferred={} TV={} set_aside={:?},distributed={:?}",surplus,total_transferred,transfer_value,set_aside_by_candidate,distributed.by_candidate.iter().map(|v|v.num_ballots).collect::<Vec<_>>());
-        let set_aside_exhausted = surplus-total_transferred;
-        let (exhausted_retained_for_quota,exhausted_set_aside) = distributed.exhausted_votes.set_aside_arbitrarily(set_aside_exhausted);
+        let exhausted_that_would_be_distributed_if_they_could_be = surplus-total_transferred;
+        let exhausted_that_are_set_aside_for_quota = distributed.exhausted-exhausted_that_would_be_distributed_if_they_could_be;
+        println!("surplus={} total_transferred={}",surplus,total_transferred);
+        let (exhausted_retained_for_quota,exhausted_set_aside) = distributed.exhausted_votes.set_aside_arbitrarily(exhausted_that_would_be_distributed_if_they_could_be);
         self.papers[candidate_being_distributed.0].add(&exhausted_retained_for_quota, TransferValue::one(), self.current_count, None, exhausted_retained_for_quota.num_ballots.0.into());
-        assert_eq!(exhausted_set_aside.num_ballots,set_aside_exhausted);
-        self.exhausted += set_aside_exhausted;
-        self.tally_exhausted += set_aside_exhausted.0.into();
+        assert_eq!(exhausted_retained_for_quota.num_ballots,exhausted_that_are_set_aside_for_quota);
+        self.exhausted += exhausted_that_would_be_distributed_if_they_could_be;
+        self.tally_exhausted += exhausted_that_would_be_distributed_if_they_could_be.0.into();
         self.exhausted_atl += exhausted_set_aside.num_atl_ballots;
-        self.in_this_count.set_aside = Some(PerCandidate {
+        self.in_this_count.set_aside_for_quota = Some(PerCandidate {
             candidate: set_aside_by_candidate,
-            exhausted: set_aside_exhausted,
+            exhausted: exhausted_that_are_set_aside_for_quota,
             rounding: SignedVersion { negative: false, value: BallotPaperCount::zero() },
             set_aside: None,
         });

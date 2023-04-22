@@ -481,7 +481,7 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
             paper_total,
             vote_delta,
             paper_delta,
-            paper_set_aside: None,
+            paper_set_aside_for_quota: None,
             count_name: None,
             papers_came_from_counts,
         });

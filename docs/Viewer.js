@@ -71,8 +71,9 @@ function Render() {
     document.getElementById("NothingChosen").className="hidden";
     if (document_to_show.transcript) {
         document.getElementById("TranscriptOnly").className="";
-        const has_set_aside = document_to_show.transcript.counts.some(a=>a.set_aside);
+        const has_set_aside = document_to_show.transcript.counts.some(a=>a.set_aside_for_quota);
         document.getElementById("ShowSetAside").className=has_set_aside?"":"hidden";
+        document.getElementById("ShowSetAsideLabel").className=has_set_aside?"":"hidden";
         RenderTranscript(document_to_show,render_div);
     } else if (document_to_show.original && document_to_show.changes) {
         document.getElementById("ChangeOnly").className="";
@@ -253,7 +254,7 @@ function RenderTranscript(full_transcript,render_div) {
             }
             if (show_set_aside) {
                 if (deltarow) {
-                    add(deltarow,"td",status+" SetAside").innerText=count.set_aside?zero_is_blank(count.set_aside.candidate[i]):"";
+                    add(deltarow,"td",status+" SetAside").innerText=count.set_aside_for_quota?zero_is_blank(count.set_aside_for_quota.candidate[i]):"";
                 }
                 const papers = add(row,"td",status);
             }
@@ -280,7 +281,7 @@ function RenderTranscript(full_transcript,render_div) {
                 add(row,"td","Continuing BallotPapers").innerText=zero_is_blank(count.status.papers.exhausted);
             }
             if (show_set_aside) {
-                if (deltarow) add(deltarow,"td","Continuing SetAside").innerText=count.set_aside?zero_is_blank(count.set_aside.exhausted):"";
+                if (deltarow) add(deltarow,"td","Continuing SetAside").innerText=count.set_aside_for_quota?zero_is_blank(count.set_aside_for_quota.exhausted):"";
                 add(row,"td","Continuing");
             }
         }
