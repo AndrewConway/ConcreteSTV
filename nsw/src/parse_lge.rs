@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -16,12 +16,12 @@ use anyhow::{anyhow, Context};
 use scraper::{ElementRef, Html, Selector};
 use stv::ballot_paper::PreferencesComingOutOfOrderHelper;
 use stv::parse_util::{file_to_string, file_to_string_windows_1252, FileFinder, KnowsAboutRawMarkings, MissingAlternateNamedFiles, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
-use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionExplicitDecisionInCount, TieResolutionsMadeByEC};
 use serde::{Serialize,Deserialize};
 use url::Url;
 use stv::ballot_pile::BallotPaperCount;
 use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
-use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
+use stv::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo};
 use stv::download::CacheDir;
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use stv::parse_util::parse_xlsx_by_converting_to_csv_using_openoffice;
@@ -260,10 +260,11 @@ impl NSWLGEDataLoader {
             }
         }
         if electorate=="Port Stephens - Central Ward" && self.year.as_str()=="2017" {
-            metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{
-                favoured: vec![CandidateIndex(1)],
-                disfavoured: vec![CandidateIndex(2),CandidateIndex(13),CandidateIndex(14),CandidateIndex(15)],
-                came_up_in: Some("2".to_string()),
+            let favoured = vec![CandidateIndex(1)];
+            let disfavoured = vec![CandidateIndex(2), CandidateIndex(13), CandidateIndex(14), CandidateIndex(15)];
+            metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecisionInCount {
+                decision: TieResolutionExplicitDecision::two_lists(disfavoured,favoured),
+                came_up_in: Some(CountIndex(1)),
             }))
         }
         Ok((metadata,preferences_loc))

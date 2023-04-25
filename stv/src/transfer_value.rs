@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -14,8 +14,8 @@ use std::hash::Hash;
 use std::str::FromStr;
 use num::rational::{ParseRatioError, Ratio};
 use crate::ballot_metadata::CandidateIndex;
-use crate::distribution_of_preferences_transcript::{DecisionMadeByEC, Transcript};
-use crate::tie_resolution::{MethodOfTieResolution, TieResolutionGranularityNeeded, TieResolutionsMadeByEC};
+use crate::distribution_of_preferences_transcript::{CountIndex, Transcript};
+use crate::tie_resolution::{MethodOfTieResolution, TieResolutionExplicitDecision, TieResolutionGranularityNeeded, TieResolutionsMadeByEC, TieResolutionUsage};
 
 #[derive(Clone,Debug,Serialize,Deserialize,Ord, PartialOrd, Eq, PartialEq,Hash)]
 #[serde(into = "String")]
@@ -149,8 +149,8 @@ impl TransferValue {
     /// are transferred.
     ///
     /// Returns an array of candidates
-    pub fn calculate_number_of_ballot_papers_to_be_set_aside<Tally:Clone+Hash+Ord+Display+FromStr+Debug>(&self, surplus:BallotPaperCount, num_candidates:usize, transcript:&Transcript<Tally>, distributed:&DistributedVotes<'_>, use_f32_instead_of_exact:bool, ec_resolutions: &TieResolutionsMadeByEC) -> (Vec<BallotPaperCount>, Option<DecisionMadeByEC>)  {
-        let mut ec_decision : Option<DecisionMadeByEC> = None;
+    pub fn calculate_number_of_ballot_papers_to_be_set_aside<Tally:Clone+Hash+Ord+Display+FromStr+Debug>(&self, surplus:BallotPaperCount, num_candidates:usize, transcript:&Transcript<Tally>, distributed:&DistributedVotes<'_>, use_f32_instead_of_exact:bool, ec_resolutions: &TieResolutionsMadeByEC,current_count:CountIndex) -> (Vec<BallotPaperCount>, Option<TieResolutionExplicitDecision>)  {
+        let mut ec_decision : Option<TieResolutionExplicitDecision> = None;
         let set_aside_by_candidate = if self.is_one() { // work out how to distribute.
             vec![BallotPaperCount::zero();num_candidates]
         } else {
@@ -193,10 +193,10 @@ impl TransferValue {
                     while end_tied_index_exclusive<compute_transferred.len() && compute_transferred[extra_to_distribute].distributed==compute_transferred[end_tied_index_exclusive].distributed { end_tied_index_exclusive+=1; }
                     let mut tied_candidates : Vec<CandidateIndex> = compute_transferred[start_tied_index..end_tied_index_exclusive].iter().map(|v|v.candidate).collect();
                     let num_missing_out_on_rounding_up = end_tied_index_exclusive-extra_to_distribute;
-                    ec_decision = MethodOfTieResolution::AnyDifferenceIsADiscriminator.resolve(&mut tied_candidates,transcript,TieResolutionGranularityNeeded::LowestSeparated(num_missing_out_on_rounding_up));
-                    if ec_decision.is_some() {
-                        ec_resolutions.resolve(&mut tied_candidates,TieResolutionGranularityNeeded::LowestSeparated(num_missing_out_on_rounding_up));
-                    }
+                    if let Some((remaining_tied,remaining_granularity)) = MethodOfTieResolution::AnyDifferenceIsADiscriminator.resolve(&mut tied_candidates,transcript,TieResolutionGranularityNeeded::LowestSeparated(num_missing_out_on_rounding_up)) {
+                        let decision = ec_resolutions.resolve(remaining_tied,remaining_granularity,TieResolutionUsage::RoundingUp,current_count);
+                        ec_decision = Some(decision);
+                    };
                     for i in 0..tied_candidates.len() {
                         compute_transferred[i+start_tied_index].candidate=tied_candidates[tied_candidates.len()-1-i]; // tied_candidates is sorted low to high.
                     }

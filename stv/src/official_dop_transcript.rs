@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -21,7 +21,7 @@ use crate::datasource_description::ElectionDataSource;
 use crate::official_dop_transcript::DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyDeltaRounding;
 use crate::parse_util::FileFinder;
 use crate::preference_distribution::PreferenceDistributionRules;
-use crate::tie_resolution::TieResolutionExplicitDecision;
+use crate::tie_resolution::TieResolutionExplicitDecisionInCount;
 use crate::verify_official_transcript::distribute_preferences_using_official_results;
 
 #[derive(thiserror::Error, Debug, Eq, PartialEq)]
@@ -206,12 +206,12 @@ impl OfficialDistributionOfPreferencesTranscript {
     pub fn compare_with_transcript<Tally: Clone + Zero + Debug + PartialEq + Sub<Output=Tally> + Display + Ord + FromStr + CanConvertToF64PossiblyLossily>(&self, transcript: &Transcript<Tally>) {
         let ec_decision = self.compare_with_transcript_checking_for_ec_decisions(transcript, true).unwrap();
         if let Some(decision) = ec_decision {
-            panic!("An EC decision was not made the way we expected: {:?} was favoured over {:?}", decision.favoured, decision.disfavoured);
+            panic!("An EC decision was not made the way we expected: {}", decision.decision);
         }
     }
     /// like compare_with_transcript but don't panic if the first difference is caused by a difference in EC decision making. If so, return the decision.
     /// If there is some other error, return the error.
-    pub fn compare_with_transcript_checking_for_ec_decisions<Tally: Clone + Zero + Debug + Ord + PartialEq + Sub<Output=Tally> + Display + FromStr + CanConvertToF64PossiblyLossily>(&self, transcript: &Transcript<Tally>, verbose: bool) -> Result<Option<TieResolutionExplicitDecision>, DifferenceBetweenOfficialDoPAndComputed<Tally>> {
+    pub fn compare_with_transcript_checking_for_ec_decisions<Tally: Clone + Zero + Debug + Ord + PartialEq + Sub<Output=Tally> + Display + FromStr + CanConvertToF64PossiblyLossily>(&self, transcript: &Transcript<Tally>, verbose: bool) -> Result<Option<TieResolutionExplicitDecisionInCount>, DifferenceBetweenOfficialDoPAndComputed<Tally>> {
         fn decode<Tally: CanConvertToF64PossiblyLossily>(tally: Tally) -> f64 { tally.convert_to_f64() }
         if let Some(quota) = &self.quota {
             if quota.vacancies != transcript.quota.as_ref().unwrap().vacancies { return Err(DifferenceBetweenOfficialDoPAndComputed::DifferentNumbersOfVacanciesInQuota(quota.vacancies, transcript.quota.as_ref().unwrap().vacancies)) }
@@ -229,7 +229,7 @@ impl OfficialDistributionOfPreferencesTranscript {
     }
 
     /// Compare a specific count on the official count to the actual count.
-    fn compare_with_transcript_checking_for_ec_decisions_on_given_count<Tally: Clone + Zero + Ord + Debug + PartialEq + Sub<Output=Tally> + Display + FromStr + CanConvertToF64PossiblyLossily>(&self, transcript: &Transcript<Tally>, count_number: CountIndex, verbose: bool) -> Result<Option<TieResolutionExplicitDecision>, DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally>> {
+    fn compare_with_transcript_checking_for_ec_decisions_on_given_count<Tally: Clone + Zero + Ord + Debug + PartialEq + Sub<Output=Tally> + Display + FromStr + CanConvertToF64PossiblyLossily>(&self, transcript: &Transcript<Tally>, count_number: CountIndex, verbose: bool) -> Result<Option<TieResolutionExplicitDecisionInCount>, DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally>> {
         fn decode<Tally: CanConvertToF64PossiblyLossily>(tally: Tally) -> f64 { tally.convert_to_f64() }
         fn different<Tally: CanConvertToF64PossiblyLossily>(official:f64,tally: Tally) -> bool {
             let our = tally.convert_to_f64();
@@ -258,26 +258,9 @@ impl OfficialDistributionOfPreferencesTranscript {
         let excluded_comparison = DifferentCandidateLists{ list1: official_count.excluded.clone(), list2: my_excluded.clone() };
         let excluded_deltas : DeltasInCandidateLists = excluded_comparison.into();
         if !excluded_deltas.is_empty() {
-            for who in &official_count.excluded {
-                if !my_excluded.contains(who) { // this could be improved.
-                    if let Some(relevant_decision) = my_count.decisions.iter().find(|d| d.affected.contains(who)) { // may exclude a different candidate because of random decisions.
-                        // The EC excluded "who". Work out whom I excluded.
-                        if let Some(&_who_was_lucky) = relevant_decision.affected.iter().find(|&c| my_count.not_continuing.contains(c)) {
-                            // I excluded "who_was_lucky". They should have a higher priority than "who".
-                            let favoured = relevant_decision.affected.iter().filter(|&&c| c != *who).cloned().collect::<Vec<_>>();
-                            return Ok(Some(TieResolutionExplicitDecision { favoured, disfavoured: vec![*who], came_up_in: my_count.count_name.clone().or_else(|| Some((count_number.0 + 1).to_string())) }))
-                            // panic!("I excluded candidate {} but the EC excluded candidate {}. This was chosen by lot.",who_was_lucky,who);
-                        } /*else {
-                            Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::CandidateNotContinuingInOfficialCountWithPointlessDecision(*who, relevant_decision.affected.clone()))
-                        }*/
-                    } /*else {
-                        let mut official_order = official_count.elected.clone();
-                        official_order.sort_by_key(|c|c.0);
-                        let mut my_order = my_count.elected.iter().map(|e| e.who).collect::<Vec<CandidateIndex>>();
-                        my_order.sort_by_key(|c|c.0);
-
-                        Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::CandidateNotContinuingInOfficalCount(*who))
-                    }*/
+            for decision in &my_count.decisions { // see if a different decision would solve this.
+                if let Some(alternate_decision) = decision.could_a_different_decision_have_caused_different_candidates_to_be_excluded(&excluded_deltas) {
+                    return Ok(Some(TieResolutionExplicitDecisionInCount { decision: alternate_decision, came_up_in: Some(count_number) }))
                 }
             }
             let mut official_order = official_count.excluded.clone();
@@ -376,7 +359,7 @@ pub fn candidate_elem<T:Default+Clone>(vec : &mut Vec<T>, who:CandidateIndex) ->
 /// Innermost error is discrepancies with the official DoP.
 ///
 /// If `save_transcripts` is true, transcripts will be saved to the `test_transcripts` folder.
-pub fn test_official_dop_without_actual_votes<Rules:PreferenceDistributionRules,Source:ElectionDataSource>(source:&Source,year:&str,state:&str,save_transcripts:bool) -> anyhow::Result<Result<Option<TieResolutionExplicitDecision>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
+pub fn test_official_dop_without_actual_votes<Rules:PreferenceDistributionRules,Source:ElectionDataSource>(source:&Source,year:&str,state:&str,save_transcripts:bool) -> anyhow::Result<Result<Option<TieResolutionExplicitDecisionInCount>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
     let loader = source.get_loader_for_year(year,&FileFinder::find_ec_data_repository())?;
     let metadata = loader.read_raw_metadata(state)?;
     let official_transcript = loader.read_official_dop_transcript(&metadata)?;

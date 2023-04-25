@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -16,6 +16,7 @@ use std::fmt::{Debug, Display, Formatter};
 use crate::preference_distribution::TransferValueMethod;
 use crate::signed_version::SignedVersion;
 use std::str::FromStr;
+use crate::tie_resolution::TieResolutionExplicitDecision;
 
 
 /// The index of a count. 0 means the first. This is different from the human readable
@@ -201,6 +202,7 @@ pub struct TransferValueCreation<Tally> {
 /// Sometimes the Electoral Commission needs to make a decision, such as tie resolution.
 /// Sometimes legislation mandates this be random, sometimes the returning officer.
 /// Regardless, this records that the decision needs to be made.
+/// TODO remove.
 #[derive(Clone,Serialize,Deserialize)]
 pub struct DecisionMadeByEC {
     pub affected : Vec<CandidateIndex>
@@ -230,8 +232,8 @@ pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
     pub not_continuing : Vec<CandidateIndex>,
     /// If a transfer value was created, how
     pub created_transfer_value : Option<TransferValueCreation<Tally>>,
-    /// whether the EC needs to make any decisions
-    pub decisions : Vec<DecisionMadeByEC>,
+    /// the decisions made by the EC (possibly randomly)
+    pub decisions : Vec<TieResolutionExplicitDecision>,
     /// if there are any set aside for quota votes on this distribution (at time of writing only used for old NSW)
     #[serde(skip_serializing_if = "Option::is_none",default)]
     pub set_aside_for_quota: Option<PerCandidate<BallotPaperCount>>,

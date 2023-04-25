@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{BufReader, Seek, BufRead, SeekFrom, Read};
 use crate::election_data::ElectionData;
-use crate::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
+use crate::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecisionInCount, TieResolutionsMadeByEC};
 use anyhow::{anyhow, Context};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -25,7 +25,6 @@ use reqwest::Url;
 use crate::ballot_paper::{RawBallotMarkings};
 use crate::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
 use crate::datasource_description::{AssociatedRules, Copyright};
-use crate::distribution_of_preferences_transcript::ReasonForCount;
 use crate::errors_btl::ObviousErrorsInBTLVotes;
 use crate::find_vote::{FindMyVoteQuery, FindMyVoteResult};
 use crate::official_dop_transcript::OfficialDistributionOfPreferencesTranscript;
@@ -220,39 +219,31 @@ pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutio
     if electorate.ends_with("Mayoral") { return Ok(data); } // don't have DOP file for mayoral elections. Besides, STV is not necessarily exactly a generalization of IRV... e.g. early termination conditions.
     // let mut tie_resolutions = TieResolutionsMadeByEC::default();
     let official_transcript = loader.read_official_dop_transcript(&data.metadata)?;
+    // let mut initial_ec_decisions = data.metadata.tie_resolutions.clone(); // should be empty, unless we set it up some way else.
     data.metadata.tie_resolutions=TieResolutionsMadeByEC::default(); // Get rid of less fine grained decisions that may be entered.
-    let mut initial_ec_decisions = data.metadata.tie_resolutions.clone(); // should be empty, unless we set it up some way else.
     loop {
         println!("Looping...");
         let transcript = data.distribute_preferences::<Rules>();
         if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript,false).context("Trying to determine EC decisions")? {
-            println!("Observed tie resolution favouring {:?} over {:?}", decision.favoured, decision.disfavoured);
-            assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
+            println!("Observed tie resolution {}", decision.decision);
+            assert!(!decision.decision.is_reverse_donkey_vote(), "favoured candidate should be lower as higher candidates are assumed favoured.");
             data.metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
         } else {
-            // now check for EC decisions that were compatible with my default assumption of reverse-donkey-vote.
+            // rebuild the list of decisions based upon the values in the transcript. This will get any decisions that "happened naturally", and put them all in order.
+            let mut final_ec_decisions = TieResolutionsMadeByEC::default();
             for (count_index,count) in transcript.counts.iter().enumerate() {
                 for decision in &count.decisions {
-                    match &count.reason {
-                        ReasonForCount::Elimination(disfavoured) => {
-                            if disfavoured.iter().all(|c|decision.affected.contains(c)) {
-                                let disfavoured = disfavoured.clone();
-                                let favoured = decision.affected.iter().filter(|&c|!disfavoured.contains(c)).cloned().collect();
-                                let ecdecision = TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{favoured,disfavoured,came_up_in:count.count_name.clone().or_else(||Some((count_index+1).to_string()))});
-                                initial_ec_decisions.tie_resolutions.push(ecdecision);
-                            }
-                        }
-                        _ => {}
-                    }
+                    let ecdecision = TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecisionInCount {decision: decision.clone(),came_up_in:Some(CountIndex(count_index))});
+                    final_ec_decisions.tie_resolutions.push(ecdecision);
                 }
             }
             // check the newly deduced list contains every decision previously deduced.
             for decision in &data.metadata.tie_resolutions.tie_resolutions {
-                if !initial_ec_decisions.tie_resolutions.contains(decision) {
+                if !final_ec_decisions.tie_resolutions.contains(decision) {
                     panic!("EC decision {:?} was not in the re-deduced set",decision);
                 }
             }
-            data.metadata.tie_resolutions=initial_ec_decisions; // overwrite to get decisions in count order.
+            data.metadata.tie_resolutions= final_ec_decisions; // overwrite to get decisions in count order.
             // if there is no "winning candidates" section in the metadata, add it.
             if let Some(official_results) = data.metadata.results.clone() {
                 // check the official results match the actual
@@ -381,6 +372,8 @@ pub fn file_to_string_windows_1252(file:&mut File) -> anyhow::Result<String> {
 
 
 use once_cell::sync::Lazy;
+use crate::distribution_of_preferences_transcript::CountIndex;
+
 // The openoffice CLI seems to be unreliable if running multiple simultaneously. This is used as a lock.
 static OPENOFFICE_CLI_LOCK: Lazy<Mutex<u64>> = Lazy::new(||Mutex::new(1u64));
 

@@ -1,4 +1,4 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -15,11 +15,11 @@ use thiserror::Error;
 use crate::ballot_metadata::{CandidateIndex, ElectionMetadata};
 use crate::ballot_paper::BTL;
 use crate::ballot_pile::BallotPaperCount;
-use crate::distribution_of_preferences_transcript::{CountIndex, DecisionMadeByEC, PerCandidate, QuotaInfo, Transcript};
+use crate::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo, Transcript};
 use crate::election_data::ElectionData;
 use crate::official_dop_transcript::{CanConvertToF64PossiblyLossily, OfficialDistributionOfPreferencesTranscript};
 use crate::preference_distribution::{PreferenceDistributionRules, PreferenceDistributor};
-use crate::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionGranularityNeeded, TieResolutionsMadeByEC};
+use crate::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionExplicitDecisionInCount, TieResolutionGranularityNeeded, TieResolutionsMadeByEC};
 
 #[derive(Error, Debug)]
 pub enum IssueWithOfficialDOPTranscript<Tally:Display+Debug> {
@@ -280,13 +280,13 @@ impl <'a> OracleFromOfficialDOP<'a> {
         }
     }
 
-    pub fn resolve_tie_resolution(&mut self, current_count:CountIndex,granularity:TieResolutionGranularityNeeded,decision_needed:DecisionMadeByEC) -> Option<TieResolutionAtom> {
+    pub fn resolve_tie_resolution(&mut self, current_count:CountIndex,granularity:TieResolutionGranularityNeeded,tied_candidates:&[CandidateIndex]) -> Option<TieResolutionAtom> {
         if current_count.0>self.official.counts.len() { return None }
         let count = &self.official.counts[current_count.0];
-        let mut elected_this_count : Vec<CandidateIndex> = count.elected.iter().filter(|c|decision_needed.affected.contains(c)).cloned().collect();
-        let mut excluded_this_count : Vec<CandidateIndex> = count.excluded.iter().filter(|c|decision_needed.affected.contains(c)).cloned().collect();
-        let mut remaining : Vec<CandidateIndex> = decision_needed.affected.iter().filter(|c|!(elected_this_count.contains(*c)||excluded_this_count.contains(*c))).cloned().collect();
-        assert_eq!(decision_needed.affected.len(),elected_this_count.len()+excluded_this_count.len()+remaining.len());
+        let mut elected_this_count : Vec<CandidateIndex> = count.elected.iter().filter(|c|tied_candidates.contains(c)).cloned().collect();
+        let mut excluded_this_count : Vec<CandidateIndex> = count.excluded.iter().filter(|c|tied_candidates.contains(c)).cloned().collect();
+        let mut remaining : Vec<CandidateIndex> = tied_candidates.iter().filter(|c|!(elected_this_count.contains(*c)||excluded_this_count.contains(*c))).cloned().collect();
+        assert_eq!(tied_candidates.len(),elected_this_count.len()+excluded_this_count.len()+remaining.len());
         let decision = match granularity {
             TieResolutionGranularityNeeded::Total => {
                 if remaining.len()>1 { return None } // not enough information
@@ -302,10 +302,9 @@ impl <'a> OracleFromOfficialDOP<'a> {
                 } else if excluded_this_count.len()+remaining.len()==n {
                     excluded_this_count.append(&mut remaining);
                 } else { return None }
-                TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{
-                    favoured: elected_this_count,
-                    disfavoured: excluded_this_count,
-                    came_up_in: Some(count.count_name.clone().unwrap_or_else(||format!("{}",current_count.0+1))),
+                TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecisionInCount {
+                    decision: TieResolutionExplicitDecision::two_lists(excluded_this_count,elected_this_count),
+                    came_up_in: Some(current_count),
                 })
             }
         };

@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -14,7 +14,7 @@ use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::official_dop_transcript::{DifferenceBetweenOfficialDoPAndComputed, test_official_dop_without_actual_votes};
 use stv::parse_util::{FileFinder, RawDataSource};
 use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
-use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision};
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecisionInCount};
 
 
 fn test<Rules:PreferenceDistributionRules>(electorate:&str,loader:&NSWLGEDataLoader) {
@@ -41,8 +41,7 @@ fn test<Rules:PreferenceDistributionRules>(electorate:&str,loader:&NSWLGEDataLoa
         match official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,true) {
             Ok(None) => { return; }
             Ok(Some(decision)) => {
-                println!("Observed tie resolution favouring {:?} over {:?}", decision.favoured, decision.disfavoured);
-                assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
+                println!("Observed tie resolution {}", decision.decision);
                 tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
             }
             Err(DifferenceBetweenOfficialDoPAndComputed::DifferentNumbersOfCounts(official,our)) => {
@@ -140,7 +139,7 @@ fn test_2017_internally_consistent() {
 /// Test a particular year & electorate against a particular set of rules.
 /// Outermost error is IO type errors.
 /// Innermost error is discrepancies with the official DoP.
-fn test_internally_consistent<Rules:PreferenceDistributionRules>(year:&str,state:&str) -> anyhow::Result<Result<Option<TieResolutionExplicitDecision>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
+fn test_internally_consistent<Rules:PreferenceDistributionRules>(year:&str,state:&str) -> anyhow::Result<Result<Option<TieResolutionExplicitDecisionInCount>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
     test_official_dop_without_actual_votes::<Rules,_>(&NSWLGEDataSource{},year,state,false)
 }
 

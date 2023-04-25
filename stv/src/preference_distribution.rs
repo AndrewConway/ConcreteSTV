@@ -18,9 +18,9 @@ use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use crate::transfer_value::{TransferValue, StringSerializedRational};
 use std::ops::{AddAssign, Neg, SubAssign, Sub, Range, Div};
 use std::fmt::{Debug, Display};
-use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, DecisionMadeByEC, CountIndex};
+use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, CountIndex};
 use crate::util::{DetectUnique, CollectAll};
-use crate::tie_resolution::{MethodOfTieResolution, TieResolutionsMadeByEC, TieResolutionGranularityNeeded};
+use crate::tie_resolution::{MethodOfTieResolution, TieResolutionsMadeByEC, TieResolutionGranularityNeeded, TieResolutionExplicitDecision, TieResolutionUsage};
 use std::hash::Hash;
 use std::iter::Sum;
 use std::cmp::{min, Ordering};
@@ -208,7 +208,7 @@ struct PendingTranscript<Tally> {
     elected : Vec<CandidateElected>,
     not_continuing : Vec<CandidateIndex>,
     created_transfer_value : Option<TransferValueCreation<Tally>>,
-    decisions : Vec<DecisionMadeByEC>,
+    decisions : Vec<TieResolutionExplicitDecision>,
     set_aside_for_quota: Option<PerCandidate<BallotPaperCount>>
 }
 
@@ -382,7 +382,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// resolve them, first using "how", secondly using an Oracle, if present,
     /// third using self.ec_resolutions,
     /// Re-orders to_check to be in the appropriate order.
-    pub fn check_for_ties_and_resolve(&mut self,to_check:&mut [CandidateIndex],how:MethodOfTieResolution,granularity:TieResolutionGranularityNeeded) {
+    pub fn check_for_ties_and_resolve(&mut self,to_check:&mut [CandidateIndex],how:MethodOfTieResolution,granularity:TieResolutionGranularityNeeded,usage:TieResolutionUsage) {
         // let mut to_check = &mut self.continuing_candidates_sorted_by_tally[to_check];
         let mut i:usize = 0;
         while i<to_check.len() {
@@ -395,16 +395,19 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                     TieResolutionGranularityNeeded::LowestSeparated(n) if n<=differs && n>i  => Some(TieResolutionGranularityNeeded::LowestSeparated(n-i)),
                     _ => None, // no resolution needed as all in or all not in.
                 } {
-                    if let Some(decision) = how.resolve(tied,&self.transcript,sub_granularity) {
-                        self.in_this_count.decisions.push(decision.clone());
+                    if let Some((still_tied,remaining_granularity)) = how.resolve(tied,&self.transcript,sub_granularity) {
                         let solved_by_oracle = if let Some(oracle) = &mut self.oracle {
-                            if let Some(solution) = oracle.resolve_tie_resolution(self.current_count,sub_granularity,decision) {
+                            if let Some(solution) = oracle.resolve_tie_resolution(self.current_count,remaining_granularity,still_tied) {
                                 let resolutions = TieResolutionsMadeByEC{ tie_resolutions: vec![solution] };
-                                resolutions.resolve(tied,sub_granularity);
+                                let decision = resolutions.resolve(still_tied,remaining_granularity,usage,self.current_count);
+                                self.in_this_count.decisions.push(decision);
                                 true
                             } else { false }
                         } else { false };
-                        if !solved_by_oracle { self.ec_resolutions.resolve(tied,sub_granularity); }
+                        if !solved_by_oracle {
+                            let decision = self.ec_resolutions.resolve(still_tied,remaining_granularity,usage,self.current_count);
+                            self.in_this_count.decisions.push(decision);
+                        }
                     }
                 }
             }
@@ -413,17 +416,17 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 
     /// Like check_for_ties_and_resolve but do in place on self.continuing_candidates_sorted_by_tally for the indices given in to_check
-    pub fn check_for_ties_and_resolve_inplace(&mut self,to_check:Range<usize>,how:MethodOfTieResolution,granularity:TieResolutionGranularityNeeded) {
+    pub fn check_for_ties_and_resolve_inplace(&mut self,to_check:Range<usize>,how:MethodOfTieResolution,granularity:TieResolutionGranularityNeeded,usage:TieResolutionUsage) {
         // can't just pass a mutable reference to self.continuing_candidates_sorted_by_tally[to_check] as there would be 2 mutable refs :-(
         let mut tied_candidates = self.continuing_candidates_sorted_by_tally[to_check.clone()].to_vec();
-        self.check_for_ties_and_resolve(&mut tied_candidates,how,granularity);
+        self.check_for_ties_and_resolve(&mut tied_candidates,how,granularity,usage);
         self.continuing_candidates_sorted_by_tally[to_check].copy_from_slice(&tied_candidates); // copy resolved order back.
     }
 
     pub fn check_elected_by_quota(&mut self) {
         let mut elected_by_quota : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().rev().take_while(|&&c|self.tally(c)>=self.quota).cloned().collect();
         elected_by_quota.reverse(); // make sure low to high so that tie checking ordering is compatible.
-        self.check_for_ties_and_resolve(&mut elected_by_quota,Rules::resolve_ties_elected_by_quota(),TieResolutionGranularityNeeded::Total);
+        self.check_for_ties_and_resolve(&mut elected_by_quota,Rules::resolve_ties_elected_by_quota(),TieResolutionGranularityNeeded::Total,TieResolutionUsage::OrderElected);
         for &c in elected_by_quota.iter().rev() {
             self.declare_elected(c,ElectionReason::ReachedQuota);
             if self.tally(c)>self.quota { self.pending_surplus_distribution.push_back(c); }
@@ -443,7 +446,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn check_elected_by_highest_of_remaining_2_when_1_needed_no_tie_resolution(&mut self) {
         if self.continuing_candidates_sorted_by_tally.len()==2 && self.remaining_to_elect()==NumberOfCandidates(1) {
             let mut possibilities = self.continuing_candidates_sorted_by_tally.clone();
-            self.check_for_ties_and_resolve(&mut possibilities,Rules::resolve_ties_elected_one_of_last_two(),TieResolutionGranularityNeeded::Total);
+            self.check_for_ties_and_resolve(&mut possibilities,Rules::resolve_ties_elected_one_of_last_two(),TieResolutionGranularityNeeded::Total,TieResolutionUsage::ShortcutWinner);
             // elect the highest, Electoral officer resolved ties.
             self.declare_elected(possibilities[1],ElectionReason::HighestOfLastTwoStanding);
         }
@@ -456,7 +459,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn check_if_should_elect_all_remaining(&mut self) {
         if self.number_continuing_candidates()==self.remaining_to_elect() {
             let mut elected_group = self.continuing_candidates_sorted_by_tally.clone();
-            self.check_for_ties_and_resolve(&mut elected_group,Rules::resolve_ties_elected_all_remaining(),TieResolutionGranularityNeeded::Total);
+            self.check_for_ties_and_resolve(&mut elected_group,Rules::resolve_ties_elected_all_remaining(),TieResolutionGranularityNeeded::Total,TieResolutionUsage::ShortcutWinner);
             for &c in elected_group.iter().rev() {
                 self.declare_elected(c,ElectionReason::AllRemainingMustBeElected);
             }
@@ -532,6 +535,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
     }
 
+
     pub fn end_of_count_step(&mut self,reason : ReasonForCount,portion : PortionOfReasonBeingDoneThisCount,reason_completed : bool) {
         self.resort_candidates();
         let should_check_elected = reason_completed || match reason {
@@ -543,7 +547,6 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             self.check_elected(&reason,reason_completed);
         }
         if self.print_progress_to_stdout { self.print_tallys(); }
-        self.current_count=CountIndex(self.current_count.0+1);
         let count_name : Option<String> = match Rules::how_to_name_counts() {
             CountNamingMethod::SimpleNumber => None,
             CountNamingMethod::MajorMinor => Some(format!("{}.{}",self.current_major_count.0,self.current_minor_count.0)),
@@ -569,7 +572,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             elected: self.in_this_count.elected.clone(),
             not_continuing: self.in_this_count.not_continuing.clone(),
             created_transfer_value: self.in_this_count.created_transfer_value.take(),
-            decisions: self.in_this_count.decisions.clone(),
+            decisions: std::mem::take(&mut self.in_this_count.decisions),
             set_aside_for_quota: self.in_this_count.set_aside_for_quota.take(),
             status: EndCountStatus {
                 tallies: PerCandidate {
@@ -593,10 +596,10 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             },
             count_name,
         });
+        self.current_count=CountIndex(self.current_count.0+1);
         if reason_completed { self.current_major_count=CountIndex(self.current_major_count.0+1); self.current_minor_count=CountIndex(1); }
         else { self.current_minor_count=CountIndex(self.current_minor_count.0+1); }
         self.in_this_count.not_continuing=self.in_this_count.elected.drain(..).map(|e|e.who).collect();
-        self.in_this_count.decisions.clear();
     }
 
     /// add some given number to the set_aside value. This is behind an option making it non-trivial.
@@ -811,7 +814,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// Parcel out votes by next continuing candidate with a given transfer value.
     /// Returns to the candidate being distributed the ones kept for quota.
     fn parcel_out_votes_random_portion_set_by_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,surplus:BallotPaperCount,candidate_being_distributed:CandidateIndex)  {
-        let (set_aside_by_candidate,ec_decision) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed,Rules::use_f32_arithmetic_when_applying_transfer_values_instead_of_exact(),self.ec_resolutions);
+        let (set_aside_by_candidate,ec_decision) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed,Rules::use_f32_arithmetic_when_applying_transfer_values_instead_of_exact(),self.ec_resolutions,self.current_count);
         if let Some(ec_decision) = ec_decision { self.in_this_count.decisions.push(ec_decision); }
         // do the actual distribution
         let mut total_transferred : BallotPaperCount = BallotPaperCount::zero();
@@ -834,7 +837,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         // println!("Surplus={} Total transferred={} TV={} set_aside={:?},distributed={:?}",surplus,total_transferred,transfer_value,set_aside_by_candidate,distributed.by_candidate.iter().map(|v|v.num_ballots).collect::<Vec<_>>());
         let exhausted_that_would_be_distributed_if_they_could_be = surplus-total_transferred;
         let exhausted_that_are_set_aside_for_quota = distributed.exhausted-exhausted_that_would_be_distributed_if_they_could_be;
-        println!("surplus={} total_transferred={}",surplus,total_transferred);
+        // println!("surplus={} total_transferred={}",surplus,total_transferred);
         let (exhausted_retained_for_quota,exhausted_set_aside) = distributed.exhausted_votes.set_aside_arbitrarily(exhausted_that_would_be_distributed_if_they_could_be);
         self.papers[candidate_being_distributed.0].add(&exhausted_retained_for_quota, TransferValue::one(), self.current_count, None, exhausted_retained_for_quota.num_ballots.0.into());
         assert_eq!(exhausted_retained_for_quota.num_ballots,exhausted_that_are_set_aside_for_quota);
@@ -875,7 +878,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn find_lowest_candidate(&mut self) -> Vec<CandidateIndex> {
         let lowest_tally = self.tally(self.continuing_candidates_sorted_by_tally[0]);
         let mut possibilities : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().take_while(|&&c|self.tally(c)==lowest_tally).cloned().collect();
-        self.check_for_ties_and_resolve(&mut possibilities,Rules::resolve_ties_choose_lowest_candidate_for_exclusion(),TieResolutionGranularityNeeded::LowestSeparated(1));
+        self.check_for_ties_and_resolve(&mut possibilities,Rules::resolve_ties_choose_lowest_candidate_for_exclusion(),TieResolutionGranularityNeeded::LowestSeparated(1),TieResolutionUsage::Exclusion);
         possibilities.truncate(1);
         possibilities
     }
@@ -1015,7 +1018,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             // Use rule 31(b) to resolve ties.
             let mut tie_start : usize = candidates_to_exclude-1;
             while tie_start>0 && tally_of_highest_excluded==self.tally(self.continuing_candidates_sorted_by_tally[tie_start-1]) { tie_start-=1; }
-            self.check_for_ties_and_resolve_inplace(tie_start..tie_end,Rules::resolve_ties_choose_lowest_candidate_for_exclusion(),TieResolutionGranularityNeeded::LowestSeparated(candidates_to_exclude-tie_start));
+            self.check_for_ties_and_resolve_inplace(tie_start..tie_end,Rules::resolve_ties_choose_lowest_candidate_for_exclusion(),TieResolutionGranularityNeeded::LowestSeparated(candidates_to_exclude-tie_start),TieResolutionUsage::Exclusion);
         }
         // exclude the lowest candidates_to_exclude candidates.
         Some(self.continuing_candidates_sorted_by_tally[0..candidates_to_exclude].to_vec())

@@ -1,4 +1,4 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -44,8 +44,8 @@ fn test<Rules:PreferenceDistributionRules>(electorate:&str, loader:&VicDataLoade
             serde_json::to_writer_pretty(file,&transcript).unwrap();
         }
         if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,true).unwrap() {
-            println!("Observed tie resolution favouring {:?} over {:?}", decision.favoured, decision.disfavoured);
-            assert!(decision.favoured.iter().map(|c|c.0).min().unwrap() < decision.disfavoured[0].0, "favoured candidate should be lower as higher candidates are assumed favoured.");
+            println!("Observed tie resolution {}", decision.decision);
+            assert!(!decision.decision.is_reverse_donkey_vote(), "favoured candidate should be lower as higher candidates are assumed favoured.");
             tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
         } else {
             break;

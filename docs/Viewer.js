@@ -299,7 +299,16 @@ function RenderTranscript(full_transcript,render_div) {
             tv_td.title=title;
         }
         fullSpanTD("CountAction").innerText=count.reason==="FirstPreferenceCount"?"First Preference Count":count.reason.hasOwnProperty("ExcessDistribution")?"Surplus distribution for "+cname(count.reason.ExcessDistribution):"Exclusion of "+count.reason.Elimination.map(cname).join(" & "); // TODO prettify
-        fullSpanTD("ECDecisions").innerText=count.decisions.map(a=>a.affected.map(candidate=>metadata.candidates[candidate].name+" ("+candidate+")").join(",")).join(" and ");
+        function candidate_index_array_to_string(candidate_list) {
+            return candidate_list.map(candidate=>metadata.candidates[candidate].name+" ("+candidate+")").join(",");
+        }
+        function text_description_of_decision(a) {
+            if (a.affected) return candidate_index_array_to_string(a.affected); // deprecated old style, left for compatibility with old transcripts.
+            else {
+                return candidate_index_array_to_string(a.disfavoured)+" < "+candidate_index_array_to_string(a.favoured);
+            }
+        }
+        fullSpanTD("ECDecisions").innerText=count.decisions.map(text_description_of_decision).join(" and ");
         fullSpanTD("FromCount").innerText=count.portion.papers_came_from_counts.map(format_from).join(", ");
         count_number+=1;
         last_count=count;

@@ -14,12 +14,12 @@ use stv::distribution_of_preferences_transcript::CountIndex;
 use stv::official_dop_transcript::{DifferenceBetweenOfficialDoPAndComputed, DifferenceBetweenOfficialDoPAndComputedOnParticularCount, test_official_dop_without_actual_votes};
 use stv::official_dop_transcript::DifferenceBetweenOfficialDoPAndComputed::DifferentOnCount;
 use stv::preference_distribution::PreferenceDistributionRules;
-use stv::tie_resolution::TieResolutionExplicitDecision;
+use stv::tie_resolution::TieResolutionExplicitDecisionInCount;
 
 /// Test a particular year & electorate against a particular set of rules.
 /// Outermost error is IO type errors.
 /// Innermost error is discrepancies with the official DoP.
-fn test<Rules:PreferenceDistributionRules>(year:&str,state:&str) -> anyhow::Result<Result<Option<TieResolutionExplicitDecision>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
+fn test<Rules:PreferenceDistributionRules>(year:&str,state:&str) -> anyhow::Result<Result<Option<TieResolutionExplicitDecisionInCount>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
     test_official_dop_without_actual_votes::<Rules,_>(&FederalDataSource{},year,state,false)
 }
 

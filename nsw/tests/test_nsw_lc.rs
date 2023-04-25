@@ -15,7 +15,7 @@ mod tests {
     use nsw::parse_lc::{get_nsw_lc_data_loader_2015, get_nsw_lc_data_loader_2019, get_nsw_lc_data_loader_2023, NSWLCDataSource};
     use stv::official_dop_transcript::{DifferenceBetweenOfficialDoPAndComputed, test_official_dop_without_actual_votes};
     use stv::preference_distribution::PreferenceDistributionRules;
-    use stv::tie_resolution::TieResolutionExplicitDecision;
+    use stv::tie_resolution::TieResolutionExplicitDecisionInCount;
 
 
     #[test]
@@ -84,7 +84,7 @@ mod tests {
     /// Test a particular year & electorate against a particular set of rules.
     /// Outermost error is IO type errors.
     /// Innermost error is discrepancies with the official DoP.
-    fn test_internally_consistent<Rules:PreferenceDistributionRules>(year:&str) -> anyhow::Result<Result<Option<TieResolutionExplicitDecision>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
+    fn test_internally_consistent<Rules:PreferenceDistributionRules>(year:&str) -> anyhow::Result<Result<Option<TieResolutionExplicitDecisionInCount>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
         test_official_dop_without_actual_votes::<Rules,_>(&NSWLCDataSource{},year,"",false)
     }
 

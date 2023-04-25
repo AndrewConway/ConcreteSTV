@@ -15,10 +15,10 @@ use stv::election_data::ElectionData;
 use anyhow::{anyhow, Context};
 use scraper::{ElementRef, Html, Selector};
 use stv::parse_util::{FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource};
-use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionExplicitDecisionInCount, TieResolutionsMadeByEC};
 use stv::ballot_pile::BallotPaperCount;
 use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
-use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
+use stv::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo};
 use stv::download::CacheDir;
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use crate::parse_lge::{parse_fp_by_grp_and_candidate_by_vote_type, parse_zip_election_file};
@@ -129,10 +129,11 @@ impl RawDataSource for NSWLCDataLoader {
                 let fp_by_grp_and_candidate_by_vote_type = base_url.join("fp_by_grp_and_candidate_by_vote_type")?;
                 let file = cache.get_file(fp_by_grp_and_candidate_by_vote_type.as_str())?;
                 let mut metadata = parse_fp_by_grp_and_candidate_by_vote_type(file,false,Some(NumberOfCandidates(21)),false,self.name(electorate))?;
-                metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{
-                    favoured: vec![5,12,28,30,34,37,48,52,54,60,61,62,80,85,103,109,111,148,171,192,193,196,198,240,241,243].into_iter().map(|i|CandidateIndex(i)).collect(),
-                    disfavoured: vec![36,72,73,74,90,139,142,143,195,213,217,236,242,249,252,254].into_iter().map(|i|CandidateIndex(i)).collect(),
-                    came_up_in: Some("4".to_string()),
+                let favoured = vec![5,12,28,30,34,37,48,52,54,60,61,62,80,85,103,109,111,148,171,192,193,196,198,240,241,243].into_iter().map(|i|CandidateIndex(i)).collect();
+                let disfavoured = vec![36,72,73,74,90,139,142,143,195,213,217,236,242,249,252,254].into_iter().map(|i|CandidateIndex(i)).collect();
+                metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecisionInCount {
+                    decision: TieResolutionExplicitDecision::two_lists(disfavoured,favoured),
+                    came_up_in: Some(CountIndex(3)),
                 }));
                 Ok(metadata)
             }

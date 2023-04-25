@@ -19,7 +19,7 @@ use margin::record_changes::ElectionChanges;
 use stv::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use stv::election_data::ElectionData;
 use stv::preference_distribution::PreferenceDistributionRules;
-use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionsMadeByEC};
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionExplicitDecisionInCount, TieResolutionsMadeByEC};
 use crate::rules::Rules;
 
 pub mod rules;
@@ -32,9 +32,8 @@ fn string_to_candidate_list(s:&str) -> Result<Vec<CandidateIndex>,ParseIntError>
 /// Utility that is helpful for parsing in clap a Vec<Vec<CandidateIndex>>.
 pub fn try_parse_candidate_list(s:&str) -> Result<TieResolutionAtom,ParseIntError> {
     if let Some((disfavoured,favoured)) = s.split_once(',') {
-        Ok(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{
-            favoured: string_to_candidate_list(favoured)?,
-            disfavoured: string_to_candidate_list(disfavoured)?,
+        Ok(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecisionInCount {
+            decision: TieResolutionExplicitDecision::two_lists(string_to_candidate_list(disfavoured)?,string_to_candidate_list(favoured)?),
             came_up_in: None
         }))
     } else {
