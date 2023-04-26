@@ -149,8 +149,8 @@ impl TransferValue {
     /// are transferred.
     ///
     /// Returns an array of candidates
-    pub fn calculate_number_of_ballot_papers_to_be_set_aside<Tally:Clone+Hash+Ord+Display+FromStr+Debug>(&self, surplus:BallotPaperCount, num_candidates:usize, transcript:&Transcript<Tally>, distributed:&DistributedVotes<'_>, use_f32_instead_of_exact:bool, ec_resolutions: &TieResolutionsMadeByEC,current_count:CountIndex) -> (Vec<BallotPaperCount>, Option<TieResolutionExplicitDecision>)  {
-        let mut ec_decision : Option<TieResolutionExplicitDecision> = None;
+    pub fn calculate_number_of_ballot_papers_to_be_set_aside<Tally:Clone+Hash+Ord+Display+FromStr+Debug>(&self, surplus:BallotPaperCount, num_candidates:usize, transcript:&Transcript<Tally>, distributed:&DistributedVotes<'_>, use_f32_instead_of_exact:bool, ec_resolutions: &TieResolutionsMadeByEC,current_count:CountIndex) -> (Vec<BallotPaperCount>, Vec<TieResolutionExplicitDecision>)  {
+        let mut ec_decision : Vec<TieResolutionExplicitDecision> = vec![];
         let set_aside_by_candidate = if self.is_one() { // work out how to distribute.
             vec![BallotPaperCount::zero();num_candidates]
         } else {
@@ -193,9 +193,9 @@ impl TransferValue {
                     while end_tied_index_exclusive<compute_transferred.len() && compute_transferred[extra_to_distribute].distributed==compute_transferred[end_tied_index_exclusive].distributed { end_tied_index_exclusive+=1; }
                     let mut tied_candidates : Vec<CandidateIndex> = compute_transferred[start_tied_index..end_tied_index_exclusive].iter().map(|v|v.candidate).collect();
                     let num_missing_out_on_rounding_up = end_tied_index_exclusive-extra_to_distribute;
-                    if let Some((remaining_tied,remaining_granularity)) = MethodOfTieResolution::AnyDifferenceIsADiscriminator.resolve(&mut tied_candidates,transcript,TieResolutionGranularityNeeded::LowestSeparated(num_missing_out_on_rounding_up)) {
+                    for (remaining_tied,remaining_granularity) in MethodOfTieResolution::AnyDifferenceIsADiscriminator.resolve(&mut tied_candidates, transcript, TieResolutionGranularityNeeded::LowestSeparated(num_missing_out_on_rounding_up)) {
                         let decision = ec_resolutions.resolve(remaining_tied,remaining_granularity,TieResolutionUsage::RoundingUp,current_count);
-                        ec_decision = Some(decision);
+                        ec_decision.push(decision);
                     };
                     for i in 0..tied_candidates.len() {
                         compute_transferred[i+start_tied_index].candidate=tied_candidates[tied_candidates.len()-1-i]; // tied_candidates is sorted low to high.

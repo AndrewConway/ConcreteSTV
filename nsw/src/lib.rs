@@ -152,6 +152,10 @@ impl PreferenceDistributionRules for NSWECLocalGov2021 {
     /// 29       25    25   25
     /// ```text
     /// The NSWEC excluded BA at count 24, which means there was not a requirement for all to be different.
+    ///
+    /// It is not clear whether if a countback resolves some but not all candidates, then is there a lot amongst all or just the unresolved?
+    /// I am giving the NSWEC the benefit of the doubt and taking the more powerful answer as there is convincing
+    /// evidence that this was done in the prior system (e.g. Port Stephens - Central Ward, count 2, 2017)
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished }
     fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished }
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished }

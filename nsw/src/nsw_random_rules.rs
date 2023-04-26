@@ -36,7 +36,14 @@ pub trait NSWRandomVariations {
     /// Candidates.
     /// '''
     ///
-    /// This is ambiguous for LGEs, probably AnyDifferenceIsADiscriminator but unambiguous for LCs as None.
+    /// This is ambiguous for LGEs, probably AnyDifferenceIsADiscriminatorDrawJustForRemaining but unambiguous for LCs as None.
+    /// It clumsily implies that a draw should only be done for the LGS case for the candidates that can't be conducted by countback.
+    /// This is specified more explicitly in a different situation, 1.4.18:
+    /// ```text
+    /// If there is still an undistributed surplus left a draw is conducted between the remaining tied
+    /// candidates who have had equal progressive totals at all proceeding Counts (including Count 1).
+    /// ```
+    /// This latter case is hard coded in the DoP.
     ///
     /// We don't know if the 2016 NSWEC bug in resolving ties for exclusion (common) also applied to this (rare) case.
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution;
@@ -54,7 +61,7 @@ pub trait NSWRandomVariations {
     /// Candidates have had equal Progressive Totals at all preceding Counts (including Count 1), then a
     /// draw must be conducted to determine the Candidate to be Excluded.
     ///
-    /// This is ambiguous for LGEs, probably AnyDifferenceIsADiscriminator but unambiguous for LCs as None.
+    /// This is ambiguous for LGEs, probably AnyDifferenceIsADiscriminatorDrawJustForRemaining but unambiguous for LCs as None.
     ///
     /// Furthermore, there was a bug we discovered in the NSWEC implementation - see report "2016 NSW LGE Errors.pdf"
     /// ```
@@ -102,9 +109,9 @@ impl NSWRandomVariations for NSWECLGE2012 {
     /// Assuming this bug was not newly created in 2016
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::None }
     fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanOrEqualToDifferenceBetweenTwoLowestContinuingCandidates }
-
     /// This is the error in our report "LSWLGE2012CountErrorTechReport.pdf"
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElectedPlusSimilarBonusIfExclusion }
+    /// Assuming this bug was not newly created in 2016
     fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
 }
@@ -115,9 +122,11 @@ pub struct NSWECLGE2016{}
 impl NSWRandomVariations for NSWECLGE2016 {
     fn name() -> String { "NSWECrandomLGE2016".to_string() }
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
+    /// 2016 Bug 1
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::None }
     fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanOrEqualToDifferenceBetweenTwoLowestContinuingCandidates }
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LastPlusIfItWasSurplusDistributionPriorSurplusDistributionsWithoutAnyoneElected }
+    /// 2016 Bug 2
     fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
 }

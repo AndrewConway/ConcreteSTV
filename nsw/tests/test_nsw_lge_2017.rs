@@ -21,14 +21,6 @@ fn test<Rules:PreferenceDistributionRules>(electorate:&str,loader:&NSWLGEDataLoa
     let data = loader.read_raw_data(electorate).unwrap();
     data.print_summary();
     let mut tie_resolutions = data.metadata.tie_resolutions.clone();
-    /*
-    if electorate=="Port Stephens - Central Ward" {
-        tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecision{
-            favoured: vec![CandidateIndex(1)],
-            disfavoured: vec![CandidateIndex(2),CandidateIndex(13),CandidateIndex(14),CandidateIndex(15)],
-            came_up_in: Some("2".to_string()),
-        }))
-    }*/
     let official_transcript = loader.read_official_dop_transcript(&data.metadata).unwrap();
     loop {
         let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &data.metadata.excluded.iter().cloned().collect(), &tie_resolutions,None,false);

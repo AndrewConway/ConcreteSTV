@@ -395,7 +395,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                     TieResolutionGranularityNeeded::LowestSeparated(n) if n<=differs && n>i  => Some(TieResolutionGranularityNeeded::LowestSeparated(n-i)),
                     _ => None, // no resolution needed as all in or all not in.
                 } {
-                    if let Some((still_tied,remaining_granularity)) = how.resolve(tied,&self.transcript,sub_granularity) {
+                    for (still_tied,remaining_granularity) in how.resolve(tied,&self.transcript,sub_granularity) {
                         let solved_by_oracle = if let Some(oracle) = &mut self.oracle {
                             if let Some(solution) = oracle.resolve_tie_resolution(self.current_count,remaining_granularity,still_tied) {
                                 let resolutions = TieResolutionsMadeByEC{ tie_resolutions: vec![solution] };
@@ -814,8 +814,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// Parcel out votes by next continuing candidate with a given transfer value.
     /// Returns to the candidate being distributed the ones kept for quota.
     fn parcel_out_votes_random_portion_set_by_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,surplus:BallotPaperCount,candidate_being_distributed:CandidateIndex)  {
-        let (set_aside_by_candidate,ec_decision) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed,Rules::use_f32_arithmetic_when_applying_transfer_values_instead_of_exact(),self.ec_resolutions,self.current_count);
-        if let Some(ec_decision) = ec_decision { self.in_this_count.decisions.push(ec_decision); }
+        let (set_aside_by_candidate,ec_decisions) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed,Rules::use_f32_arithmetic_when_applying_transfer_values_instead_of_exact(),self.ec_resolutions,self.current_count);
+        self.in_this_count.decisions.extend(ec_decisions);
         // do the actual distribution
         let mut total_transferred : BallotPaperCount = BallotPaperCount::zero();
         for (candidate_index,candidate_ballots) in distributed.by_candidate.iter().enumerate() {

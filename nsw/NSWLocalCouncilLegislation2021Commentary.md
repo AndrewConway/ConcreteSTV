@@ -193,6 +193,8 @@ I will choose the first of these as the interpretation (for both 9(5)/(6) and 8(
 The NSWEC appears to have chosen the third of these methods (evidence: three way tie resolution at the end of count 29 for City of Campbelltown). This 
 is reasonable, and has the advantage of resolving more ties.
 
+It is not clear what happens when there is a countback involving more than two candidates, say three, and one is ruled out by the countback, but the other two are contenders. Does 9(6) or 8(4) apply to just the two contenders, or are all three in the lot? 
+
 #### Does the countback in 8(4) or 9(5) apply to sub-transfers or compound transfers?
 
 There is another ambiguity I did not consider at first. Do clauses 8(4) and 9(5) apply to sub-transfers or compound-transfers?

@@ -85,7 +85,7 @@ mod tests {
     /// Outermost error is IO type errors.
     /// Innermost error is discrepancies with the official DoP.
     fn test_internally_consistent<Rules:PreferenceDistributionRules>(year:&str) -> anyhow::Result<Result<Option<TieResolutionExplicitDecisionInCount>, DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
-        test_official_dop_without_actual_votes::<Rules,_>(&NSWLCDataSource{},year,"",false)
+        test_official_dop_without_actual_votes::<Rules,_>(&NSWLCDataSource{},year,"",true)
     }
 
 }

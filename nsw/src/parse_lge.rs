@@ -261,7 +261,7 @@ impl NSWLGEDataLoader {
         }
         if electorate=="Port Stephens - Central Ward" && self.year.as_str()=="2017" {
             let favoured = vec![CandidateIndex(1)];
-            let disfavoured = vec![CandidateIndex(2), CandidateIndex(13), CandidateIndex(14), CandidateIndex(15)];
+            let disfavoured = vec![CandidateIndex(15)];
             metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecisionInCount {
                 decision: TieResolutionExplicitDecision::two_lists(disfavoured,favoured),
                 came_up_in: Some(CountIndex(1)),

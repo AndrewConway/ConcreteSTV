@@ -129,10 +129,8 @@ impl RawDataSource for NSWLCDataLoader {
                 let fp_by_grp_and_candidate_by_vote_type = base_url.join("fp_by_grp_and_candidate_by_vote_type")?;
                 let file = cache.get_file(fp_by_grp_and_candidate_by_vote_type.as_str())?;
                 let mut metadata = parse_fp_by_grp_and_candidate_by_vote_type(file,false,Some(NumberOfCandidates(21)),false,self.name(electorate))?;
-                let favoured = vec![5,12,28,30,34,37,48,52,54,60,61,62,80,85,103,109,111,148,171,192,193,196,198,240,241,243].into_iter().map(|i|CandidateIndex(i)).collect();
-                let disfavoured = vec![36,72,73,74,90,139,142,143,195,213,217,236,242,249,252,254].into_iter().map(|i|CandidateIndex(i)).collect();
                 metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecisionInCount {
-                    decision: TieResolutionExplicitDecision::two_lists(disfavoured,favoured),
+                    decision: TieResolutionExplicitDecision::two_lists(vec![CandidateIndex(195)],vec![CandidateIndex(34)]),
                     came_up_in: Some(CountIndex(3)),
                 }));
                 Ok(metadata)
