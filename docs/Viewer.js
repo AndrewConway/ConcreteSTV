@@ -305,7 +305,7 @@ function RenderTranscript(full_transcript,render_div) {
         function text_description_of_decision(a) {
             if (a.affected) return candidate_index_array_to_string(a.affected); // deprecated old style, left for compatibility with old transcripts.
             else {
-                return candidate_index_array_to_string(a.disfavoured)+" < "+candidate_index_array_to_string(a.favoured);
+                return a.increasing_favour.map(candidate_index_array_to_string).join(" < ");
             }
         }
         fullSpanTD("ECDecisions").innerText=count.decisions.map(text_description_of_decision).join(" and ");
