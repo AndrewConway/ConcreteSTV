@@ -1,4 +1,4 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -24,6 +24,7 @@ use stv::ballot_pile::BallotPaperCount;
 use stv::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
 use stv::election_data::ElectionData;
 use stv::preference_distribution::{PreferenceDistributionRules, RoundUpToUsize};
+use stv::random_util::Randomness;
 use stv::transfer_value::TransferValue;
 use crate::choose_votes::{BallotsWithGivenTransferValue, ChooseVotes, ChooseVotesOptions, TakeVotes};
 use crate::retroscope::{Retroscope};
@@ -240,7 +241,7 @@ impl <Tally> BallotChanges<Tally> {
 impl <Tally:PartialEq+Clone+Display+FromStr+Debug> BallotChanges<Tally> {
     pub fn see_effect<R:PreferenceDistributionRules<Tally=Tally>>(&self, election_data:&ElectionData) -> DeltasInCandidateLists {
         let changed_data = self.apply_to_votes(election_data,false);
-        let transcript = changed_data.distribute_preferences::<R>();
+        let transcript = changed_data.distribute_preferences::<R>(&mut Randomness::ReverseDonkeyVote);
         let diffs  : DeltasInCandidateLists = DifferentCandidateLists{ list1: transcript.elected.clone(), list2: election_data.metadata.results.as_ref().unwrap().clone() }.into();
         diffs
     }

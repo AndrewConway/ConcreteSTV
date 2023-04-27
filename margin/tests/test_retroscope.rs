@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -18,6 +18,7 @@ use stv::election_data::ElectionData;
 use margin::retroscope::{PileStatus, Retroscope, RetroscopeVoteIndex, RetroscopeVoteStatus};
 use margin::vote_changes::{VoteChange, VoteChanges};
 use stv::ballot_pile::BallotPaperCount;
+use stv::random_util::Randomness;
 use stv::transfer_value::TransferValue;
 
 #[test]
@@ -66,7 +67,7 @@ fn test_retroscope() {
         btl_types: vec![],
         informal: 0
     };
-    let transcript = vote_data.distribute_preferences::<FederalRulesPre2021>();
+    let transcript = vote_data.distribute_preferences::<FederalRulesPre2021>(&mut Randomness::ReverseDonkeyVote);
     println!("{}",serde_json::to_string_pretty(&transcript).unwrap());
     let mut retroscope = Retroscope::new(&vote_data,&[]);
     assert_eq!(false,retroscope.is_highest_continuing_member_party_ticket(CandidateIndex(1),&vote_data.metadata)); // 0 is above

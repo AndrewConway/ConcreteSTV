@@ -15,6 +15,7 @@ use statistics::mean_preference::{MeanPreferenceByCandidate, MeanPreferences};
 use statistics::simple_statistics::SimpleStatistics;
 use statistics::who_got_votes::WhoGotVotes;
 use stv::parse_util::{FileFinder, RawDataSource};
+use stv::random_util::Randomness;
 
 #[test]
 fn test_tasmanian_statistics_using_just_formal_votes() {
@@ -22,7 +23,7 @@ fn test_tasmanian_statistics_using_just_formal_votes() {
 
     let loader = get_federal_data_loader_2016(&FileFinder::find_ec_data_repository());
     let data = loader.load_cached_data("TAS").unwrap();
-    let _transcript = data.distribute_preferences::<FederalRulesUsed2016>();
+    let _transcript = data.distribute_preferences::<FederalRulesUsed2016>(&mut Randomness::ReverseDonkeyVote);
 
     // Test simple statistics.
     let simple_statistics = SimpleStatistics::new(&data);

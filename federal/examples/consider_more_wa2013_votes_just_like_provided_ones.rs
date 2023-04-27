@@ -17,6 +17,7 @@ use stv::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists, 
 use stv::election_data::ElectionData;
 use stv::monte_carlo::SampleWithReplacement;
 use stv::parse_util::{FileFinder, RawDataSource};
+use stv::random_util::Randomness;
 
 const WRITE_CHARACTER_PER_RUN:bool = true;
 
@@ -76,7 +77,7 @@ fn run_elections(data:&ElectionData, sampler:&SampleWithReplacement<usize>, num_
             undos.push(index);
             if index<num_atl { data.atl[index].n+=1; } else { data.btl[index-num_atl].n+=1; }
         }
-        let result = data.distribute_preferences::<FederalRulesUsed2013>().elected;
+        let result = data.distribute_preferences::<FederalRulesUsed2013>(&mut Randomness::ReverseDonkeyVote).elected;
         let diff : DeltasInCandidateLists = DifferentCandidateLists{ list1: data.metadata.results.as_ref().unwrap().clone(), list2: result }.into();
         if WRITE_CHARACTER_PER_RUN {
             if diff.is_empty() { print!("."); } else { print!("*"); }

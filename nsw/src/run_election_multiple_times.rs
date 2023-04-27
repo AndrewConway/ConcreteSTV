@@ -12,10 +12,13 @@ use std::fmt::{Debug, Display};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 use stv::ballot_metadata::{CandidateIndex, ElectionMetadata};
 use stv::distribution_of_preferences_transcript::Transcript;
 use stv::election_data::ElectionData;
 use stv::preference_distribution::PreferenceDistributionRules;
+use stv::random_util::Randomness;
 
 pub struct PossibleResults {
     /// The total number of times the election is run.
@@ -39,16 +42,16 @@ impl PossibleResults {
         }
     }
     /// Run the election some number of times, and add each
-    pub fn add_run_times<R: PreferenceDistributionRules>(&mut self, data: &ElectionData, times: usize) {
+    pub fn add_run_times<R: PreferenceDistributionRules>(&mut self, data: &ElectionData, times: usize,randomness:&mut Randomness) {
         for _ in 0..times {
-            let result = data.distribute_preferences::<R>();
+            let result = data.distribute_preferences::<R>(randomness);
             self.add_run(&result);
         }
     }
     /// Create a new PossibleResults structure from running the rules a given number of times.
-    pub fn new_from_runs<R: PreferenceDistributionRules>(data: &ElectionData, times: usize) -> Self {
+    pub fn new_from_runs<R: PreferenceDistributionRules>(data: &ElectionData, times: usize,randomness:&mut Randomness) -> Self {
         let mut res = PossibleResults::new(data.metadata.candidates.len());
-        res.add_run_times::<R>(data, times);
+        res.add_run_times::<R>(data, times,randomness);
         res
     }
     /// add in other to the cumulative sum of self.
@@ -66,8 +69,8 @@ impl PossibleResults {
             let num_to_do = times / num_threads + (if times % num_threads > thread_no { 1 } else { 0 });
             let data = data.clone();
             let handle = thread::spawn(move || {
-                // let mut rng = ChaCha20Rng::seed_from_u64(thread_no as u64);
-                Self::new_from_runs::<R>(&data, num_to_do)
+                let mut rng = Randomness::PRNG(ChaCha20Rng::seed_from_u64(thread_no as u64));
+                Self::new_from_runs::<R>(&data, num_to_do,&mut rng)
             });
             handles.push(handle);
         }

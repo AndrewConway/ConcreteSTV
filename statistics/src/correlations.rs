@@ -1,11 +1,11 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-use nalgebra::{Dynamic, OMatrix, SVD};
+use nalgebra::{OMatrix, SVD,Dyn};
 use stv::election_data::ElectionData;
 use serde::{Serialize,Deserialize};
 use stv::ballot_metadata::CandidateIndex;
@@ -126,7 +126,7 @@ pub struct CorrelationDendrogramsAndSVD {
     pub dendrogram_complete : Dendrogram,
     pub dendrogram_mean : Dendrogram,
     pub dendrogram_weighted_mean : Dendrogram,
-    pub svd : SVD<f64,Dynamic,Dynamic>,
+    pub svd : SVD<f64,Dyn,Dyn>,
 }
 
 impl CorrelationDendrogramsAndSVD {
@@ -139,7 +139,7 @@ impl CorrelationDendrogramsAndSVD {
         let dendrogram_mean = Dendrogram::compute_mean_linkage_slow(distance_function,num_nodes);
         let dendrogram_weighted_mean = Dendrogram::compute_weighted_mean_linkage_slow(distance_function,num_nodes);
         let distance_function_undoing_to_distance_matrix = |i:usize,j:usize|1.0-correlation.matrix[i][j];
-        let matrix : OMatrix<f64,Dynamic,Dynamic> = OMatrix::<f64,Dynamic,Dynamic>::from_fn(num_nodes,num_nodes,distance_function_undoing_to_distance_matrix);
+        let matrix : OMatrix<f64,Dyn,Dyn> = OMatrix::<f64,Dyn,Dyn>::from_fn(num_nodes,num_nodes,distance_function_undoing_to_distance_matrix);
         let svd = SVD::new(matrix,true,true);
         Ok(CorrelationDendrogramsAndSVD{
             correlation,

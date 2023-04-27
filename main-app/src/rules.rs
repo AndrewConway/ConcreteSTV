@@ -20,6 +20,7 @@ use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 use serde::{Serialize,Deserialize};
 use margin::record_changes::ElectionChanges;
 use nsw::{NSWECLocalGov2021, NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation, SimpleIRVAnyDifferenceBreaksTies};
+use stv::random_util::Randomness;
 use vic::Vic2018LegislativeCouncil;
 use crate::ChangeOptions;
 
@@ -87,27 +88,27 @@ impl Display for Rules {
 
 impl Rules {
 
-    pub fn count_simple(&self, data:&ElectionData, verbose:bool) -> anyhow::Result<PossibleTranscripts> {
-        Ok(self.count(data,data.metadata.vacancies.ok_or_else(||anyhow!("Need to specify number of vacancies"))?,&data.metadata.excluded.iter().cloned().collect(),&data.metadata.tie_resolutions,None,verbose))
+    pub fn count_simple(&self, data:&ElectionData, verbose:bool,randomness:&mut Randomness) -> anyhow::Result<PossibleTranscripts> {
+        Ok(self.count(data,data.metadata.vacancies.ok_or_else(||anyhow!("Need to specify number of vacancies"))?,&data.metadata.excluded.iter().cloned().collect(),&data.metadata.tie_resolutions,None,verbose,randomness))
     }
 
-    pub fn count(&self,data: &ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool) -> PossibleTranscripts {
+    pub fn count(&self,data: &ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool,randomness:&mut Randomness) -> PossibleTranscripts {
         let transcript = match self {
-            Rules::AEC2013 => distribute_preferences::<FederalRulesUsed2013>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
-            Rules::AEC2016 => distribute_preferences::<FederalRulesUsed2016>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
-            Rules::AEC2019 => distribute_preferences::<FederalRulesUsed2019>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
-            Rules::FederalPre2021 => distribute_preferences::<FederalRulesPre2021>(data, candidates_to_be_elected, excluded_candidates, ec_resolutions, vote_types, print_progress_to_stdout),
-            Rules::FederalPost2021 => distribute_preferences::<FederalRulesPost2021>(data, candidates_to_be_elected, excluded_candidates, ec_resolutions, vote_types, print_progress_to_stdout),
-            Rules::FederalPost2021Manual => distribute_preferences::<FederalRulesPost2021Manual>(data, candidates_to_be_elected, excluded_candidates, ec_resolutions, vote_types, print_progress_to_stdout),
-            Rules::ACTPre2020 => distribute_preferences::<ACTPre2020>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
-            Rules::NSWLocalGov2021 => distribute_preferences::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
-            Rules::NSWECLocalGov2021 => distribute_preferences::<NSWECLocalGov2021>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
-            Rules::Vic2018 => distribute_preferences::<Vic2018LegislativeCouncil>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
-            Rules::IRV => distribute_preferences::<SimpleIRVAnyDifferenceBreaksTies>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
+            Rules::AEC2013 => distribute_preferences::<FederalRulesUsed2013>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::AEC2016 => distribute_preferences::<FederalRulesUsed2016>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::AEC2019 => distribute_preferences::<FederalRulesUsed2019>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::FederalPre2021 => distribute_preferences::<FederalRulesPre2021>(data, candidates_to_be_elected, excluded_candidates, ec_resolutions, vote_types, print_progress_to_stdout,randomness),
+            Rules::FederalPost2021 => distribute_preferences::<FederalRulesPost2021>(data, candidates_to_be_elected, excluded_candidates, ec_resolutions, vote_types, print_progress_to_stdout,randomness),
+            Rules::FederalPost2021Manual => distribute_preferences::<FederalRulesPost2021Manual>(data, candidates_to_be_elected, excluded_candidates, ec_resolutions, vote_types, print_progress_to_stdout,randomness),
+            Rules::ACTPre2020 => distribute_preferences::<ACTPre2020>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::NSWLocalGov2021 => distribute_preferences::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::NSWECLocalGov2021 => distribute_preferences::<NSWECLocalGov2021>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::Vic2018 => distribute_preferences::<Vic2018LegislativeCouncil>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::IRV => distribute_preferences::<SimpleIRVAnyDifferenceBreaksTies>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
             _ => { // handle 6 digit transcripts.
                 let transcript = match self {
-                    Rules::ACT2020 => distribute_preferences::<ACT2020>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
-                    Rules::ACT2021 => distribute_preferences::<ACT2021>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout),
+                    Rules::ACT2020 => distribute_preferences::<ACT2020>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+                    Rules::ACT2021 => distribute_preferences::<ACT2021>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
                     _ => panic!("Case not handled.")
                 };
                 return PossibleTranscripts::SixDigitDecimals(TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript })

@@ -6,6 +6,7 @@ use stv::distribution_of_preferences_transcript::{Transcript};
 use stv::election_data::ElectionData;
 use stv::parse_util::{FileFinder, RawDataSource};
 use stv::preference_distribution::distribute_preferences;
+use stv::random_util::Randomness;
 use stv::tie_resolution::TieResolutionsMadeByEC;
 
 fn load2019(state:&str) -> anyhow::Result<ElectionData> {
@@ -14,7 +15,7 @@ fn load2019(state:&str) -> anyhow::Result<ElectionData> {
 }
 
 fn count2019(data:&ElectionData) -> Transcript<usize> {
-    distribute_preferences::<FederalRulesUsed2019>(&data, data.metadata.vacancies.unwrap(), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,false)
+    distribute_preferences::<FederalRulesUsed2019>(&data, data.metadata.vacancies.unwrap(), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,false,&mut Randomness::ReverseDonkeyVote)
 }
 
 fn load_tas2019(c: &mut Criterion) {

@@ -79,13 +79,16 @@ function getOptions() {
     let selected_rule_index = document.getElementById("RulesChoice").selectedIndex;
     let rules = selected_rule_index===-1 ? null: rules_list&&rules_list[selected_rule_index].name;
     if (rules===null) return null;
-    return {
+    let options = {
         excluded:ineligible_candidates,
         rules:rules,
         candidates_to_be_elected: +document.getElementById("NumVacancies").value,
         tie_resolutions:ec_tie_resolutions_being_edited||[],
         vote_types:get_vote_types(),
-    }
+    };
+    let seed = document.getElementById("RandomSeed").value;
+    if (seed.length!==0) options.seed= +seed;
+    return options;
 }
 
 
@@ -206,7 +209,7 @@ function getNewTieBeingCurrentlyEdited() {
     if (favoured.length===0) return null;
     const candidateDisfavoured = document.getElementById("DisFavouredCandidate").selectedIndex;
     if (candidateDisfavoured=== -1) return null;
-    return {favoured:favoured, disfavoured: [candidateDisfavoured]};
+    return { increasing_favour : [ [candidateDisfavoured], favoured] };
 }
 
 function addFavour() {

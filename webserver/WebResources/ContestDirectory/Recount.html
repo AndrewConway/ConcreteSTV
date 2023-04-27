@@ -34,6 +34,8 @@
         <div>
             <button onclick="addFavour();" id="AddFavour"> Add </button> <select id="FavouredCandidate1"></select> <span id="extraFavourChoices"></span> <button id="RemoveFavourChoiceButton" onclick="removeFavourChoice()" class="hidden">-</button><button id="AddFavourChoiceButton" onclick="addFavourChoice()">+</button> favoured over <select id="DisFavouredCandidate"></select>
         </div>
+        <label for="RandomSeed" title="When all else fails, ties are broken randomly if a number is provided here, and reverse donkey vote order if not. Results will be repeatable for a given number here.">Random seed</label>: <input id="RandomSeed" type="text" inputmode="numeric" pattern="\d*" />
+
     </fieldset>
     <fieldset id="VoteTypes" class="hidden">
         <legend>Vote Types</legend>
@@ -67,6 +69,9 @@
         </select>
 
         <input type="checkbox" id="ShowPapers"> <label for="ShowPapers">Show Papers</label>
+        <input type="checkbox" id="ShowSetAside"> <label id="ShowSetAsideLabel" for="ShowPapers">Show Set Aside</label>
+        <button type="button" onclick="saveHTML('RenderThingToView',document.getElementById('TitleHeading').innerText);">Save as HTML</button>
+
     </div>
     <div id="RenderThingToView"></div>
 

@@ -14,6 +14,7 @@ use anyhow::anyhow;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 use crate::compare_transcripts::DeltasInCandidateLists;
+use crate::random_util::Randomness;
 
 #[derive(Debug,Clone,Copy)]
 pub enum MethodOfTieResolution {
@@ -180,15 +181,30 @@ pub struct TieResolutionExplicitDecision {
     pub usage : Option<TieResolutionUsage>,
 }
 
+/// Where a tie resolution was performed.
 #[derive(Serialize,Deserialize,Debug,Clone,Copy,Eq,PartialEq)]
 pub enum TieResolutionUsage {
     Exclusion,
     OrderElected,
     ShortcutWinner,
-    OrderSurplusDistributed, // usually OrderElected, unless this is present.
+    OrderSurplusDistributed, // usually OrderElected, unless this is present earlier in the list.
     RoundingUp, // For NSW stochastic
 }
 
+impl FromStr for TieResolutionUsage {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Exclusion" => Ok(TieResolutionUsage::Exclusion),
+            "OrderElected" => Ok(TieResolutionUsage::OrderElected),
+            "ShortcutWinner" => Ok(TieResolutionUsage::ShortcutWinner),
+            "OrderSurplusDistributed" => Ok(TieResolutionUsage::OrderSurplusDistributed),
+            "RoundingUp" => Ok(TieResolutionUsage::RoundingUp),
+            _ => Err("no such tie resolution usage"),
+        }
+    }
+}
 impl TieResolutionExplicitDecision {
     /// make a decision from the common case of two lists of candidates, one favoured over the other.
     pub fn two_lists(disfavoured:Vec<CandidateIndex>,favoured:Vec<CandidateIndex>) -> Self {
@@ -283,6 +299,8 @@ impl Display for TieResolutionExplicitDecision {
     }
 }
 
+
+
 impl TieResolutionsMadeByEC {
     /// Simple constructor that checks to see that a candidate is not repeated which would cause later bugs and would be ambiguous in any case.
     pub fn new(tie_resolutions : Vec<Vec<CandidateIndex>>) -> anyhow::Result<Self> {
@@ -298,11 +316,12 @@ impl TieResolutionsMadeByEC {
         Ok(TieResolutionsMadeByEC{tie_resolutions})
     }
     /// Sort tied_candidates appropriately (low to high), and then return a description of what was done.
-    pub fn resolve(&self, tied_candidates: &mut [CandidateIndex], granularity: TieResolutionGranularityNeeded,usage:TieResolutionUsage,current_count:CountIndex) -> TieResolutionExplicitDecision {
-        self.resolve_work(tied_candidates,granularity,usage,current_count);
+    /// If all else fails, use randomness.
+    pub fn resolve(&self, tied_candidates: &mut [CandidateIndex], granularity: TieResolutionGranularityNeeded,usage:TieResolutionUsage,current_count:CountIndex,randomness:&mut Randomness) -> TieResolutionExplicitDecision {
+        self.resolve_work(tied_candidates,granularity,usage,current_count,randomness);
         TieResolutionExplicitDecision::from_resolution(tied_candidates,granularity,usage)
     }
-    fn resolve_work(&self, tied_candidates: &mut [CandidateIndex], granularity: TieResolutionGranularityNeeded,usage:TieResolutionUsage,current_count:CountIndex)  {
+    fn resolve_work(&self, tied_candidates: &mut [CandidateIndex], granularity: TieResolutionGranularityNeeded,usage:TieResolutionUsage,current_count:CountIndex,randomness:&mut Randomness)  {
         // println!("Trying to resolve {:?}",tied_candidates);
         for atom in &self.tie_resolutions {
             match atom {
@@ -351,8 +370,8 @@ impl TieResolutionsMadeByEC {
                 }
             }
         }
-        // If all else fails, we need to do a draw. For repeatability, do reverse donkey vote ATM. TODO make an option allowing randomness.
-        tied_candidates.sort_by_key(|c|c.0);
+        // If all else fails, we need to do a draw.
+        randomness.resolve(tied_candidates);
     }
 }
 
@@ -418,36 +437,5 @@ fn resolve_ties_any_different<'a,Tally:Clone+Eq+Hash+Ord+Display+FromStr+Debug>(
 /// Like resolve_ties_any_different_work but give up if there are any problems.
 fn resolve_ties_any_different_give_up_if_cant_do_everything<Tally:Clone+Eq+Hash+Ord+Display+FromStr+Debug>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded,just_consider_major_counts:bool) -> bool {
     resolve_ties_any_different(tied_candidates,transcript,granularity,just_consider_major_counts).is_empty()
-    /*
-    //println!("Resolve ties any different between {}",tied_candidates.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(","));
-    for count in transcript.counts.iter().rev() {if count.reason_completed || !just_consider_major_counts {
-        let mut observed : HashMap<Tally,Vec<CandidateIndex>> = HashMap::new();
-        for candidate in tied_candidates.iter() {
-            observed.entry(count.status.tallies.candidate[candidate.0].clone()).or_insert_with(||vec![]).push(*candidate);
-        }
-        if observed.len()>1 { // at least 1 different.
-            //println!("Broken into {} groups",observed.len());
-            let mut tallies : Vec<Tally> = observed.keys().cloned().collect();
-            tallies.sort();
-            let mut ok = true;
-            let mut upto : usize = 0;
-            for tally in tallies {
-                let who = observed.get_mut(&tally).unwrap();
-                if who.len()>1 {
-                    match granularity {
-                        TieResolutionGranularityNeeded::Total => {ok=ok&&resolve_ties_any_different_give_up_if_cant_do_everything(who,transcript,granularity,just_consider_major_counts)}  // could optimize to start at count currently up to.
-                        TieResolutionGranularityNeeded::LowestSeparated(loc) if loc>upto && loc<upto+who.len() => {ok=ok&&resolve_ties_any_different_give_up_if_cant_do_everything(who,transcript,TieResolutionGranularityNeeded::LowestSeparated(loc-upto),just_consider_major_counts)}
-                        TieResolutionGranularityNeeded::LowestSeparated(_) => {} // granularity means we don't care.
-                    }
-                }
-                tied_candidates[upto..upto+who.len()].copy_from_slice(who);
-                upto+=who.len();
-            }
-            //println!("Solution is : {}",tied_candidates.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(","));
-            return ok;
-        }
-    }}
-    false
-
-     */
 }
+

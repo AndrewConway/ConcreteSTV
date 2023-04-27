@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -10,6 +10,7 @@ use stv::ballot_metadata::{CandidateIndex};
 use stv::distribution_of_preferences_transcript::{CountIndex, ReasonForCount, SingleCount};
 use stv::election_data::ElectionData;
 use stv::preference_distribution::PreferenceDistributionRules;
+use stv::random_util::Randomness;
 use crate::choose_votes::{ChooseVotes, ChooseVotesOptions};
 use crate::evaluate_and_optimize_vote_changes::optimise;
 use crate::record_changes::ElectionChanges;
@@ -19,7 +20,7 @@ use crate::vote_changes::{VoteChange, VoteChanges};
 pub fn find_outcome_changes <Rules>(original_data:&ElectionData, vote_choice_options:&ChooseVotesOptions,verbose:bool) -> ElectionChanges<Rules::Tally>
 where Rules : PreferenceDistributionRules {
 
-    let transcript = original_data.distribute_preferences::<Rules>();
+    let transcript = original_data.distribute_preferences::<Rules>(&mut Randomness::ReverseDonkeyVote);
     let mut not_continuing = HashSet::new();
 
     let mut retroscope = Retroscope::new(&original_data, &original_data.metadata.excluded);

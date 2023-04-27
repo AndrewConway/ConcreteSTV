@@ -9,6 +9,7 @@ use stv::ballot_metadata::CandidateIndex;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::parse_util::{FileFinder, RawDataSource};
 use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
+use stv::random_util::Randomness;
 use stv::tie_resolution::{TieResolutionAtom, TieResolutionsMadeByEC};
 use vic::parse_vic::{get_vic_data_loader_2014, get_vic_data_loader_2022, VicDataLoader};
 use vic::Vic2018LegislativeCouncil;
@@ -36,7 +37,7 @@ fn test<Rules:PreferenceDistributionRules>(electorate:&str, loader:&VicDataLoade
     let mut tie_resolutions = TieResolutionsMadeByEC::default();
     let official_transcript = loader.read_official_dop_transcript(&data.metadata).unwrap();
     loop {
-        let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &data.metadata.excluded.iter().cloned().collect(), &tie_resolutions,None,false);
+        let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &data.metadata.excluded.iter().cloned().collect(), &tie_resolutions,None,false,&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript };
         std::fs::create_dir_all("test_transcripts").unwrap();
         {

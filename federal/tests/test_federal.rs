@@ -20,6 +20,7 @@ mod tests {
     use std::iter::FromIterator;
     use stv::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
     use stv::parse_util::{RawDataSource, FileFinder};
+    use stv::random_util::Randomness;
 
 
     fn test2022(state:&str) -> anyhow::Result<()> {
@@ -29,7 +30,7 @@ mod tests {
         //use stv::ballot_metadata::CandidateIndex;
         //let mut excluded = HashSet::default();
         //excluded.insert(CandidateIndex(8));
-        let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true);
+        let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}2022.json",state))?;
@@ -53,7 +54,7 @@ mod tests {
         let loader = get_federal_data_loader_2019(&FileFinder::find_ec_data_repository());
         let data = loader.read_raw_data(state)?;
         data.print_summary();
-        let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true);
+        let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}2019.json",state))?;
@@ -72,7 +73,7 @@ mod tests {
         let loader = get_federal_data_loader_2016(&FileFinder::find_ec_data_repository());
         let data = loader.read_raw_data(state)?;
         data.print_summary();
-        let transcript = distribute_preferences::<FederalRulesUsed2016>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state),None,true);
+        let transcript = distribute_preferences::<FederalRulesUsed2016>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state),None,true,&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}2016.json",state))?;
@@ -86,7 +87,7 @@ mod tests {
         let loader = get_federal_data_loader_2013(&FileFinder::find_ec_data_repository());
         let data = loader.read_raw_data(state)?;
         data.print_summary();
-        let transcript = distribute_preferences::<FederalRulesUsed2013>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state),None,true);
+        let transcript = distribute_preferences::<FederalRulesUsed2013>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state),None,true,&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}2013.json",state))?;

@@ -1,6 +1,6 @@
 [package]
 name = "main-app"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Andrew Conway <arcgit@greatcactus.org>"]
 edition = "2021"
 
@@ -16,5 +16,5 @@ nsw = { path = "../nsw" }
 vic = { path = "../vic" }
 serde = {version="1.0", features = ["derive"]}
 serde_json = "1.0"
-clap = {version="3.2.5", features = ["derive","deprecated"]}
+clap = {version= "4.2", features = ["derive"]}
 num = {version="0.4", features=["serde"]}

@@ -6,6 +6,8 @@
 
 
 use std::fs::File;
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 use nsw::nsw_random_rules::{NSWECrandomLGE2017};
 use nsw::parse_lge::{get_nsw_lge_data_loader_2017, NSWLGEDataLoader, NSWLGEDataSource};
 use nsw::run_election_multiple_times::PossibleResults;
@@ -14,6 +16,7 @@ use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::official_dop_transcript::{DifferenceBetweenOfficialDoPAndComputed, test_official_dop_without_actual_votes};
 use stv::parse_util::{FileFinder, RawDataSource};
 use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
+use stv::random_util::Randomness;
 use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecisionInCount};
 
 
@@ -22,8 +25,9 @@ fn test<Rules:PreferenceDistributionRules>(electorate:&str,loader:&NSWLGEDataLoa
     data.print_summary();
     let mut tie_resolutions = data.metadata.tie_resolutions.clone();
     let official_transcript = loader.read_official_dop_transcript(&data.metadata).unwrap();
+    let mut randomness = Randomness::PRNG(ChaCha20Rng::seed_from_u64(1));
     loop {
-        let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &data.metadata.excluded.iter().cloned().collect(), &tie_resolutions,None,false);
+        let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &data.metadata.excluded.iter().cloned().collect(), &tie_resolutions,None,false,&mut randomness);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript };
         std::fs::create_dir_all("test_transcripts").unwrap();
         {
@@ -96,7 +100,8 @@ fn test_wollstonecraft_run_10000_times_and_check_probabilistic_winners_reasonabl
     let finder = FileFinder::find_ec_data_repository();
     let loader = get_nsw_lge_data_loader_2017(&finder).unwrap();
     let data = loader.read_raw_data("North Sydney - Wollstonecraft Ward").unwrap();
-    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2017>(&data,10000);
+    let mut randomness = Randomness::PRNG(ChaCha20Rng::seed_from_u64(1));
+    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2017>(&data,10000,&mut randomness);
     results.print_table_results(&data.metadata);
     assert_eq!(10000,results.candidates[9].num_times_elected);
     assert!(results.is_close_to_expected_prob_winning(CandidateIndex(9),1.0));

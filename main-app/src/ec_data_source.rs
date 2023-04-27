@@ -47,7 +47,7 @@ impl FromStr for ECDataSource {
             "VIC2014" => Ok(ECDataSource::VIC2014),
             "VIC2018" => Ok(ECDataSource::VIC2018),
             "VIC2022" => Ok(ECDataSource::VIC2022),
-            _ => Err("No such source supported. Allowed sources are AEC2013, AEC2016, AEC2019, AEC2022, ACT2008, ACT2012, ACT2016, ACT2020")
+            _ => Err("No such source supported. Allowed sources are AEC2013, AEC2016, AEC2019, AEC2022, ACT2008, ACT2012, ACT2016, ACT2020, NSWLG2021, VIC2014, VIC2018, VIC2022")
         }
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -14,6 +14,7 @@ use std::ops::Range;
 use serde::{Deserialize,Serialize};
 use crate::distribution_of_preferences_transcript::Transcript;
 use crate::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
+use crate::random_util::Randomness;
 
 /*
 /// Complete list of raw ballot markings.
@@ -58,9 +59,9 @@ impl VoteTypeSpecification {
     ///
     /// ```
     /// use stv::election_data::VoteTypeSpecification;
-    /// let specA = VoteTypeSpecification{ vote_type : "A".to_string(), first_index_inclusive:5, last_index_exclusive:10 };
-    /// let specB = VoteTypeSpecification{ vote_type : "B".to_string(), first_index_inclusive:10, last_index_exclusive:15 };
-    /// let specs = vec![specA,specB];
+    /// let spec_a = VoteTypeSpecification{ vote_type : "A".to_string(), first_index_inclusive:5, last_index_exclusive:10 };
+    /// let spec_b = VoteTypeSpecification{ vote_type : "B".to_string(), first_index_inclusive:10, last_index_exclusive:15 };
+    /// let specs = vec![spec_a,spec_b];
     ///
     /// assert_eq!(VoteTypeSpecification::restrict(None,&specs,20),vec![0..20]);
     /// assert_eq!(VoteTypeSpecification::restrict(Some(&["A".to_string(),"".to_string()]),&specs,20)
@@ -163,8 +164,8 @@ impl ElectionData {
     pub fn is_btl_verifiable(&self,btl_index:usize,ballot_types_considered_unverifiable:&HashSet<String>) -> bool { Self::is_verifiable(&self.btl_types,btl_index,ballot_types_considered_unverifiable) }
 
     /// run the distribution of preferences with the values given in the metadata for the number of vacancies, who is ineligible, and EC resolutions. Convenience method.
-    pub fn distribute_preferences<Rules:PreferenceDistributionRules>(&self) -> Transcript<Rules::Tally> {
-        distribute_preferences::<Rules>(self,self.metadata.vacancies.unwrap(),&self.metadata.excluded.iter().cloned().collect::<HashSet<_>>(),&self.metadata.tie_resolutions,None,false)
+    pub fn distribute_preferences<Rules:PreferenceDistributionRules>(&self,randomness:&mut Randomness) -> Transcript<Rules::Tally> {
+        distribute_preferences::<Rules>(self,self.metadata.vacancies.unwrap(),&self.metadata.excluded.iter().cloned().collect::<HashSet<_>>(),&self.metadata.tie_resolutions,None,false,randomness)
     }
 
 }

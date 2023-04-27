@@ -27,6 +27,7 @@ use std::cmp::{min, Ordering};
 use serde::{Serialize,Deserialize};
 use std::str::FromStr;
 use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
+use crate::random_util::Randomness;
 use crate::signed_version::SignedVersion;
 use crate::verify_official_transcript::OracleFromOfficialDOP;
 
@@ -238,6 +239,7 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     pending_surplus_distribution : VecDeque<CandidateIndex>,
     elected_candidates : Vec<CandidateIndex>,
     candidate_elected_at_count : Vec<Option<CountIndex>>,
+    randomness : &'a mut Randomness,
 
     // information about what is going on in this count.
     in_this_count : PendingTranscript<Rules::Tally>,
@@ -248,7 +250,7 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
 
 impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 {
-    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<PartiallyDistributedVote<'a>>,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC,print_progress_to_stdout : bool,oracle : Option<OracleFromOfficialDOP<'a>>) -> Self {
+    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<PartiallyDistributedVote<'a>>,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC,print_progress_to_stdout : bool,oracle : Option<OracleFromOfficialDOP<'a>>,randomness:&'a mut Randomness) -> Self {
         let num_candidates = data.metadata.candidates.len();
         let tallys = vec![Rules::Tally::zero();num_candidates];
         let mut papers = vec![];
@@ -283,6 +285,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             pending_surplus_distribution : VecDeque::default(),
             elected_candidates : vec![],
             candidate_elected_at_count: vec![None;num_candidates],
+            randomness: randomness,
             in_this_count : PendingTranscript {
                 elected: vec![],
                 not_continuing: vec![],
@@ -399,13 +402,13 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                         let solved_by_oracle = if let Some(oracle) = &mut self.oracle {
                             if let Some(solution) = oracle.resolve_tie_resolution(self.current_count,remaining_granularity,still_tied) {
                                 let resolutions = TieResolutionsMadeByEC{ tie_resolutions: vec![solution] };
-                                let decision = resolutions.resolve(still_tied,remaining_granularity,usage,self.current_count);
+                                let decision = resolutions.resolve(still_tied,remaining_granularity,usage,self.current_count,&mut self.randomness);
                                 self.in_this_count.decisions.push(decision);
                                 true
                             } else { false }
                         } else { false };
                         if !solved_by_oracle {
-                            let decision = self.ec_resolutions.resolve(still_tied,remaining_granularity,usage,self.current_count);
+                            let decision = self.ec_resolutions.resolve(still_tied,remaining_granularity,usage,self.current_count,&mut self.randomness);
                             self.in_this_count.decisions.push(decision);
                         }
                     }
@@ -814,13 +817,13 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     /// Parcel out votes by next continuing candidate with a given transfer value.
     /// Returns to the candidate being distributed the ones kept for quota.
     fn parcel_out_votes_random_portion_set_by_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,surplus:BallotPaperCount,candidate_being_distributed:CandidateIndex)  {
-        let (set_aside_by_candidate,ec_decisions) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed,Rules::use_f32_arithmetic_when_applying_transfer_values_instead_of_exact(),self.ec_resolutions,self.current_count);
+        let (set_aside_by_candidate,ec_decisions) = transfer_value.calculate_number_of_ballot_papers_to_be_set_aside(surplus,self.num_candidates,&self.transcript,&distributed,Rules::use_f32_arithmetic_when_applying_transfer_values_instead_of_exact(),self.ec_resolutions,self.current_count,&mut self.randomness);
         self.in_this_count.decisions.extend(ec_decisions);
         // do the actual distribution
         let mut total_transferred : BallotPaperCount = BallotPaperCount::zero();
         for (candidate_index,candidate_ballots) in distributed.by_candidate.iter().enumerate() {
             if candidate_ballots.num_ballots.0>0 {
-                let (chosen,unchosen) = candidate_ballots.set_aside(set_aside_by_candidate[candidate_index]);
+                let (chosen,unchosen) = candidate_ballots.set_aside(set_aside_by_candidate[candidate_index],self.randomness);
                 if chosen.num_ballots.0>0 {
                     let worth = chosen.num_ballots;
                     total_transferred +=worth;
@@ -1168,10 +1171,10 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
 
 
-pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool) -> Transcript<Rules::Tally> {
+pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool,randomness:&mut Randomness) -> Transcript<Rules::Tally> {
     let arena = typed_arena::Arena::<CandidateIndex>::new();
     let votes = data.resolve_atl(&arena,vote_types);
-    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates,ec_resolutions,print_progress_to_stdout,None);
+    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates,ec_resolutions,print_progress_to_stdout,None,randomness);
     work.go();
     work.transcript
 }

@@ -91,7 +91,9 @@ function tieResolutionDescription(metaDiv,metadata,tie_resolutions) {
 }
 
 function descriptionOfSingleTie(metadata,tie) {
-    if (Array.isArray(tie)) return tie.map(n=>metadata.candidates[n].name).join(" was favoured less than ");
+    console.log(tie);
+    if (tie.increasing_favour) return tie.increasing_favour.map(candidates=>candidates.map(n=>metadata.candidates[n].name).join(" and ")).join(" less favoured than ");
+    else if (Array.isArray(tie)) return tie.map(n=>metadata.candidates[n].name).join(" was favoured less than ");
     else if (tie.favoured) return tie.favoured.map(n=>metadata.candidates[n].name).join(" and ")+(tie.favoured.length>1?" were ":" was ")+"favoured over "+tie.disfavoured.map(n=>metadata.candidates[n].name).join(" and ")+(tie.came_up_in?" around count "+tie.came_up_in:"")+".";
     else return null;
 }

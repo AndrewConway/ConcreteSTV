@@ -5,12 +5,14 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 use nsw::nsw_random_rules::{NSWECrandomLGE2012, NSWECrandomLGE2017};
 use nsw::parse_lge::{get_nsw_lge_data_loader_2012};
 use nsw::run_election_multiple_times::PossibleResults;
 use stv::ballot_metadata::CandidateIndex;
 use stv::parse_util::{FileFinder, RawDataSource};
-
+use stv::random_util::Randomness;
 
 
 #[test]
@@ -49,7 +51,8 @@ fn test_boorowa_run_10000_times_and_check_probabilistic_winners_reasonably_close
     let finder = FileFinder::find_ec_data_repository();
     let loader = get_nsw_lge_data_loader_2012(&finder).unwrap();
     let data = loader.read_raw_data("Boorowa Council").unwrap();
-    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2017>(&data,10000);
+    let mut prng = Randomness::PRNG(ChaCha20Rng::seed_from_u64(1));
+    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2017>(&data,10000,&mut prng);
     results.print_table_results(&data.metadata);
     assert!(results.is_close_to_expected_prob_winning(CandidateIndex(12),1.0));
     assert!(results.is_close_to_expected_prob_winning(CandidateIndex(11),1.0));
@@ -94,7 +97,8 @@ fn test_griffith_run_10000_times_and_check_probabilistic_winners_reasonably_clos
     let finder = FileFinder::find_ec_data_repository();
     let loader = get_nsw_lge_data_loader_2012(&finder).unwrap();
     let data = loader.read_raw_data("Griffith City Council").unwrap();
-    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2017>(&data,10000);
+    let mut prng = Randomness::PRNG(ChaCha20Rng::seed_from_u64(1));
+    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2017>(&data,10000,&mut prng);
     results.print_table_results(&data.metadata);
     assert!(results.is_close_to_expected_prob_winning(CandidateIndex(8),1.0));
     assert!(results.is_close_to_expected_prob_winning(CandidateIndex(6),1.0));
@@ -125,7 +129,8 @@ fn test_griffith_run_100_times_and_check_probabilistic_winners_reasonably_close_
     let finder = FileFinder::find_ec_data_repository();
     let loader = get_nsw_lge_data_loader_2012(&finder).unwrap();
     let data = loader.read_raw_data("Griffith City Council").unwrap();
-    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2012>(&data,100);
+    let mut prng = Randomness::PRNG(ChaCha20Rng::seed_from_u64(1));
+    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2012>(&data,100,&mut prng);
     results.print_table_results(&data.metadata);
     assert!(results.is_close_to_expected_prob_winning(CandidateIndex(8),1.0));
     assert!(results.is_close_to_expected_prob_winning(CandidateIndex(6),1.0));

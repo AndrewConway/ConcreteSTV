@@ -19,6 +19,7 @@ use crate::distribution_of_preferences_transcript::{CountIndex, PerCandidate, Qu
 use crate::election_data::ElectionData;
 use crate::official_dop_transcript::{CanConvertToF64PossiblyLossily, OfficialDistributionOfPreferencesTranscript};
 use crate::preference_distribution::{PreferenceDistributionRules, PreferenceDistributor};
+use crate::random_util::Randomness;
 use crate::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionExplicitDecisionInCount, TieResolutionGranularityNeeded, TieResolutionsMadeByEC};
 
 #[derive(Error, Debug)]
@@ -248,7 +249,8 @@ pub fn distribute_preferences_using_official_results<Rules:PreferenceDistributio
     let arena = typed_arena::Arena::<CandidateIndex>::new();
     let votes = data.resolve_atl(&arena,None);
     let oracle = OracleFromOfficialDOP{official, tie_resolutions: Default::default() };
-    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(&data,&votes,candidates_to_be_elected,&excluded_candidates,&ec_resolutions,print_progress_to_stdout,Some(oracle));
+    let mut randomness = Randomness::ReverseDonkeyVote;
+    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(&data,&votes,candidates_to_be_elected,&excluded_candidates,&ec_resolutions,print_progress_to_stdout,Some(oracle),&mut randomness);
     work.go();
     Ok(work.transcript)
 }

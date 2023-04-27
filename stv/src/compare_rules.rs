@@ -15,11 +15,12 @@ use crate::compare_transcripts::{DifferenceBetweenTranscripts, compare_transcrip
 use serde::{Serialize,Deserialize};
 use std::fmt::{Debug, Display, Formatter};
 use crate::ballot_pile::BallotPaperCount;
-use crate::transfer_value::{TransferValue};
+use crate::transfer_value::TransferValue;
 use crate::tie_resolution::MethodOfTieResolution;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use num::BigRational;
+use crate::random_util::Randomness;
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct CompareRules {
@@ -67,7 +68,7 @@ impl CompareRules {
     }
 
     fn compute<Rules:PreferenceDistributionRules>(&self,data:&ElectionData) -> anyhow::Result<Transcript<Rules::Tally>> {
-        let transcript = data.distribute_preferences::<Rules>();
+        let transcript = data.distribute_preferences::<Rules>(&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript };
         let name = data.metadata.name.identifier()+"_"+&Rules::name()+".transcript";
         self.save(&transcript,&name)?;

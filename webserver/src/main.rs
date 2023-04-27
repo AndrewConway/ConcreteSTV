@@ -25,6 +25,7 @@ use stv::tie_resolution::TieResolutionsMadeByEC;
 use crate::cache::cache_json;
 use crate::find_election::{ALL_ELECTIONS_AS_LIST, ElectionInfo, ElectionsOfOneType, FoundElection};
 use serde::{Serialize,Deserialize};
+use stv::random_util::Randomness;
 
 #[get("/get_all_contests.json")]
 async fn get_all_contests() -> Json<Result<Vec<ElectionsOfOneType>,String>> {
@@ -90,7 +91,7 @@ async fn get_find_btl_errors(election : web::Path<FoundElection>) -> Json<Result
 
 
 #[post("/{name}/{year}/{electorate}/find_my_vote")]
-async fn find_my_vote(election : web::Path<FoundElection>,query:web::Json<FindMyVoteQuery>) -> Json<Result<FindMyVoteResult,String>> {
+async fn find_my_vote(election : web::Path<FoundElection>,query:Json<FindMyVoteQuery>) -> Json<Result<FindMyVoteResult,String>> {
     Json(election.loader.find_my_vote(election.electorate(),&query).map_err(|e|e.to_string()))
 }
 
@@ -123,13 +124,16 @@ pub struct RecountQuery {
     pub rules : Rules,
     /// if none, use all votes. Otherwise only use ones specified in here. "" means votes not assigned a type.
     pub vote_types : Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub seed : Option<u64>,
 }
 
 #[post("/{name}/{year}/{electorate}/recount")]
-async fn recount(election : web::Path<FoundElection>,query:web::Json<RecountQuery>) -> Json<Result<PossibleTranscripts,String>> {
+async fn recount(election : web::Path<FoundElection>,query:Json<RecountQuery>) -> Json<Result<PossibleTranscripts,String>> {
     async fn recount_uncached(election : &web::Path<FoundElection>,query:&RecountQuery) -> Result<PossibleTranscripts,String> {
         let vote_types : Option<&[String]> = if let Some(vt) = &query.vote_types { Some(vt) } else { None };
-        Ok(query.rules.count(&election.data().await?,query.candidates_to_be_elected,&query.excluded.iter().cloned().collect(),&query.tie_resolutions,vote_types,false))
+        let mut randomness : Randomness = query.seed.into();
+        Ok(query.rules.count(&election.data().await?,query.candidates_to_be_elected,&query.excluded.iter().cloned().collect(),&query.tie_resolutions,vote_types,false,&mut randomness))
     }
     cache_json("recount",&(election.spec.clone(),query.clone()),||recount_uncached(&election,&query)).await
 }

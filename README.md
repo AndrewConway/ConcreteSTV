@@ -8,17 +8,23 @@ widely used in Australian elections.
 Unlike many forms of voting, the actual counting of STV elections is not trivial, and
 indeed there are many plausible quite different sets of rules for STV. 
 The aim of ConcreteSTV is to implement versions of STV that are actually used in
-a variety of jurisdictions. This emphasis on perfectly matching actual the
+a variety of jurisdictions. This emphasis on perfectly matching the
 algorithms used in actual, concrete elections is where the name comes from.
+This includes emulation of the known bugs in the electoral commissions' counts. 
 
-ConcreteSTV is a rewrite of an [earlier project](https://github.com/SiliconEconometrics/PublicService)
-but does not yet have all the features of the earlier project. However ConcreteSTV now has most
-of the features, many new features, is much more user-friendly, and future development will be on
-this project.  
+ConcreteSTV is a rewrite of an [earlier project](https://github.com/SiliconEconometrics/PublicService) 
+ConcreteSTV has many new features, is much more user-friendly, is better documented, 
+and future development will be on this project.  
 
-Results from the earlier project were used to find and fix bugs [in the 2020 ACT STV count](reports/2020%20Errors%20In%20ACT%20Counting.pdf), and to identify bugs in the [2012](reports/NSWLGE2012CountErrorTechReport.pdf) and [2016](reports/2016%20NSW%20LGE%20Errors.pdf) NSW count which led the NSW Parliament to simplify the rules. Everyone is encouraged to use this code to double-check and correct election results.
+Results from the earlier project were used to find and fix bugs [in the 2020 ACT STV count](reports/2020%20Errors%20In%20ACT%20Counting.pdf), 
+and to identify bugs in the [2012](reports/NSWLGE2012CountErrorTechReport.pdf) and [2016](reports/2016%20NSW%20LGE%20Errors.pdf) NSW count 
+which led the NSW Parliament to simplify the rules. Everyone is encouraged to use this code to double-check and correct election results.
 
 Results from this project were used to find bugs [in the 2013, 2016 and 2019 Federal counts](reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf) resulting in legislation change resolving some of the issues.
+
+Other STV counting programs include Grahame Bowland's [Dividebatur](https://github.com/grahame/dividebatur)
+and its successor [Dividebatur2](https://github.com/grahame/dividebatur2), Lee Yingtong Li's [OpenTally](https://yingtongli.me/git/OpenTally/), and Milad Ghale's [formally verified STV](https://github.com/MiladKetabGhale/STV-Counting-ProtocolVerification).
+
 
 ## Currently Supported Election Rules
 
@@ -41,7 +47,7 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **ACT2021** Rules that should have been used by ElectionsACT in 2020 and were used for the 2021 recount.
 - **NSWLocalGov2021** My dubious interpretation of the new, very ambiguous, legislation for NSW local government elections introduced before the 2021 elections. 
 - **NSWECLocalGov2021** Rules used by the NSWEC in the 2021 local government elections. This differs in many respects from my interpretation of the very ambiguous legislation. See [my thoughts](nsw/NSWLocalCouncilLegislation2021Commentary.md) for details.
-- **Vic2018** My interpretation of the Victorian Legislative Council rules. The 2018 refers to a conflict resolution fixed in 2018, but the rules were plausible if not literal before then.
+- **Vic2018** My interpretation of the Victorian Legislative Council rules. The 2018 refers to a contradiction in the legislation fixed in 2018, but the rules were plausible if not literal before then.
 
 This list is expected to grow as ConcreteSTV supports more jurisdictions.
 
@@ -73,6 +79,32 @@ third parties who pointed out issues before they cropped up in elections.
 
 If you notice any bugs in ConcreteSTV, please contact me at the address at the bottom
 of this file.
+
+## Randomness and perfectly matching the official results
+
+ConcreteSTV is designed to match the electoral commissions' counts perfectly. This is fairly straight forward
+if counting the election is deterministic.
+
+Most STV counting is deterministic. However, sometimes there are ties that have no way of being resolved
+under the legislation other than random draw. There are two ways a responsible electoral commission can
+handle such randomness:
+* Perform the draws in public, and then feed them into the program. This is dealt with in ConcreteSTV
+  using the `--tie` argument which actively specifies which candidates were favoured.
+* Use a pseudo random number generator in a program, open source the program, publish the input
+  data for the program, and then conduct a public ceremony to determine the seed for the pseudo random
+  number generator using something like dice. This technique is used by many USA electoral authorities
+  to demonstrate the truth of their auditing. This is supported by the `--seed` argument in ConcreteSTV.
+
+If an electoral authority does neither of these, it is usually possible to figure out what choices
+they made by careful investigation of the distribution of preferences and entering these into ConcreteSTV using the 
+`--tie` argument. This allows ConcreteSTV to match the electoral commissions' results perfectly. When loading
+data from published sources, ConcreteSTV will often be able to automatically derive this information.
+
+An exception is the NSW randomized counting algorithms, which involve a lot of randomness, and frequently
+in practice rerunning the count will cause different candidates to be elected. Here the choices made by
+the NSWEC are usually not visible from the provided distribution of preferences, nor is their use of
+a pseudo random number generator sufficiently well described to reproduce, so it is impossible to verify
+their results, although some errors are discoverable (see our reports).
 
 ## To compile
 
@@ -131,6 +163,7 @@ Currently parse_ec_data can accept (as first argument) the following elections:
 * Federal Senate : AEC2013, AEC2016, AEC2019 [AEC](https://results.aec.gov.au/)
 * ACT Legislative assembly : ACT2008, ACT2012, ACT2016, ACT2020 [ElectionsACT](https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections)
 * NSW Local Government : NSWLG2021 [NSW Election Commission](https://www.elections.nsw.gov.au/) See [docs](nsw/parse_ec_data_lge.md) for specific instructions.
+* Victoria : VIC2014, VIC2018, VIC2022 if you have the privilege of having the data.
 
 ## To count (concrete_stv)
 
@@ -168,9 +201,6 @@ Votes, and the differentials for each count, are listed by default; you can also
 the number of papers by selecting the "Show papers" box.
 
 You can compare this to the [AEC provided transcript](https://results.aec.gov.au/24310/Website/External/SenateStateDop-24310-TAS.pdf).
-
-Other STV counting programs include Grahame Bowland's [Dividebatur](https://github.com/grahame/dividebatur) 
-and its successor [Dividebatur2](https://github.com/grahame/dividebatur2), Lee Yingtong Li's [OpenTally](https://yingtongli.me/git/OpenTally/), and Milad Ghale's [formally verified STV](https://github.com/MiladKetabGhale/STV-Counting-ProtocolVerification).
 
 ## Margins and modifications.
 

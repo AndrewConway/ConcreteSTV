@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -10,6 +10,7 @@ use anyhow::anyhow;
 use clap::{Parser};
 use main_app::{ChangeOptions, ModifyStvFileOptions};
 use main_app::rules::Rules;
+use stv::random_util::Randomness;
 
 #[derive(Parser)]
 #[clap(version = "0.2", author = "Andrew Conway and Vanessa Teague", name="ConcreteSTV")]
@@ -23,6 +24,8 @@ use main_app::rules::Rules;
 /// this allows searching for manipulations on top of manipulations.
 ///
 /// This will not reliably work with ticket elections (e.g. Federal 2013 and earlier) if ATL modifications are allowed.
+///
+/// As randomness could cause changes, random seeds are not allowed, and reverse donkey vote is used to resolve ties.
 struct Opts {
     /// The counting rules to use.
     /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021
@@ -56,7 +59,7 @@ fn main() -> anyhow::Result<()> {
     let result_file = opt.input_options.result_file_name(&opt.votes,opt.out.as_ref(),".vchange",&opt.rules);
 
     // make sure the default elected people are correct.
-    let normal_elected_transcript = opt.rules.count(&votes,votes.metadata.vacancies.ok_or_else(||anyhow!("Need to specify number of vacancies"))?,&votes.metadata.excluded.iter().cloned().collect(),&votes.metadata.tie_resolutions,None,false);
+    let normal_elected_transcript = opt.rules.count(&votes,votes.metadata.vacancies.ok_or_else(||anyhow!("Need to specify number of vacancies"))?,&votes.metadata.excluded.iter().cloned().collect(),&votes.metadata.tie_resolutions,None,false,&mut Randomness::ReverseDonkeyVote);
     votes.metadata.results=Some(normal_elected_transcript.elected().clone());
 
 

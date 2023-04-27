@@ -223,7 +223,7 @@ pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutio
     data.metadata.tie_resolutions=TieResolutionsMadeByEC::default(); // Get rid of less fine grained decisions that may be entered.
     loop {
         println!("Looping...");
-        let transcript = data.distribute_preferences::<Rules>();
+        let transcript = data.distribute_preferences::<Rules>(&mut Randomness::ReverseDonkeyVote);
         if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript,false).context("Trying to determine EC decisions")? {
             println!("Observed tie resolution {}", decision.decision);
             assert!(!decision.decision.is_reverse_donkey_vote(), "favoured candidate should be lower as higher candidates are assumed favoured.");
@@ -373,6 +373,7 @@ pub fn file_to_string_windows_1252(file:&mut File) -> anyhow::Result<String> {
 
 use once_cell::sync::Lazy;
 use crate::distribution_of_preferences_transcript::CountIndex;
+use crate::random_util::Randomness;
 
 // The openoffice CLI seems to be unreliable if running multiple simultaneously. This is used as a lock.
 static OPENOFFICE_CLI_LOCK: Lazy<Mutex<u64>> = Lazy::new(||Mutex::new(1u64));
