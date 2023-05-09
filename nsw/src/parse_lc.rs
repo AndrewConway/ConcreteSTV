@@ -14,6 +14,7 @@ use stv::ballot_metadata::{Candidate, CandidateIndex, DataSource, ElectionMetada
 use stv::election_data::ElectionData;
 use anyhow::{anyhow, Context};
 use scraper::{ElementRef, Html, Selector};
+use url::Url;
 use stv::parse_util::{FileFinder, KnowsAboutRawMarkings, MissingFile, RawDataSource};
 use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionExplicitDecisionInCount, TieResolutionsMadeByEC};
 use stv::ballot_pile::BallotPaperCount;
@@ -21,12 +22,12 @@ use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource
 use stv::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo};
 use stv::download::CacheDir;
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
-use crate::parse_lge::{parse_fp_by_grp_and_candidate_by_vote_type, parse_zip_election_file};
+use crate::parse_lge::parse_zip_election_file;
 
 
 // 2011 data files are at http://www.pastvtr.elections.nsw.gov.au/SGE2011/lc_prefdata.htm
 pub fn get_nsw_lc_data_loader_2015(finder:&FileFinder) -> anyhow::Result<NSWLCDataLoader> {
-    NSWLCDataLoader::new(finder,"2015","https://pastvtr.elections.nsw.gov.au/SGE2015/lc-home.htm","https://pastvtr.elections.nsw.gov.au/SGE2015/lc/state/dop/dop_index/index.htm","https://pastvtr.elections.nsw.gov.au/SGE2015/lc/state/preferences/index.htm")
+    NSWLCDataLoader::new(finder,"2015","https://pastvtr.elections.nsw.gov.au/SGE2015/lc-home.htm","https://pastvtr.elections.nsw.gov.au/SGE2015/lc/state/dop/dop_index/index.htm","https://pastvtr.elections.nsw.gov.au/SGE2015/data/lc/") // https://pastvtr.elections.nsw.gov.au/SGE2015/lc/state/preferences/index.htm is a description of the preferences files.
 }
 
 pub fn get_nsw_lc_data_loader_2019(finder:&FileFinder) -> anyhow::Result<NSWLCDataLoader> {
@@ -34,7 +35,7 @@ pub fn get_nsw_lc_data_loader_2019(finder:&FileFinder) -> anyhow::Result<NSWLCDa
 }
 
 pub fn get_nsw_lc_data_loader_2023(finder:&FileFinder) -> anyhow::Result<NSWLCDataLoader> {
-    NSWLCDataLoader::new(finder,"2023","https://vtr.elections.nsw.gov.au/SG2301/LC/results","https://vtr.elections.nsw.gov.au/SG2301/LC/state/dop/index","")
+    NSWLCDataLoader::new(finder,"2023","https://vtr.elections.nsw.gov.au/SG2301/LC/results","https://vtr.elections.nsw.gov.au/SG2301/LC/state/dop/index","https://vtr.elections.nsw.gov.au/SG2301/LC/state/preferences")
 }
 
 
@@ -64,7 +65,7 @@ pub struct NSWLCDataLoader {
     year : String,
     page_url : String,
     dop_url : String,
-    pref_url : String,
+    pref_url : Url,
 }
 
 
@@ -120,23 +121,20 @@ impl RawDataSource for NSWLCDataLoader {
     fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> { self.read_raw_data(electorate) }
 
     fn read_raw_metadata(&self, electorate: &str) -> anyhow::Result<ElectionMetadata> {
-        match self.year.as_str() {
-            "2015" => self.read_raw_metadata_from_excel_file(electorate,"SGE2015 LC Candidates v1.xlsx"),
-            "2019" => self.read_raw_metadata_from_excel_file(electorate,"SGE2019 LC Candidates.xlsx"),
-            "2023" => {
+        let mut metadata = self.read_raw_metadata_from_excel_file(electorate)?;
+        if self.year=="2023" {
+            metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecisionInCount {
+                decision: TieResolutionExplicitDecision::two_lists(vec![CandidateIndex(195)],vec![CandidateIndex(34)]),
+                came_up_in: Some(CountIndex(3)),
+            }));
+        }
+        Ok(metadata)
+            /* Alternate method using HTML files
                 let cache = self.cache();
                 let base_url = url::Url::parse(&self.dop_url)?;
                 let fp_by_grp_and_candidate_by_vote_type = base_url.join("fp_by_grp_and_candidate_by_vote_type")?;
                 let file = cache.get_file(fp_by_grp_and_candidate_by_vote_type.as_str())?;
-                let mut metadata = parse_fp_by_grp_and_candidate_by_vote_type(file,false,Some(NumberOfCandidates(21)),false,self.name(electorate))?;
-                metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecisionInCount {
-                    decision: TieResolutionExplicitDecision::two_lists(vec![CandidateIndex(195)],vec![CandidateIndex(34)]),
-                    came_up_in: Some(CountIndex(3)),
-                }));
-                Ok(metadata)
-            }
-            _ => {return Err(anyhow!("Invalid Year"))}
-        }
+                let metadata = parse_fp_by_grp_and_candidate_by_vote_type(file,false,Some(NumberOfCandidates(21)),false,self.name(electorate))?;*/
     }
 
     fn copyright(&self) -> Copyright {
@@ -384,12 +382,28 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
 
 impl NSWLCDataLoader {
 
+    /// Name of the file containing detailed preferences
+    fn pref_data_filename(&self) -> String {
+        match self.year.as_str() {
+            "2023" => "SG2301 LC Pref Data Statewide.zip".to_string(),
+            _ => format!("SGE{} LC Pref Data Statewide.zip",&self.year),
+        }
+    }
+    /// Name of the file containing candidates.
+    fn candidate_list_excel_filename(&self) -> String {
+        match self.year.as_str() {
+            "2015" => "SGE2015 LC Candidates v1.xlsx".to_string(),
+            _ => format!("SGE{} LC Candidates.xlsx",&self.year),
+        }
+    }
+
     pub fn read_raw_data_possibly_rejecting_some_types(&self, electorate: &str, reject_vote_type : Option<HashSet<String>>) -> anyhow::Result<ElectionData> {
         let mut metadata = self.read_raw_metadata(electorate)?;
-        let zip_preferences_list = self.finder.find_raw_data_file(&format!("SGE{} LC Pref Data Statewide.zip",&self.year),&self.archive_location,&self.pref_url)?;
+        let zip_preferences_list = self.find_raw_data_file_from_cache(self.pref_url.join(&self.pref_data_filename())?.as_str())?;
+        // let zip_preferences_list = self.finder.find_raw_data_file(&self.pref_data_filename(),&self.archive_location,&self.pref_url)?; // old location
         metadata.source.push(DataSource{
             url: self.pref_url.to_string(),
-            files: zip_preferences_list.file_name().map(|p|p.to_string_lossy().to_string()).into_iter().collect(),
+            files: vec![self.pref_data_filename()],
             comments: None,
         });
         parse_zip_election_file(File::open(zip_preferences_list)?,metadata,reject_vote_type,false)
@@ -403,7 +417,7 @@ impl NSWLCDataLoader {
             year: year.to_string(),
             page_url: page_url.to_string(),
             dop_url: dop_url.to_string(),
-            pref_url: pref_url.to_string(),
+            pref_url: Url::parse(pref_url)?,
         })
     }
 
@@ -411,13 +425,18 @@ impl NSWLCDataLoader {
     fn cache(&self) -> CacheDir {
         CacheDir::new(self.finder.path.join(&self.archive_location))
     }
+
+    fn find_raw_data_file_from_cache(&self, url:&str) -> Result<PathBuf, MissingFile> {
+        self.cache().find_raw_data_file_from_cache(url)
+    }
 /*
     fn read_cached_url_as_string(&self,url:&str) -> anyhow::Result<String> {
         self.cache().get_string(url)
     }
 */
-    fn read_raw_metadata_from_excel_file(&self, electorate: &str,excel_file_name:&str) -> anyhow::Result<ElectionMetadata> {
-        let metadata_path = self.finder.find_raw_data_file(excel_file_name,&self.archive_location,&self.pref_url)?;
+    fn read_raw_metadata_from_excel_file(&self, electorate: &str) -> anyhow::Result<ElectionMetadata> {
+        let metadata_path = self.find_raw_data_file_from_cache(self.pref_url.join(&self.candidate_list_excel_filename())?.as_str())?;
+            // self.finder.find_raw_data_file(excel_file_name,&self.archive_location,&self.pref_url)?; // old location
         let metadata = self.parse_candidate_list(&metadata_path,electorate)?;
         Ok(metadata)
     }

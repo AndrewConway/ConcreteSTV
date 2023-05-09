@@ -97,6 +97,14 @@ impl PerCandidate<usize> {
         fn zero(i:usize) -> bool { i==0 || i==usize::MAX}
         zero(self.exhausted) && self.candidate.iter().all(|v|zero(*v)) && self.set_aside.iter().all(|v|zero(*v)) && zero(self.rounding.value)
     }
+
+    pub fn sum(&self) -> usize {
+        let mut res = self.exhausted;
+        for s in &self.candidate { res+=*s; }
+        for s in &self.set_aside { res+=*s; }
+        if self.rounding.negative { res-=self.rounding.value } else { res+=self.rounding.value }
+        res
+    }
 }
 
 impl From<PerCandidate<isize>> for PerCandidate<f64> {

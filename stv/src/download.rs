@@ -12,7 +12,7 @@ use std::time::Duration;
 use std::sync::Mutex;
 use anyhow::{anyhow, Context};
 use once_cell::sync::OnceCell;
-use crate::parse_util::file_to_string;
+use crate::parse_util::{file_to_string, MissingFile};
 
 /// Helper for downloading a URL to a local file equivalent.
 /// Tries to make this an obvious mirror of the URL.
@@ -65,6 +65,12 @@ impl CacheDir {
         let already_has_suffix = url_path.split('/').last().map(|s|s.contains('.')).unwrap_or(false);
         let url_path_with_extension : String = if already_has_suffix { url_path } else if let Some(suffix) = suffix { url_path+suffix } else { url_path };
         self.file(&url_path_with_extension)
+    }
+    /// Find the path to an existing file, or useful error if it doesn't exist.
+    /// Don't try to download.
+    pub fn find_raw_data_file_from_cache(&self,url:&str) -> Result<PathBuf,MissingFile> {
+        let path = self.get_file_path_with_extension(url,None);
+        if path.exists() { Ok(path) } else { Err(MissingFile{file_name:path.to_string_lossy().to_string(),where_to_get:url.to_string(),where_to_get_is_exact_url:true })}
     }
     /// Download a url using Reqwest, and store. Add a suffix before storing, if suffix is not None, unless the file already has a suffix.
     /// If Ok(None) is returned, then this is not available now but may be later.
