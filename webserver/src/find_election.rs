@@ -1,4 +1,4 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -13,6 +13,7 @@ use federal::parse::FederalDataSource;
 use nsw::parse_lge::NSWLGEDataSource;
 use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
 use serde::{Deserialize,Serialize};
+use nsw::parse_lc::NSWLCDataSource;
 use statistics::simple_statistics::SimpleStatistics;
 use stv::ballot_metadata::ElectionMetadata;
 use stv::election_data::ElectionData;
@@ -20,7 +21,7 @@ use stv::parse_util::{FileFinder, RawDataSource};
 use stv::run_once_globally::RunOnceController;
 
 fn get_all_elections_with_redistributable_data() -> Vec<Box<dyn ElectionDataSource+Sync+Send>>{
-    vec![Box::new(FederalDataSource{}),Box::new(NSWLGEDataSource{})]
+    vec![Box::new(FederalDataSource{}),Box::new(NSWLCDataSource{}),Box::new(NSWLGEDataSource{})]
 }
 
 static GREAT_ELECTION_LIST: Lazy<Vec<Box<dyn ElectionDataSource+Sync+Send>>> = Lazy::new(get_all_elections_with_redistributable_data);

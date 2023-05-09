@@ -18,7 +18,7 @@ use stv::random_util::Randomness;
 /// those used by various electoral commissions on various elections.
 struct Opts {
     /// The counting rules to use.
-    /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021, Vic2018
+    /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021, NSWECRandomLGE2012, NSWECRandomLGE2016, NSWECRandomLGE2017, NSWECRandomLC2015, NSWECRandomLC2019, Vic2018
     rules : Rules,
 
     /// The name of the .stv (or .vchange) file to get votes from

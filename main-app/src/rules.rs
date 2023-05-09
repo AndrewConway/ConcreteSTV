@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -20,6 +20,7 @@ use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 use serde::{Serialize,Deserialize};
 use margin::record_changes::ElectionChanges;
 use nsw::{NSWECLocalGov2021, NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation, SimpleIRVAnyDifferenceBreaksTies};
+use nsw::nsw_random_rules::{NSWECRandomLC2015, NSWECRandomLC2019, NSWECRandomLGE2012, NSWECRandomLGE2016, NSWECRandomLGE2017};
 use stv::random_util::Randomness;
 use vic::Vic2018LegislativeCouncil;
 use crate::ChangeOptions;
@@ -37,6 +38,11 @@ pub enum Rules {
     ACT2021,
     NSWLocalGov2021,
     NSWECLocalGov2021,
+    NSWECRandomLGE2012,
+    NSWECRandomLGE2016,
+    NSWECRandomLGE2017,
+    NSWECRandomLC2015,
+    NSWECRandomLC2019,
     Vic2018,
     IRV,
 }
@@ -58,6 +64,10 @@ impl FromStr for Rules {
             "ACT2021" => Ok(Rules::ACT2021),
             "NSWLocalGov2021" => Ok(Rules::NSWLocalGov2021),
             "NSWECLocalGov2021" => Ok(Rules::NSWECLocalGov2021),
+            "NSWECRandomLGE2012" => Ok(Rules::NSWECRandomLGE2012),
+            "NSWECRandomLGE2016" => Ok(Rules::NSWECRandomLGE2016),
+            "NSWECRandomLC2015" => Ok(Rules::NSWECRandomLC2015),
+            "NSWECRandomLC2019" => Ok(Rules::NSWECRandomLC2019),
             "Vic2018" => Ok(Rules::Vic2018),
             "IRV" => Ok(Rules::IRV),
             _ => Err("No such rule supported")
@@ -79,6 +89,11 @@ impl Display for Rules {
             Rules::ACT2021 => "ACT2021",
             Rules::NSWLocalGov2021 => "NSWLocalGov2021",
             Rules::NSWECLocalGov2021 => "NSWECLocalGov2021",
+            Rules::NSWECRandomLGE2012 => "NSWECRandomLGE2012",
+            Rules::NSWECRandomLGE2016 => "NSWECRandomLGE2016",
+            Rules::NSWECRandomLGE2017 => "NSWECRandomLGE2017",
+            Rules::NSWECRandomLC2015 => "NSWECRandomLC2015",
+            Rules::NSWECRandomLC2019 => "NSWECRandomLC2019",
             Rules::Vic2018 => "Vic2018",
             Rules::IRV => "IRV",
         };
@@ -103,6 +118,11 @@ impl Rules {
             Rules::ACTPre2020 => distribute_preferences::<ACTPre2020>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
             Rules::NSWLocalGov2021 => distribute_preferences::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
             Rules::NSWECLocalGov2021 => distribute_preferences::<NSWECLocalGov2021>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::NSWECRandomLGE2012 => distribute_preferences::<NSWECRandomLGE2012>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::NSWECRandomLGE2016 => distribute_preferences::<NSWECRandomLGE2016>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::NSWECRandomLGE2017 => distribute_preferences::<NSWECRandomLGE2017>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::NSWECRandomLC2015 => distribute_preferences::<NSWECRandomLC2015>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::NSWECRandomLC2019 => distribute_preferences::<NSWECRandomLC2019>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
             Rules::Vic2018 => distribute_preferences::<Vic2018LegislativeCouncil>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
             Rules::IRV => distribute_preferences::<SimpleIRVAnyDifferenceBreaksTies>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
             _ => { // handle 6 digit transcripts.
@@ -132,6 +152,11 @@ impl Rules {
             Rules::NSWECLocalGov2021 => PossibleChanges::Integers(options.find_changes::<NSWECLocalGov2021>(data,verbose)?),
             Rules::Vic2018 => PossibleChanges::Integers(options.find_changes::<Vic2018LegislativeCouncil>(data,verbose)?),
             Rules::IRV => PossibleChanges::Integers(options.find_changes::<SimpleIRVAnyDifferenceBreaksTies>(data,verbose)?),
+            Rules::NSWECRandomLGE2012 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLGE2012>(data, verbose)?),
+            Rules::NSWECRandomLGE2016 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLGE2016>(data, verbose)?),
+            Rules::NSWECRandomLGE2017 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLGE2017>(data, verbose)?),
+            Rules::NSWECRandomLC2015 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLC2015>(data,verbose)?),
+            Rules::NSWECRandomLC2019 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLC2019>(data,verbose)?),
         })
     }
 
@@ -157,6 +182,11 @@ impl RulesDetails {
             RulesDetails{ name: "ACT2021".to_string(), description: "My interpretation of the rules that should have been used by Elections ACT in 2020, and were actually used in 2021 to recount the 2020 election after we pointed out errors.".to_string() },
             RulesDetails{ name: "NSWLocalGov2021".to_string(), description: "My interpretation of the very ambiguous rules covering the NSW 2021 local government elections.".to_string() },
             RulesDetails{ name: "NSWECLocalGov2021".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2021 local government elections. It is not how I would interpret the very ambiguous legislation, but not implausible.".to_string() },
+            RulesDetails{ name: "NSWECRandomLGE2012".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2012 local government elections. Note that there is considerable randomness so recounting with a different random choices will probably produce different results. Same as NSWECRandomLGE2016 except sometimes incorrectly computes last parcel.".to_string() },
+            RulesDetails{ name: "NSWECRandomLGE2016".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2016 local government elections. Note that there is considerable randomness so recounting with a different random choices will probably produce different results. Same as NSWECRandomLGE2017 except gets some fractions wrong and gets some tie resolutions wrong.".to_string() },
+            RulesDetails{ name: "NSWECRandomLGE2017".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2017 local government elections. Note that there is considerable randomness so recounting with a different random choices will probably produce different results.".to_string() },
+            RulesDetails{ name: "NSWECRandomLC2015".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2015 legislative council elections. Note that there is considerable randomness so recounting with a different random choices will probably produce different results. Same as NSWECRandomLC2019 except with the same last parcel error as NSWECRandomLGE2012 (which didn't come up so may or may not be present).".to_string() },
+            RulesDetails{ name: "NSWECRandomLC2019".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2019 and 2023 legislative council elections. Note that there is considerable randomness so recounting with a different random choices will probably produce different results. ".to_string() },
             RulesDetails{ name: "Vic2018".to_string(), description: "My interpretation of the rules that should have been used by the VEC since the 2018 modification to 114A(28)(c) of the Electoral Act 2002, and a plausible if not literal interpretation of the rules prior to that.".to_string() },
             RulesDetails{ name: "IRV".to_string(), description: "IRV with tie resolution by count backs with any non-equality breaking ties where possible.".to_string() },
         ]

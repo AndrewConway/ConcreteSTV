@@ -8,7 +8,7 @@
 use std::fs::File;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use nsw::nsw_random_rules::{NSWECrandomLGE2016, NSWECrandomLGE2017};
+use nsw::nsw_random_rules::{NSWECRandomLGE2016, NSWECRandomLGE2017};
 use nsw::parse_lge::{get_nsw_lge_data_loader_2016, NSWLGEDataLoader, NSWLGEDataSource};
 use nsw::run_election_multiple_times::PossibleResults;
 use stv::ballot_metadata::CandidateIndex;
@@ -71,7 +71,7 @@ fn test_2016_plausible() {
     let electorate =&loader.all_electorates()[0];
     assert_eq!(electorate,"Albury City Council");
     for electorate in &loader.all_electorates() {
-        test::<NSWECrandomLGE2016>(electorate,&loader);
+        test::<NSWECRandomLGE2016>(electorate, &loader);
     }
 }
 
@@ -82,8 +82,8 @@ fn test_bland_shire_nswec_bug() {
     let data = loader.read_raw_data("Bland Shire Council").unwrap();
     let official_dop = loader.read_official_dop_transcript(&data.metadata).unwrap();
     let mut randomness = Randomness::PRNG(ChaCha20Rng::seed_from_u64(1));
-    let used_rules = data.distribute_preferences::<NSWECrandomLGE2016>(&mut randomness);
-    let without_rounding_errors = data.distribute_preferences::<NSWECrandomLGE2017>(&mut randomness);
+    let used_rules = data.distribute_preferences::<NSWECRandomLGE2016>(&mut randomness);
+    let without_rounding_errors = data.distribute_preferences::<NSWECRandomLGE2017>(&mut randomness);
     assert_eq!(Err(DifferenceBetweenOfficialDoPAndComputed::DifferentOnCount(CountIndex(1),None,DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalCandidate(ECTally(260.),259,CandidateIndex(0)))),
                official_dop.compare_with_transcript_checking_for_ec_decisions(&without_rounding_errors,false));
     assert_ne!(Err(DifferenceBetweenOfficialDoPAndComputed::DifferentOnCount(CountIndex(1),None,DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalCandidate(ECTally(260.),259,CandidateIndex(0)))),
@@ -96,7 +96,7 @@ fn test_2016_internally_consistent() {
     let loader = get_nsw_lge_data_loader_2016(&finder).unwrap();
     for electorate in &loader.all_electorates() {
         println!("Testing electorate {}",electorate);
-        assert_eq!(test_internally_consistent::<NSWECrandomLGE2016>("2016",electorate).unwrap(),Ok(None));
+        assert_eq!(test_internally_consistent::<NSWECRandomLGE2016>("2016", electorate).unwrap(), Ok(None));
     }
 }
 
@@ -123,7 +123,7 @@ fn test_blue_mountains_run_10000_times_and_check_probabilistic_winners_reasonabl
     let loader = get_nsw_lge_data_loader_2016(&finder).unwrap();
     let data = loader.read_raw_data("Blue Mountains City Council - Ward 2").unwrap();
     let mut randomness = Randomness::PRNG(ChaCha20Rng::seed_from_u64(1));
-    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2017>(&data,10000,&mut randomness);
+    let results = PossibleResults::new_from_runs::<NSWECRandomLGE2017>(&data, 10000, &mut randomness);
     results.print_table_results(&data.metadata);
     assert!(results.is_close_to_expected_prob_winning(CandidateIndex(6),1.0));
     assert!(results.is_close_to_expected_prob_winning(CandidateIndex(9),1.0));

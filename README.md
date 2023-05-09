@@ -45,8 +45,13 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **ACTPre2020** Rules used for ACT Legislative Assembly by ElectionsACT prior to 2020.
 - **ACT2020** Very buggy rules used by ElectionsACT in 2020
 - **ACT2021** Rules that should have been used by ElectionsACT in 2020 and were used for the 2021 recount.
+- **NSWECRandomLGE2012** Buggy rules used by the NSWEC in the 2012 NSW Local Government elections.
+- **NSWECRandomLGE2016** Buggy rules used by the NSWEC in the 2016 NSW Local Government elections.
+- **NSWECRandomLGE2017** Rules used by the NSWEC in the 2017 NSW Local Government elections.
 - **NSWLocalGov2021** My dubious interpretation of the new, very ambiguous, legislation for NSW local government elections introduced before the 2021 elections. 
 - **NSWECLocalGov2021** Rules used by the NSWEC in the 2021 local government elections. This differs in many respects from my interpretation of the very ambiguous legislation. See [my thoughts](nsw/NSWLocalCouncilLegislation2021Commentary.md) for details.
+- **NSWECRandomLC2015** Possibly buggy rules used by the NSWEC in the 2015 Legislative Council elections.
+- **NSWECRandomLC2019** Rules used by the NSWEC in the 2019 and 2023 Legislative Council elections.
 - **Vic2018** My interpretation of the Victorian Legislative Council rules. The 2018 refers to a contradiction in the legislation fixed in 2018, but the rules were plausible if not literal before then.
 
 This list is expected to grow as ConcreteSTV supports more jurisdictions.

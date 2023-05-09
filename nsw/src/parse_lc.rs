@@ -147,14 +147,15 @@ impl RawDataSource for NSWLCDataLoader {
     }
 
     fn rules(&self, _electorate: &str) -> AssociatedRules {
-        match self.year.as_str() {
-            "2015" => AssociatedRules { // TODO
-                rules_used: None,
-                rules_recommended: None,
-                comment: Some("The legislation is poorly written and involves significant randomness - a repeat count may produce a different outcome.".into()),
-                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2012CountErrorTechReport.pdf".into(),"https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/2016%20NSW%20LGE%20Errors.pdf".into()],
+        AssociatedRules {
+            rules_used: match self.year.as_str() {
+                "2015" => Some("NSWECRandomLC2015".into()),
+                "2019" | "2023" => Some("NSWECRandomLC2019".into()),
+                _ => None,
             },
-            _ => AssociatedRules { rules_used: None, rules_recommended: None, comment: None, reports: vec![] },
+            rules_recommended: Some("NSWECRandomLC2019".into()),
+            comment: Some("The legislation is poorly written and involves significant randomness - a repeat count may produce a different outcome.".into()),
+            reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2012CountErrorTechReport.pdf".into(),"https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/2016%20NSW%20LGE%20Errors.pdf".into()],
         }
     }
 

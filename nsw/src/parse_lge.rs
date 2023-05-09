@@ -149,6 +149,24 @@ impl RawDataSource for NSWLGEDataLoader {
                 comment: Some("The legislation is very ambiguous. My interpretation of the rules is NSWLocalGov2021 but NSWECLocalGov2021 seems a plausible interpretation.".into()),
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2021Report.pdf".into()],
             },
+            "2012" => AssociatedRules {
+                rules_used: Some("NSWECRandomLGE2012".into()),
+                rules_recommended: Some("NSWECRandomLGE2017".into()),
+                comment: Some("The legislation is poorly written and involves significant randomness - a repeat count may produce a different outcome.".into()),
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2012CountErrorTechReport.pdf".into()],
+            },
+            "2016" => AssociatedRules {
+                rules_used: Some("NSWECRandomLGE2016".into()),
+                rules_recommended: Some("NSWECRandomLGE2017".into()),
+                comment: Some("The legislation is poorly written and involves significant randomness - a repeat count may produce a different outcome.".into()),
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/2016%20NSW%20LGE%20Errors.pdf".into()],
+            },
+            "2017" => AssociatedRules {
+                rules_used: Some("NSWECRandomLGE2017".into()),
+                rules_recommended: Some("NSWECRandomLGE2017".into()),
+                comment: Some("The legislation is poorly written and involves significant randomness - a repeat count may produce a different outcome.".into()),
+                reports: vec![],
+            },
             _ => AssociatedRules { rules_used: None, rules_recommended: None, comment: None, reports: vec![] },
         }
     }

@@ -102,11 +102,24 @@ In 2020 they made it a secret (just in time for the bugs).
   It differs from ACTPre2020 in counting votes to 6 decimal places. To match the results currently (as of March 2021) on the
   [ElectionsACT website](https://www.elections.act.gov.au/elections_and_voting/2020_legislative_assembly_election/distribution-of-preferences-2020)
   use ACT2021 ruleset rather than ACT2020.
-  
-## NSW Local Government
 
-The NSW local government elections used to use similar legislation to the NSW legislative council,
-but drastically changed prior to the 2021 election as the old legislation was probabilistic, and frequently
+## NSW Local Government (2017 and earlier)
+
+The NSW local government elections use somewhat random selection for surplus distribution. This means
+that rerunning the count with different random choices can significantly change the outcome (often changing
+who is elected).
+The NSWEC does not provide their choices, so attempting to reproduce their exact outcomes is not practical.
+
+The legislation is very ambiguous, and my implementation is instead based on a specification the NSWEC
+produces, _Functional Requirements for Count Module_. 
+
+- **NSWECRandomLGE2012** My interpretation of the rules used by the NSWEC for the 2012 local government election. Same as NSWECRandomLGE2016 except it sometimes computes the last parcel incorrectly (see [our report](reports/NSWLGE2012CountErrorTechReport.pdf))
+- **NSWECRandomLGE2016** My interpretation of the rules used by the NSWEC for the 2016 local government election. Same as NSWECRandomLGE2017 except it sometimes gets tie resolutions for exclusions and fractions incorrect (see [our report](reports/2016%20NSW%20LGE%20Errors.pdf))
+- **NSWECRandomLGE2017** My interpretation of the rules used by the NSWEC for the 2017 local government election. 
+
+## NSW Local Government (2021 and later)
+
+The NSW local government election count algorithm changed prior to the 2021 election as the old legislation was probabilistic, and frequently
 gave different results when counted multiple times.
 
 The [new legislation](nsw/NSWLocalCouncilLegislation2021.md) is very ambiguous, and while I have
@@ -118,6 +131,19 @@ to work out my interpretation of their interpretation, which is now also in the 
 
 - **NSWLocalGov2021** My interpretation, for what it is worth
 - **NSWECLocalGov2021** My interpretation of the rules used by the NSWEC for the 2021 NSW local government elections.
+
+## NSW Legislative council
+
+The NSW legislative council elections use somewhat random selection for surplus distribution, very similar to the old
+NSW local government legislation. This means that rerunning the count with different random choices can significantly change the transcript. 
+The NSWEC does not provide their choices, so attempting to reproduce their exact outcomes is not practical.
+
+The legislation is very ambiguous, and my implementation is instead based on a specification the NSWEC
+produces, _Functional Requirements for Count Module_.
+
+- **NSWECRandomLC2015** My interpretation of the rules used by the NSWEC for the 2015 local government election. Same as NSWECRandomLC2019 except it sometimes computes the last parcel incorrectly (see [our report](reports/NSWLGE2012CountErrorTechReport.pdf). 
+  The situation where this error occurs does not crop up in the official count, so it is not clear whether this bug was actually present in the program used by the NSWEC, but the bug was present in the pseudocode for the documentation for the specification of the program at the time, so my best guess is that it was.)
+- **NSWECRandomLC2019** My interpretation of the rules used by the NSWEC for the 2019 and 2023 legislative council election. 
 
 ## Victorian upper house (Legislative Council)
 

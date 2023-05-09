@@ -104,7 +104,7 @@ pub trait NSWRandomVariations {
 /// The count used by the NSWEC in 2012, as far as I can tell.
 pub struct NSWECLGE2012{}
 impl NSWRandomVariations for NSWECLGE2012 {
-    fn name() -> String { "NSWECrandomLGE2012".to_string() }
+    fn name() -> String { "NSWECRandomLGE2012".to_string() }
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
     /// Assuming this bug was not newly created in 2016
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::None }
@@ -115,12 +115,12 @@ impl NSWRandomVariations for NSWECLGE2012 {
     fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
 }
-pub type NSWECrandomLGE2012 = NSWRandomSamplingVariant<NSWECLGE2012>;
+pub type NSWECRandomLGE2012 = NSWRandomSamplingVariant<NSWECLGE2012>;
 
 /// The count used by the NSWEC in 2016, as far as I can tell.
 pub struct NSWECLGE2016{}
 impl NSWRandomVariations for NSWECLGE2016 {
-    fn name() -> String { "NSWECrandomLGE2016".to_string() }
+    fn name() -> String { "NSWECRandomLGE2016".to_string() }
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
     /// 2016 Bug 1
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::None }
@@ -130,13 +130,13 @@ impl NSWRandomVariations for NSWECLGE2016 {
     fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { true }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
 }
-pub type NSWECrandomLGE2016 = NSWRandomSamplingVariant<NSWECLGE2016>;
+pub type NSWECRandomLGE2016 = NSWRandomSamplingVariant<NSWECLGE2016>;
 
 /// The count used by the NSWEC in 2017, as far as I can tell.
 /// It does not emulate the bizarre tally changes between the end of count 35 and the start of count 36 in "Federation"
 pub struct NSWECLGE2017{}
 impl NSWRandomVariations for NSWECLGE2017 {
-    fn name() -> String { "NSWECrandomLGE2017".to_string() }
+    fn name() -> String { "NSWECRandomLGE2017".to_string() }
     fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
     fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
     fn when_should_surplus_distribution_be_deferred() -> DeferSurplusDistribution { DeferSurplusDistribution::DeferIfSumOfUndistributedSurplussesLessThanOrEqualToDifferenceBetweenTwoLowestContinuingCandidates }
@@ -144,7 +144,7 @@ impl NSWRandomVariations for NSWECLGE2017 {
     fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
     fn when_checking_if_top_few_have_overwhelming_votes_require_exactly_one() -> bool { false }
 }
-pub type NSWECrandomLGE2017 = NSWRandomSamplingVariant<NSWECLGE2017>;
+pub type NSWECRandomLGE2017 = NSWRandomSamplingVariant<NSWECLGE2017>;
 
 
 /*

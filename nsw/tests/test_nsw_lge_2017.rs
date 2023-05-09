@@ -8,7 +8,7 @@
 use std::fs::File;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use nsw::nsw_random_rules::{NSWECrandomLGE2017};
+use nsw::nsw_random_rules::{NSWECRandomLGE2017};
 use nsw::parse_lge::{get_nsw_lge_data_loader_2017, NSWLGEDataLoader, NSWLGEDataSource};
 use nsw::run_election_multiple_times::PossibleResults;
 use stv::ballot_metadata::CandidateIndex;
@@ -72,7 +72,7 @@ fn test_2017_plausible() {
     println!("Made loader");
     assert_eq!(&loader.all_electorates()[0],"Armidale Regional");
     for electorate in &loader.all_electorates() {
-        test::<NSWECrandomLGE2017>(electorate,&loader);
+        test::<NSWECRandomLGE2017>(electorate, &loader);
         println!("Testing Electorate {}",electorate);
     }
 }
@@ -81,7 +81,7 @@ fn test_2017_plausible() {
 fn test_wollstonecraft() {
     let finder = FileFinder::find_ec_data_repository();
     let loader = get_nsw_lge_data_loader_2017(&finder).unwrap();
-    test::<NSWECrandomLGE2017>("North Sydney - Wollstonecraft Ward",&loader);
+    test::<NSWECRandomLGE2017>("North Sydney - Wollstonecraft Ward", &loader);
 }
 
 
@@ -101,7 +101,7 @@ fn test_wollstonecraft_run_10000_times_and_check_probabilistic_winners_reasonabl
     let loader = get_nsw_lge_data_loader_2017(&finder).unwrap();
     let data = loader.read_raw_data("North Sydney - Wollstonecraft Ward").unwrap();
     let mut randomness = Randomness::PRNG(ChaCha20Rng::seed_from_u64(1));
-    let results = PossibleResults::new_from_runs::<NSWECrandomLGE2017>(&data,10000,&mut randomness);
+    let results = PossibleResults::new_from_runs::<NSWECRandomLGE2017>(&data, 10000, &mut randomness);
     results.print_table_results(&data.metadata);
     assert_eq!(10000,results.candidates[9].num_times_elected);
     assert!(results.is_close_to_expected_prob_winning(CandidateIndex(9),1.0));
@@ -128,7 +128,7 @@ fn test_2017_internally_consistent() {
         // there is something bizarre in the Inner West - Marrickville Ward DoP. On the NSWEC website, count 12, the webpage is not a count webpage but rather a duplicate of the DoP summary page.
         if electorate!="Federation" && electorate!="Inner West - Marrickville Ward" {
             println!("Testing electorate {}",electorate);
-            assert_eq!(test_internally_consistent::<NSWECrandomLGE2017>("2017",electorate).unwrap(),Ok(None));
+            assert_eq!(test_internally_consistent::<NSWECRandomLGE2017>("2017", electorate).unwrap(), Ok(None));
         }
     }
 }
