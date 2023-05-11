@@ -117,8 +117,13 @@ impl RawDataSource for NSWLGEDataLoader {
     fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> { self.read_raw_data_possibly_rejecting_some_types(electorate, None) }
 
     fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> {
-        if electorate.ends_with("Mayoral") { read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<SimpleIRVAnyDifferenceBreaksTies,Self>(self, electorate) }
-        else { read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021,Self>(self,electorate) }
+        match self.year.as_str() {
+            "2012" | "2016" | "2017" => self.read_raw_data(electorate), // too hard to get ec resolutions from the probabilistic years.
+            _ => {
+                if electorate.ends_with("Mayoral") { read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<SimpleIRVAnyDifferenceBreaksTies,Self>(self, electorate) }
+                else { read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021,Self>(self,electorate) }
+            }
+        }
     }
 
     fn read_raw_metadata(&self, electorate: &str) -> anyhow::Result<ElectionMetadata> {

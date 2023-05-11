@@ -71,7 +71,7 @@ pub struct ElectionsOfOneTypeAndYear {
 }
 
 
-#[derive(Debug,Serialize,Deserialize,Clone)]
+#[derive(Debug,Serialize,Deserialize,Clone,Eq,PartialEq,Hash)]
 pub struct TextElectionSpecification {
     pub name : String,
     pub year : String,
@@ -105,14 +105,14 @@ impl TryFrom<TextElectionSpecification> for FoundElection {
 }
 
 // control how the election is loaded.
-static RUN_ONCE_CONTROLLER: Lazy<RunOnceController<String,Result<ElectionData,String>>> = Lazy::new(||RunOnceController::default());
+static RUN_ONCE_CONTROLLER: Lazy<RunOnceController<TextElectionSpecification,Result<ElectionData,String>>> = Lazy::new(||RunOnceController::default());
 
 impl FoundElection {
     pub fn electorate(&self) -> &str { self.spec.electorate.as_str() }
     pub async fn data(& self) -> Result<ElectionData,String> {
         let loader = self.loader.clone();
         let electorate = self.electorate().to_string();
-        RUN_ONCE_CONTROLLER.get(&self.electorate().to_string(),||async move{
+        RUN_ONCE_CONTROLLER.get(&self.spec.clone(),||async move{
             loader.load_cached_data(&electorate).map_err(|e|e.to_string())
         }).await
         // self.loader.load_cached_data(self.electorate())

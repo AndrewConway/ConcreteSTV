@@ -115,6 +115,7 @@ impl Default for TieResolutionsMadeByEC {
 }
 
 #[derive(Serialize,Deserialize,Debug,Clone,Eq,PartialEq)]
+#[serde(untagged)]
 #[serde(from = "TieResolutionAtomWithBackwardsCompatibility")]
 pub enum TieResolutionAtom {
     /// Old style, list candidates in order of increasing favour. Useful for 3 way ties on order of election, should that ever happen. Should possibly deprecate.
