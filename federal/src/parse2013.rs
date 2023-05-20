@@ -1,11 +1,11 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-//! 2013 is significantly different to later years due to the presence of tickets,
+//! 2013 (and the 2014 WA rerun) is significantly different to later years due to the presence of tickets,
 //! and the AEC used significantly different file formats.
 //! So I have made the parsing code for them different.
 
@@ -22,7 +22,7 @@ use std::fs::File;
 use std::io::{Read};
 
 /// Read from a file "SenateGroupVotingTicketsDownload which defines candidates, parties and tickets.
-/// Used in 2013.
+/// Used in 2013 and 2014.
 pub(crate) fn read_from_senate_group_voting_tickets_download_file2013(builder: &mut CandidateAndGroupInformationBuilder, path:&Path, state:&str) -> anyhow::Result<()> {
     fn add_ticket(builder: &mut CandidateAndGroupInformationBuilder,current_ticket : &Vec<usize>,current_ticket_owner:&Option<String>) {
         let party = builder.group_from_group_id(current_ticket_owner.as_ref().unwrap()).unwrap();
@@ -106,11 +106,17 @@ fn get_deduced_aec_ticket_splits2013(state:&str) -> anyhow::Result<HashMap<&'sta
         _ => Err(anyhow!("Not a valid state : {}",state)),
     }
 }
+fn get_deduced_aec_ticket_splits2014(state:&str) -> anyhow::Result<HashMap<&'static str,usize>> {
+    match state {
+        "WA" => Ok(HashMap::<_, _>::from_iter([("G",0),("I",0),("AD",0)])),
+        _ => Err(anyhow!("Not a valid state : {}",state)),
+    }
+}
 
 /// Read the file SenateUseOfGvtByGroupDownload for 2013 to get the number of voters voting for each ticket.
 /// Nasty hack - return as BTLs, as ATL has different meaning to tickets, and don't want to complicate ElectionData with ticket votes.
-pub(crate) fn read_ticket_votes2013(metadata:&ElectionMetadata,path:&Path, state:&str) -> anyhow::Result<Vec<ATL>> {
-    let splits = get_deduced_aec_ticket_splits2013(state)?;
+pub(crate) fn read_ticket_votes2013(metadata:&ElectionMetadata,path:&Path, state:&str,year:&str) -> anyhow::Result<Vec<ATL>> {
+    let splits = if year=="2013" {get_deduced_aec_ticket_splits2013(state)?} else {get_deduced_aec_ticket_splits2014(state)?};
     let mut rdr = csv::Reader::from_reader(skip_first_line_of_file(path)?);
     let mut res = vec![];
     for result in rdr.records() {

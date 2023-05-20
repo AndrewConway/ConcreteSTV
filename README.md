@@ -39,7 +39,7 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **FederalPre2021** Federal Senate, my interpretation of the correct rules prior to the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md). Formerly named **Federal**.
 - **FederalPost2021** Federal Senate, my interpretation of the correct rules for electronic counting after the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md).
 - **FederalPost2021Manual** Federal Senate, my interpretation of the correct rules for manual counting after the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md).
-- **AEC2013** Possibly buggy rules used by AEC in 2013 Federal Senate election
+- **AEC2013** Buggy rules used by AEC in 2013 and 2014 Federal Senate election (bug never came up in 2014)
 - **AEC2016** Buggy rules used by AEC in 2016 Federal Senate election
 - **AEC2019** Buggy rules used by AEC in 2019 and 2022 Federal Senate election
 - **ACTPre2020** Rules used for ACT Legislative Assembly by ElectionsACT prior to 2020.
@@ -56,6 +56,11 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 
 This list is expected to grow as ConcreteSTV supports more jurisdictions.
 
+Note that when I describe rules as "buggy" it means I have had to purposefully introduce bugs into
+my interpretation of the rules in order to accurately reproduce the official results. These bugs have 
+been reported to the appropriate electoral commissions, who have usually acknowledged and almost
+always subsequently fixed said bugs, either by changing their programs or the legislation covering the rules.
+
 ### A short note on bugs
 
 Bugs are expected in any computer program. I am sure ConcreteSTV contains lots of bugs. Electoral
@@ -65,13 +70,13 @@ is that they be transparent enough to demonstrate what they do, and commit to th
 they will use before the election.
 
 The rules that I have implemented are my best guesses at a plausible set of rules
-that would produce the output that actually happens. There may well be a different
+that would produce the output that the electoral commission reported. There may well be a different
 set of rules that also would produce the same output.
 
 If my program matches their output exactly, is that evidence that the correct candidates
 were elected? Only very weak evidence. For a start, I may have the same bug as the electoral
 commission. This sounds unlikely, but it actually
-happened once in prior work - my transcripts matched the AEC's perfectly in 2013, but later I found a bug
+happened once in prior work - at first my transcripts matched the AEC's perfectly in 2013, but later I found a bug
 in my code. More importantly, the accuracy depends on the list of the votes provided by the
 electroral commission, and there is rarely any meaningful evidence provided either to the public
 or scrutineers that these

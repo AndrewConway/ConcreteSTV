@@ -27,11 +27,9 @@ asking for the source code of the counting algorithm under FOI, so the actual ru
   2021 legislation changes. Changes are to tie resolution and the removal of bulk exclusion, making it essentially **AEC2016**.
 - **FederalPost2021Manual** My interpretation of the Australian Federal Senate election system for manual counting post the
   2021 legislation changes. Same as **FederalPost2021** except bulk exclusion is still included, making it essentially **AEC2013**.
-- **AEC2013** This is my interpretation of the rules actually used by the AEC for the 2013 election.
+- **AEC2013** This is my interpretation of the rules actually used by the AEC for the 2013 and 2014 election.
   It is very similar to *FederalPre2021* except when resolving 3 way ties by looking at prior counts, any difference is used as a discriminator,
-          instead of requiring that each has a different count. Evidence: NSW 2016, special count
-          with Rod Cullerton excluded, count 49. I assume 2013 same as 2016, and this is born out
-   by the response below to our report, but is not absolutely clear.
+          instead of requiring that each has a different count. Evidence: Vic 2013, count 60. I assume 2014 is the same in this respect as 2013 and 2016, where there is a similar case.
 - **AEC2016** This is my interpretation of the rules actually used by the AEC for the 2016 election.
   It is very similar to *AEC2013*, except the Bulk Exclusion rules are not applied (evidence : this crops
   up frequently).

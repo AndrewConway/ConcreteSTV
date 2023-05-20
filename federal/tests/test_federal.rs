@@ -10,7 +10,7 @@
 
 #[cfg(test)]
 mod tests {
-    use federal::parse::{get_federal_data_loader_2016, get_federal_data_loader_2019, get_federal_data_loader_2013, get_federal_data_loader_2022};
+    use federal::parse::{get_federal_data_loader_2016, get_federal_data_loader_2019, get_federal_data_loader_2013, get_federal_data_loader_2022, get_federal_data_loader_2014};
     use stv::preference_distribution::distribute_preferences;
     use federal::{FederalRulesUsed2019, FederalRulesUsed2016, FederalRulesUsed2013};
     use std::collections::HashSet;
@@ -83,6 +83,20 @@ mod tests {
         Ok(())
     }
 
+    fn test2014(state:&str) -> anyhow::Result<()> {
+        let loader = get_federal_data_loader_2014(&FileFinder::find_ec_data_repository());
+        let data = loader.read_raw_data(state)?;
+        data.print_summary();
+        let transcript = distribute_preferences::<FederalRulesUsed2013>(&data, loader.candidates_to_be_elected(state), &HashSet::from_iter(loader.excluded_candidates(state)), &loader.ec_decisions(state),None,true,&mut Randomness::ReverseDonkeyVote);
+        let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
+        std::fs::create_dir_all("test_transcripts")?;
+        let file = File::create(format!("test_transcripts/transcript{}2014.json",state))?;
+        serde_json::to_writer_pretty(file,&transcript)?;
+        let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
+        official_transcript.compare_with_transcript(&transcript.transcript);
+        Ok(())
+    }
+
     fn test2013(state:&str) -> anyhow::Result<()> {
         let loader = get_federal_data_loader_2013(&FileFinder::find_ec_data_repository());
         let data = loader.read_raw_data(state)?;
@@ -96,6 +110,7 @@ mod tests {
         official_transcript.compare_with_transcript(&transcript.transcript);
         Ok(())
     }
+
 
     #[test]
     #[allow(non_snake_case)]
@@ -122,6 +137,9 @@ mod tests {
     #[allow(non_snake_case)]
     fn test_TAS2013() { test2013("TAS").unwrap() }
 
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_WA2014() { test2014("WA").unwrap() }
 
     #[test]
     #[allow(non_snake_case)]
