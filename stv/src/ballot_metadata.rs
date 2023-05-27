@@ -114,6 +114,12 @@ pub struct DataSource {
     pub comments : Option<String>,
 }
 
+impl DataSource {
+    pub fn new(url:&str,path:&PathBuf) -> Self {
+        DataSource{ url:url.to_string(), files:vec![path.file_name().as_ref().unwrap().to_string_lossy().to_string()],comments:None}
+    }
+}
+
 impl ElectionMetadata {
     pub fn party(&self,index:PartyIndex) -> &Party { &self.parties[index.0] }
     pub fn candidate(&self,index:CandidateIndex) -> &Candidate { &self.candidates[index.0] }

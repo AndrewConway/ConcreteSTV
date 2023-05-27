@@ -72,6 +72,24 @@ impl CacheDir {
         let path = self.get_file_path_with_extension(url,None);
         if path.exists() { Ok(path) } else { Err(MissingFile{file_name:path.to_string_lossy().to_string(),where_to_get:url.to_string(),where_to_get_is_exact_url:true })}
     }
+    /// Find the path to an existing file, or useful error if it doesn't exist.
+    /// Do try to download.
+    pub fn find_raw_data_file_from_cache_or_download<D:Downloader>(&self,url:&str) -> anyhow::Result<PathBuf> {
+        let file = self.get_file_path_with_extension(url,None);
+        if file.exists() { Ok(file) } else {
+            // need to download it,
+            if let Some(p) = file.parent() {
+                std::fs::create_dir_all(p)?;
+            }
+            Self::rate_limit();
+            if D::download(&file,url)? {
+                Ok(file)
+            } else {
+                Err(MissingFile{file_name:file.to_string_lossy().to_string(),where_to_get:url.to_string(),where_to_get_is_exact_url:true }.into())
+            }
+        }
+    }
+
     /// Download a url using Reqwest, and store. Add a suffix before storing, if suffix is not None, unless the file already has a suffix.
     /// If Ok(None) is returned, then this is not available now but may be later.
     pub fn get_or_download_with_file_suffix<D:Downloader>(&self,url:&str,suffix:Option<&str>) -> anyhow::Result<Option<File>> {
