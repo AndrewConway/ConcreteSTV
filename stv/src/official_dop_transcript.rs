@@ -6,7 +6,7 @@
 
 
 use crate::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo, ReasonForCount, Transcript, TranscriptWithMetadata};
-use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
+use crate::ballot_metadata::{CandidateIndex, ElectionMetadata, NumberOfCandidates};
 use std::cmp::min;
 use num::{abs, Zero};
 use std::ops::Sub;
@@ -159,6 +159,31 @@ pub struct OfficialDistributionOfPreferencesTranscript {
     pub all_exhausted_go_to_rounding : bool,
 }
 
+impl OfficialDistributionOfPreferencesTranscript {
+    pub fn print_table(&self,metadata:&ElectionMetadata) {
+        if let Some(quota) = &self.quota {
+            println!("Papers : {}, Vacancies : {} -> Quota : {}",quota.papers.0,quota.vacancies.0,quota.quota)
+        }
+        print!("\t");
+        for candidate_index in 0..metadata.candidates.len() {
+            print!("{}\t",metadata.candidates[candidate_index].name);
+        }
+        println!("Exhausted\tRounding");
+        for count in &self.counts {
+            for candidate in &count.excluded { println!("Excluded {}",metadata.candidate(*candidate).name)}
+            let print_row = |heading,row:&PerCandidate<f64>| {
+                print!("{}\t",heading);
+                for candidate_index in 0..metadata.candidates.len() {
+                    print!("{}\t",row.candidate[candidate_index]);
+                }
+                println!("{}\t{}",row.exhausted,row.rounding.resolve());
+            };
+            if let Some(row) = &count.vote_delta { print_row("ΔVotes",row); }
+            if let Some(row) = &count.vote_total { print_row("Votes",row); }
+            for candidate in &count.elected { println!("Elected {}",metadata.candidate(*candidate).name)}
+        }
+    }
+}
 impl OfficialDOPForOneCount {
     pub fn vote_total(&mut self) -> &mut PerCandidate<f64> { self.vote_total.get_or_insert_with(Default::default) }
     pub fn paper_total(&mut self) -> &mut PerCandidate<usize> { self.paper_total.get_or_insert_with(Default::default) }

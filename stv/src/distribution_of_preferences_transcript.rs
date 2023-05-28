@@ -72,6 +72,10 @@ impl <X:Default+PartialEq+Clone+Display+FromStr> PerCandidate<X> {
 #[error("Not an integer")]
 pub struct NotInteger {}
 
+#[derive(thiserror::Error, Debug)]
+#[error("Not a non-negative integer")]
+pub struct NotNonnegativeInteger {}
+
 impl TryFrom<PerCandidate<f64>> for PerCandidate<isize> {
     type Error = NotInteger;
 
@@ -88,7 +92,24 @@ impl TryFrom<PerCandidate<f64>> for PerCandidate<isize> {
             set_aside:  value.set_aside.map(as_int).transpose()?,
         })
     }
+}
 
+impl TryFrom<PerCandidate<f64>> for PerCandidate<usize> {
+    type Error = NotNonnegativeInteger;
+
+    fn try_from(value: PerCandidate<f64>) -> Result<Self, Self::Error> {
+        let as_int = |f:f64| -> Result<usize,NotNonnegativeInteger> {
+            if f.is_nan() { Ok(usize::MAX) }
+            else if f == (f as usize) as f64 { Ok(f as usize) }
+            else { Err(NotNonnegativeInteger{}) }
+        };
+        Ok(PerCandidate::<usize>{
+            candidate: value.candidate.into_iter().map(as_int).collect::<Result<Vec<usize>,NotNonnegativeInteger>>()?,
+            exhausted: as_int(value.exhausted)?,
+            rounding: SignedVersion{ negative: value.rounding.negative, value: as_int(value.rounding.value)? },
+            set_aside:  value.set_aside.map(as_int).transpose()?,
+        })
+    }
 }
 
 impl PerCandidate<usize> {
