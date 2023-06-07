@@ -856,7 +856,7 @@ impl DOPFileFormat {
                 }
             }
         }
-        Ok(OfficialDistributionOfPreferencesTranscript{ quota : Some(self.quota), counts ,missing_negatives_in_papers_delta:false, elected_candidates_are_in_order: true, all_exhausted_go_to_rounding: false })
+        Ok(OfficialDistributionOfPreferencesTranscript{ quota : Some(self.quota), counts ,missing_negatives_in_papers_delta:false, elected_candidates_are_in_order: true, all_exhausted_go_to_rounding: false, negative_values_in_surplus_distributions_and_rounding_may_be_off: false })
     }
 }
 

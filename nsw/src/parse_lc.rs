@@ -377,6 +377,7 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
         missing_negatives_in_papers_delta: true,
         elected_candidates_are_in_order: false,
         all_exhausted_go_to_rounding : false,
+        negative_values_in_surplus_distributions_and_rounding_may_be_off: false,
     })
 }
 

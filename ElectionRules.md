@@ -157,3 +157,22 @@ rule set for the regions not updated in 2015.
 - **Vic2018** My interpretation of the rules post the 2018 conflict resolution
               (and a reasonable if not literal interpretation of prior rules).
 
+## WA upper house (Legislative Council)
+
+The WA rules are relatively straight forward, although there is some ambiguity about
+when the election ends, and the division of transfers during a surplus is very
+ambiguous. See the [source code](wa/src/lib.rs) for more detailed comments.
+
+Thanks to Yington Li for some conversation about this ambiguity; errors
+are my own.
+
+Unfortunately the WAEC does not publish full vote data, and so it is difficult to
+verify their count. Even worse, while their website is quite user friendly, most years
+they only publish a summary of the distribution of preferences that is insufficient for
+me to work out what they did. However the 2008 distribution of preferences is 
+sufficiently detailed to be able to check most of the ambiguities.
+
+- **WA2008** My interpretation of the Western Australian Legislative Council rules consistent with the 2008 published official distribution of preferences.  
+
+
+

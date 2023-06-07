@@ -188,13 +188,16 @@ pub trait PreferenceDistributionRules {
     /// (this happens in the case of candidates ruled ineligible).
     fn should_exhausted_votes_count_for_quota_computation() -> bool { false }
 
-    /// Instead of doing exact computations using transfer values, use f32 approximate floating point computations. Needed to emulate an NSWEC bug.
-    /// Only currently implemented for the NSWEC randomized algorithm.
-    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
+    /// If someone is elected in the middle of an exclusion or surplus, should we start a new major count?
+    fn major_count_if_someone_elected() -> bool { false }
 
     //
     // Things just to support weird bugs. Defaults are given as who would otherwise do these?
     //
+
+    /// Instead of doing exact computations using transfer values, use f32 approximate floating point computations. Needed to emulate an NSWEC bug.
+    /// Only currently implemented for the NSWEC randomized algorithm.
+    fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
 
     /// Change the votes otherwise being classified as exhausted. Changes will go into the lost due to rounding tally.
     fn munge_exhausted_votes(exhausted:Self::Tally,_is_exclusion:bool) -> Self::Tally { exhausted }
@@ -600,7 +603,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             count_name,
         });
         self.current_count=CountIndex(self.current_count.0+1);
-        if reason_completed { self.current_major_count=CountIndex(self.current_major_count.0+1); self.current_minor_count=CountIndex(1); }
+        if reason_completed || (Rules::major_count_if_someone_elected() && !self.in_this_count.elected.is_empty()) { self.current_major_count=CountIndex(self.current_major_count.0+1); self.current_minor_count=CountIndex(1); }
         else { self.current_minor_count=CountIndex(self.current_minor_count.0+1); }
         self.in_this_count.not_continuing=self.in_this_count.elected.drain(..).map(|e|e.who).collect();
     }
@@ -740,7 +743,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let mut total_value_of_exhausted_votes = BigRational::zero();
         let continuing_candidates_when_distribution_done = self.continuing_candidates_sorted_by_tally.len();
         for (tv,(step_tally,ballots,prov)) in votes_to_distribute {
-            let distributed = self.distribute(&ballots.votes);
+            let distributed = self.distribute(&ballots.votes); // note that this will use the wrong oracle count value if an oracle is used.
             let exhausted_value = tv.mul(distributed.exhausted);
             total_value_of_exhausted_votes+=exhausted_value.clone();
             partially_distributed.push((tv,step_tally,ballots,prov,distributed,exhausted_value));
@@ -765,7 +768,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             let after : Rules::Tally = Rules::convert_rational_to_tally_after_applying_transfer_value(current_remaining_tally_for_candidate_being_distributed.clone());
             self.tallys[candidate_to_distribute.0] = after.clone();
             let original_worth = before-after;
-            let distributed = if continuing_candidates_when_distribution_done == self.continuing_candidates_sorted_by_tally.len() {distributed} else { self.distribute(&ballots.votes) }; // recompute if the continuing candidates list changed.
+            let distributed = if continuing_candidates_when_distribution_done == self.continuing_candidates_sorted_by_tally.len() && self.oracle.is_none() {distributed} else { self.distribute(&ballots.votes) }; // recompute if the continuing candidates list changed, or oracle exists
             let transfer_value = TransferValue(tv.0*general_tv.0.clone());
             let continuing_ballots = ballots.num_ballots-distributed.exhausted;
             self.parcel_out_votes_with_given_transfer_value(transfer_value.clone(),distributed,Some(self.current_count),original_worth,special_factor_excluded.is_some() || !Rules::transfer_value_method().denom_is_just_continuing(),false,special_factor_excluded.as_ref());

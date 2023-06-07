@@ -23,6 +23,7 @@ use nsw::{NSWECLocalGov2021, NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbigu
 use nsw::nsw_random_rules::{NSWECRandomLC2015, NSWECRandomLC2019, NSWECRandomLGE2012, NSWECRandomLGE2016, NSWECRandomLGE2017};
 use stv::random_util::Randomness;
 use vic::Vic2018LegislativeCouncil;
+use wa::WALegislativeCouncil;
 use crate::ChangeOptions;
 
 #[derive(Copy, Clone,Serialize,Deserialize)]
@@ -44,6 +45,7 @@ pub enum Rules {
     NSWECRandomLC2015,
     NSWECRandomLC2019,
     Vic2018,
+    WA2008,
     IRV,
 }
 
@@ -69,6 +71,7 @@ impl FromStr for Rules {
             "NSWECRandomLC2015" => Ok(Rules::NSWECRandomLC2015),
             "NSWECRandomLC2019" => Ok(Rules::NSWECRandomLC2019),
             "Vic2018" => Ok(Rules::Vic2018),
+            "WA2008" => Ok(Rules::WA2008),
             "IRV" => Ok(Rules::IRV),
             _ => Err("No such rule supported")
         }
@@ -95,6 +98,7 @@ impl Display for Rules {
             Rules::NSWECRandomLC2015 => "NSWECRandomLC2015",
             Rules::NSWECRandomLC2019 => "NSWECRandomLC2019",
             Rules::Vic2018 => "Vic2018",
+            Rules::WA2008 => "WA2008",
             Rules::IRV => "IRV",
         };
         f.write_str(s)
@@ -124,6 +128,7 @@ impl Rules {
             Rules::NSWECRandomLC2015 => distribute_preferences::<NSWECRandomLC2015>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
             Rules::NSWECRandomLC2019 => distribute_preferences::<NSWECRandomLC2019>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
             Rules::Vic2018 => distribute_preferences::<Vic2018LegislativeCouncil>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
+            Rules::WA2008 => distribute_preferences::<WALegislativeCouncil>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
             Rules::IRV => distribute_preferences::<SimpleIRVAnyDifferenceBreaksTies>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness),
             _ => { // handle 6 digit transcripts.
                 let transcript = match self {
@@ -151,6 +156,7 @@ impl Rules {
             Rules::NSWLocalGov2021 => PossibleChanges::Integers(options.find_changes::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(data,verbose)?),
             Rules::NSWECLocalGov2021 => PossibleChanges::Integers(options.find_changes::<NSWECLocalGov2021>(data,verbose)?),
             Rules::Vic2018 => PossibleChanges::Integers(options.find_changes::<Vic2018LegislativeCouncil>(data,verbose)?),
+            Rules::WA2008 => PossibleChanges::Integers(options.find_changes::<WALegislativeCouncil>(data,verbose)?),
             Rules::IRV => PossibleChanges::Integers(options.find_changes::<SimpleIRVAnyDifferenceBreaksTies>(data,verbose)?),
             Rules::NSWECRandomLGE2012 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLGE2012>(data, verbose)?),
             Rules::NSWECRandomLGE2016 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLGE2016>(data, verbose)?),
@@ -188,6 +194,7 @@ impl RulesDetails {
             RulesDetails{ name: "NSWECRandomLC2015".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2015 legislative council elections. Note that there is considerable randomness so recounting with a different random choices will probably produce different results. Same as NSWECRandomLC2019 except with the same last parcel error as NSWECRandomLGE2012 (which didn't come up so may or may not be present).".to_string() },
             RulesDetails{ name: "NSWECRandomLC2019".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2019 and 2023 legislative council elections. Note that there is considerable randomness so recounting with a different random choices will probably produce different results. ".to_string() },
             RulesDetails{ name: "Vic2018".to_string(), description: "My interpretation of the rules that should have been used by the VEC since the 2018 modification to 114A(28)(c) of the Electoral Act 2002, and a plausible if not literal interpretation of the rules prior to that.".to_string() },
+            RulesDetails{ name: "WA2018".to_string(), description: "My interpretation of the Western Australian Legislative Council rules consistent with the 2008 published official distribution of preferences.".to_string() },
             RulesDetails{ name: "IRV".to_string(), description: "IRV with tie resolution by count backs with any non-equality breaking ties where possible.".to_string() },
         ]
     }

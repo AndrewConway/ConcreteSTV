@@ -53,6 +53,7 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **NSWECRandomLC2015** Possibly buggy rules used by the NSWEC in the 2015 Legislative Council elections.
 - **NSWECRandomLC2019** Rules used by the NSWEC in the 2019 and 2023 Legislative Council elections.
 - **Vic2018** My interpretation of the Victorian Legislative Council rules. The 2018 refers to a contradiction in the legislation fixed in 2018, but the rules were plausible if not literal before then.
+- **WA2008** My interpretation of the Western Australian Legislative Council rules consistent with the 2008 published official distribution of preferences.
 
 This list is expected to grow as ConcreteSTV supports more jurisdictions.
 

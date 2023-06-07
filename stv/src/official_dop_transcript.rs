@@ -157,6 +157,8 @@ pub struct OfficialDistributionOfPreferencesTranscript {
     pub elected_candidates_are_in_order : bool,
     /// true if exhausted votes all go to rounding.
     pub all_exhausted_go_to_rounding : bool,
+    /// true if the assignment of negative values to tallies and rounding may be ambiguous. E.g. WA.
+    pub negative_values_in_surplus_distributions_and_rounding_may_be_off : bool,
 }
 
 impl OfficialDistributionOfPreferencesTranscript {
@@ -265,6 +267,7 @@ impl OfficialDistributionOfPreferencesTranscript {
             abs(our-official) > 1e-7
         }
         let my_count = &transcript.counts[count_number.0];
+        let ambiguous_rounding_for_candidate : Option<CandidateIndex> = match my_count.reason { ReasonForCount::ExcessDistribution(c) if self.negative_values_in_surplus_distributions_and_rounding_may_be_off => Some(c), _ => None};
         let my_prior_count = if count_number.0>0 {Some(&transcript.counts[count_number.0-1])} else {None};
         let official_count = &self.counts[count_number.0];
         if verbose { println!("Checking count {} {}", count_number.0 + 1, my_count.count_name.clone().unwrap_or_default()); }
@@ -300,10 +303,14 @@ impl OfficialDistributionOfPreferencesTranscript {
                 if different(vote_total.rounding.resolve()-my_count.status.tallies.rounding.convert_f64(&decode),my_count.status.tallies.exhausted.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalExhaustedAndRounding(vote_total.rounding.resolve().into(),my_count.status.tallies.exhausted.clone(),my_count.status.tallies.rounding.clone()))}
             } else {
                 if different(vote_total.exhausted,my_count.status.tallies.exhausted.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalExhausted(vote_total.exhausted.into(),my_count.status.tallies.exhausted.clone()))}
-                if different_signed(vote_total.rounding.resolve(),my_count.status.tallies.rounding.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalRounding(vote_total.rounding.resolve().into(),my_count.status.tallies.rounding.clone()))}
+                if ambiguous_rounding_for_candidate.is_none() {
+                    if different_signed(vote_total.rounding.resolve(),my_count.status.tallies.rounding.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalRounding(vote_total.rounding.resolve().into(),my_count.status.tallies.rounding.clone()))}
+                }
             }
             for candidate in 0..vote_total.candidate.len() {
-                if different(vote_total.candidate[candidate],my_count.status.tallies.candidate[candidate].clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalCandidate(vote_total.candidate[candidate].into(),my_count.status.tallies.candidate[candidate].clone(),CandidateIndex(candidate)))}
+                if ambiguous_rounding_for_candidate!=Some(CandidateIndex(candidate)) {
+                    if different(vote_total.candidate[candidate], my_count.status.tallies.candidate[candidate].clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalCandidate(vote_total.candidate[candidate].into(), my_count.status.tallies.candidate[candidate].clone(), CandidateIndex(candidate))) }
+                }
             }
         }
         if let Some(vote_delta) = &official_count.vote_delta {
@@ -311,14 +318,18 @@ impl OfficialDistributionOfPreferencesTranscript {
             let tally_exhausted_now = my_count.status.tallies.exhausted.clone();
             let tally_exhausted_prior = my_prior_count.map(|c|c.status.tallies.exhausted.clone()).unwrap_or_else(||Tally::zero());
             if different(vote_delta.exhausted+decode(tally_exhausted_prior.clone()),tally_exhausted_now.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyDeltaExhausted(vote_delta.exhausted.into(),tally_exhausted_prior,tally_exhausted_now))}
-            let tally_rounding_now = my_count.status.tallies.rounding.clone();
-            let tally_rounding_prior = my_prior_count.map(|c|c.status.tallies.rounding.clone()).unwrap_or_else(||SignedVersion::<Tally>::zero());
-            let tally_rounding = tally_rounding_now-tally_rounding_prior;
-            if different_signed(vote_delta.rounding.resolve(),tally_rounding.clone()) { return Err(TallyDeltaRounding(vote_delta.rounding.resolve().into(),tally_rounding))}
+            if ambiguous_rounding_for_candidate.is_none() {
+                let tally_rounding_now = my_count.status.tallies.rounding.clone();
+                let tally_rounding_prior = my_prior_count.map(|c| c.status.tallies.rounding.clone()).unwrap_or_else(|| SignedVersion::<Tally>::zero());
+                let tally_rounding = tally_rounding_now - tally_rounding_prior;
+                if different_signed(vote_delta.rounding.resolve(), tally_rounding.clone()) { return Err(TallyDeltaRounding(vote_delta.rounding.resolve().into(), tally_rounding)) }
+            }
             for candidate in 0..vote_delta.candidate.len() {
                 let tally_now = my_count.status.tallies.candidate[candidate].clone();
                 let tally_prior = my_prior_count.map(|c|c.status.tallies.candidate[candidate].clone()).unwrap_or_else(||Tally::zero());
-                if different(vote_delta.candidate[candidate]+decode(tally_prior.clone()),tally_now.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyDeltaCandidate(vote_delta.candidate[candidate].into(),tally_prior,tally_now,CandidateIndex(candidate)))}
+                if ambiguous_rounding_for_candidate!=Some(CandidateIndex(candidate)) {
+                    if different(vote_delta.candidate[candidate] + decode(tally_prior.clone()), tally_now.clone()) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyDeltaCandidate(vote_delta.candidate[candidate].into(), tally_prior, tally_now, CandidateIndex(candidate))) }
+                }
             }
         }
         if let Some(paper_total) = &official_count.paper_total {
@@ -326,7 +337,9 @@ impl OfficialDistributionOfPreferencesTranscript {
             if paper_total.exhausted!=my_count.status.papers.exhausted.0 { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperTotalExhausted(BallotPaperCount(paper_total.exhausted),my_count.status.papers.exhausted))}
             if paper_total.rounding.assume_positive()!=my_count.status.papers.rounding.assume_positive().0 { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperTotalRounding(BallotPaperCount(paper_total.rounding.assume_positive()),my_count.status.papers.rounding.assume_positive()))}
             for candidate in 0..paper_total.candidate.len() {
-                if paper_total.candidate[candidate]!=my_count.status.papers.candidate[candidate].0 { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperTotalCandidate(BallotPaperCount(paper_total.candidate[candidate]),my_count.status.papers.candidate[candidate],CandidateIndex(candidate)))}
+                if ambiguous_rounding_for_candidate!=Some(CandidateIndex(candidate)) {
+                    if paper_total.candidate[candidate]!=my_count.status.papers.candidate[candidate].0 { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperTotalCandidate(BallotPaperCount(paper_total.candidate[candidate]),my_count.status.papers.candidate[candidate],CandidateIndex(candidate)))}
+                }
             }
         }
         if let Some(paper_delta) = &official_count.paper_delta {
@@ -336,8 +349,10 @@ impl OfficialDistributionOfPreferencesTranscript {
             let my_change_rounding = my_count.status.papers.rounding.assume_positive().0-my_prior_count.map(|c|c.status.papers.rounding.assume_positive().0).unwrap_or(0);
             if paper_delta.rounding.resolve()!=my_change_rounding as isize { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperDeltaRounding(paper_delta.rounding.resolve(),my_change_rounding))}
             for candidate in 0..paper_delta.candidate.len() {
-                let my_change_candidate = my_count.status.papers.candidate[candidate].0 as isize-my_prior_count.map(|c|c.status.papers.candidate[candidate].0 as isize).unwrap_or(0);
-                if paper_delta.candidate[candidate]!=isize::MAX && paper_delta.candidate[candidate]!=my_change_candidate && !(self.missing_negatives_in_papers_delta && my_change_candidate < 0) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperDeltaCandidate(paper_delta.candidate[candidate],my_change_candidate,CandidateIndex(candidate)))}
+                if ambiguous_rounding_for_candidate!=Some(CandidateIndex(candidate)) {
+                    let my_change_candidate = my_count.status.papers.candidate[candidate].0 as isize-my_prior_count.map(|c|c.status.papers.candidate[candidate].0 as isize).unwrap_or(0);
+                    if paper_delta.candidate[candidate]!=isize::MAX && paper_delta.candidate[candidate]!=my_change_candidate && !(self.missing_negatives_in_papers_delta && my_change_candidate < 0) { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::PaperDeltaCandidate(paper_delta.candidate[candidate],my_change_candidate,CandidateIndex(candidate)))}
+                }
             }
         }
         if let Some(paper_set_aside) = & official_count.paper_set_aside_for_quota { // compare to

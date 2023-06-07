@@ -505,6 +505,7 @@ impl NSWLGEDataLoader {
             missing_negatives_in_papers_delta: true,
             elected_candidates_are_in_order: false,
             all_exhausted_go_to_rounding : true,
+            negative_values_in_surplus_distributions_and_rounding_may_be_off: false,
         })
     }
 
@@ -623,6 +624,7 @@ impl NSWLGEDataLoader {
             missing_negatives_in_papers_delta: false,
             elected_candidates_are_in_order: true,
             all_exhausted_go_to_rounding : false,
+            negative_values_in_surplus_distributions_and_rounding_may_be_off: false,
         })
     }
 

@@ -28,7 +28,7 @@ use stv::random_util::Randomness;
 /// As randomness could cause changes, random seeds are not allowed, and reverse donkey vote is used to resolve ties.
 struct Opts {
     /// The counting rules to use.
-    /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021
+    /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021, Vic2018, WA2008
     rules : Rules,
 
     /// The name of the .stv (or .vchange) file to get votes from

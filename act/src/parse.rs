@@ -486,7 +486,7 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
             papers_came_from_counts,
         });
         if sheet2.get_value((row_index,count_column)).is_none()&&sheet2.get_value((row_index+1,count_column)).is_none() {
-           return Ok(OfficialDistributionOfPreferencesTranscript{ quota, counts ,missing_negatives_in_papers_delta:true, elected_candidates_are_in_order: true, all_exhausted_go_to_rounding: false })
+           return Ok(OfficialDistributionOfPreferencesTranscript{ quota, counts ,missing_negatives_in_papers_delta:true, elected_candidates_are_in_order: true, all_exhausted_go_to_rounding: false, negative_values_in_surplus_distributions_and_rounding_may_be_off: false })
         }
     }
 
