@@ -500,7 +500,7 @@ impl NSWLCDataLoader {
             let group = sheet2.get_value((row,1)).ok_or_else(||anyhow!("Missing group name"))?.get_string().ok_or_else(||anyhow!("Group name is not a string"))?;
             let group_name = sheet2.get_value((row,2)).and_then(|s|s.get_string()).and_then(|s|if s.is_empty() {None} else {Some(s)});
             let gvs = sheet2.get_value((row,0)).ok_or_else(||anyhow!("Missing gvs"))?.get_string().ok_or_else(||anyhow!("gvs is not a string"))?;
-            let mut group = parties.iter_mut().find(|p|group==&p.column_id).ok_or_else(||anyhow!("Cannot find group {}",group))?;
+            let group = parties.iter_mut().find(|p|group==&p.column_id).ok_or_else(||anyhow!("Cannot find group {}",group))?;
             if let Some(group_name) = group_name {
                 group.name=group_name.to_string();
             }

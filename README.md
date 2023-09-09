@@ -276,6 +276,24 @@ Note that these tables are generally too large to fit onto a normal page. To res
 table to a small number of candidates, use the `--candidates` option. Use the `--help`
 option for details.
 
+
+## To import data from Preflib
+
+[Preflib](https://www.preflib.org/) contains some election data. The `soi` and `soc` formats can be
+converted to the ConcreteSTV format using the `preflib_to_stv` program:
+
+```bash
+cargo build --release
+wget https://www.preflib.org/static/data/irish/00001-00000001.soi
+./target/release/preflib_to_stv 00001-00000001.soi
+./target/release/concrete_stv AEC2013 --vacancies 1 00001-00000001.stv --verbose
+```
+will build ConcreteSTV, download a sample file from preflib, and convert it to `00001-00000001.stv`, and then
+run it with ConcreteSTV with one vacancy.
+
+Note that this will do a poor job of parsing metadata (like year, electorate, authority, copyright, name), and will not
+specify vacancies, so one _must_ specify vacancies when running `concrete_stv` on it.
+
 ## Webserver
 
 The webserver running on [https://vote.andrewconway.org](https://vote.andrewconway.org) uses ConcreteSTV. Running your

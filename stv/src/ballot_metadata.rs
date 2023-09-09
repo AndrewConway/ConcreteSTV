@@ -279,4 +279,6 @@ impl Candidate {
             first.trim().to_string()+" "+surname.trim()
         } else { self.name.clone() }
     }
+
+    pub fn from_name(name:&str) -> Self { Candidate{name:name.to_string(),party:None,position:None,ec_id:None}}
 }
