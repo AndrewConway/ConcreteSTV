@@ -325,7 +325,7 @@ impl FederalDataLoader {
         println!("Parsing {}",&preferences_zip_file.to_string_lossy());
         metadata.source[0].files.push(filename);
         let (btl,informal) = read_btl_votes2013(&metadata, &preferences_zip_file, 1)?; // The 2013 formality rules are quite complex. I am assuming the AEC has applied them already to all with a 1 vote. This is a dubious assumption as there are some without a 1 vote. However since we don't get all the informal votes, it is hard to check formality properly.
-        Ok(ElectionData{ metadata, atl:ticket_votes, atl_types: vec![], btl, btl_types: vec![], informal })
+        Ok(ElectionData{ metadata, atl:ticket_votes, atl_types: vec![], atl_transfer_values: vec![], btl, btl_types: vec![], btl_transfer_values: vec![], informal })
     }
 
 }

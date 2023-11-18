@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -62,6 +62,7 @@ mod tests {
             },
             atl: vec![],
             atl_types: vec![],
+            atl_transfer_values: vec![],
             btl: vec![
                 BTL { candidates: vec![CandidateIndex(0)], n: 10000 },
                 BTL { candidates: vec![CandidateIndex(1)], n: 10000 },
@@ -71,6 +72,7 @@ mod tests {
                 BTL { candidates: vec![CandidateIndex(5)], n: 100 },
             ],
             btl_types: vec![],
+            btl_transfer_values: vec![],
             informal: 0
         };
         let transcript = data.distribute_preferences::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(&mut Randomness::ReverseDonkeyVote);

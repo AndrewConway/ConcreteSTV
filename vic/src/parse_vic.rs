@@ -158,8 +158,10 @@ impl RawDataSource for VicDataLoader {
             metadata,
             atl : vec![],
             atl_types: vec![],
+            atl_transfer_values: vec![],
             btl : builder.to_btls(),
             btl_types: vec![],
+            btl_transfer_values: vec![],
             informal
         };
         if atl_votes.len()>0 { // the ATL votes are converted to BTL already. Deduce them (and tickets) from the BTL via the (ugly, unreliable) method of assuming the largest number of full length BTL votes starting with a given candidate is it.

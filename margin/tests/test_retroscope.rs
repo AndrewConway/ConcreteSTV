@@ -57,6 +57,7 @@ fn test_retroscope() {
             ATL{ parties : vec![PartyIndex(1)], n:100, ticket_index: None },
         ],
         atl_types: vec![],
+        atl_transfer_values: vec![],
         btl: vec![
             BTL{ candidates: vec![CandidateIndex(0)], n: 80 },
             BTL{ candidates: vec![CandidateIndex(1)], n: 10 },
@@ -65,6 +66,7 @@ fn test_retroscope() {
             BTL{ candidates: vec![CandidateIndex(4),CandidateIndex(2),CandidateIndex(1)], n: 1 },
         ],
         btl_types: vec![],
+        btl_transfer_values: vec![],
         informal: 0
     };
     let transcript = vote_data.distribute_preferences::<FederalRulesPre2021>(&mut Randomness::ReverseDonkeyVote);

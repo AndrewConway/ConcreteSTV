@@ -9,14 +9,14 @@
 //! Unlike IRV, there are many ambiguities in the conceptual description of STV, so parameterized
 
 
-use num::Zero;
+use num::{BigInt, ToPrimitive, Zero};
 pub use num::BigRational as BigRational;
-use crate::election_data::ElectionData;
+use crate::election_data::{ElectionData, VoteValueSpecification};
 use crate::ballot_pile::{VotesWithMultipleTransferValues, HowSplitByCountNumber, PartiallyDistributedVote, BallotPaperCount, DistributedVotes, VotesWithSameTransferValue};
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use crate::transfer_value::{TransferValue, StringSerializedRational};
-use std::ops::{AddAssign, Neg, SubAssign, Sub, Range, Div};
+use std::ops::{AddAssign, Neg, SubAssign, Sub, Range, Div, Mul};
 use std::fmt::{Debug, Display};
 use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, CountIndex};
 use crate::util::{DetectUnique, CollectAll};
@@ -26,6 +26,8 @@ use std::iter::Sum;
 use std::cmp::{min, Ordering};
 use serde::{Serialize,Deserialize};
 use std::str::FromStr;
+use crate::ballot_paper::{ATL, BTL, VoteSource};
+use crate::extract_votes_in_pile::{ExtractionRequest, WhatToExtract};
 use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
 use crate::random_util::Randomness;
 use crate::signed_version::SignedVersion;
@@ -220,7 +222,7 @@ struct PendingTranscript<Tally> {
 pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     data : &'a ElectionData,
     ec_resolutions: &'a TieResolutionsMadeByEC,
-    original_votes:&'a Vec<PartiallyDistributedVote<'a>>,
+    original_votes:&'a Vec<(TransferValue,Vec<PartiallyDistributedVote<'a>>)>,
     num_candidates : usize,
     candidates_to_be_elected : NumberOfCandidates,
     quota : Rules::Tally,
@@ -249,11 +251,12 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     pub(crate) transcript : Transcript<Rules::Tally>,
     print_progress_to_stdout : bool, // if true, then print tallys etc to stdout.
     oracle : Option<OracleFromOfficialDOP<'a>>,
+    extractors : &'a [ExtractionRequest],
 }
 
 impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 {
-    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<PartiallyDistributedVote<'a>>,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC,print_progress_to_stdout : bool,oracle : Option<OracleFromOfficialDOP<'a>>,randomness:&'a mut Randomness) -> Self {
+    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<(TransferValue,Vec<PartiallyDistributedVote<'a>>)>,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC,print_progress_to_stdout : bool,oracle : Option<OracleFromOfficialDOP<'a>>,randomness:&'a mut Randomness,extractors:&'a [ExtractionRequest]) -> Self {
         let num_candidates = data.metadata.candidates.len();
         let tallys = vec![Rules::Tally::zero();num_candidates];
         let mut papers = vec![];
@@ -304,6 +307,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             },
             print_progress_to_stdout,
             oracle,
+            extractors,
         }
     }
 
@@ -318,29 +322,28 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 
     pub fn distribute_first_preferences(& mut self) {
-        let distributed = self.distribute(self.original_votes);
-        let mut total_first_preferences : BallotPaperCount = BallotPaperCount(0);
-        for i in 0..self.num_candidates {
-            let votes = &distributed.by_candidate[i];
-            if votes.num_ballots!=BallotPaperCount(0) {
-                let tally = Rules::Tally::from(votes.num_ballots.0);
-                total_first_preferences+=votes.num_ballots;
-                self.tallys[i]+=tally.clone();
-                self.papers[i].add(votes, TransferValue::one(), self.current_count, Some(self.current_count), tally);
+        let mut total_first_preferences = Rules::Tally::zero();
+        for (tv,original_votes) in self.original_votes {
+            let mut ballots_with_this_tv = BallotPaperCount(0);
+            for v in original_votes { ballots_with_this_tv+=v.n; }
+            let original_worth = Rules::use_transfer_value(tv,ballots_with_this_tv);
+            let distributed = self.distribute(original_votes);
+            let (tally_distributed_to_candidates,tally_distributed_to_candidates_and_exhausted) = self.parcel_out_votes_with_given_transfer_value(tv.clone(),distributed,Some(self.current_count),original_worth,true,false,None);
+            if Rules::should_exhausted_votes_count_for_quota_computation() {
+                total_first_preferences+=tally_distributed_to_candidates_and_exhausted;
+            } else {
+                total_first_preferences+=tally_distributed_to_candidates;
             }
+            let is_last_step = tv==&self.original_votes.last().unwrap().0;
+            if is_last_step {
+                self.compute_quota(total_first_preferences.clone());
+            }
+            self.end_of_count_step(ReasonForCount::FirstPreferenceCount, PortionOfReasonBeingDoneThisCount {
+                transfer_value: Some(tv.clone()),
+                when_tv_created: None,
+                papers_came_from_counts: vec![]
+            }, is_last_step);
         }
-        self.exhausted+=distributed.exhausted;
-        self.tally_exhausted+=Rules::Tally::from(distributed.exhausted.0);
-        if Rules::should_exhausted_votes_count_for_quota_computation() {
-            total_first_preferences+=distributed.exhausted;
-        }
-        self.exhausted_atl+=distributed.exhausted_atl;
-        self.compute_quota(total_first_preferences);
-        self.end_of_count_step(ReasonForCount::FirstPreferenceCount, PortionOfReasonBeingDoneThisCount {
-            transfer_value: None,
-            when_tv_created: None,
-            papers_came_from_counts: vec![]
-        }, true);
     }
 
     pub fn resort_candidates(&mut self) {
@@ -350,8 +353,9 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 
     /// quota = round_down(first_preferences/(1+num_to_elect))+1
-    pub fn compute_quota(&mut self,total_first_preferences:BallotPaperCount) {
+    pub fn compute_quota(&mut self,total_first_preferences:Rules::Tally) {
         if Rules::has_quota() {
+            let total_first_preferences = BallotPaperCount(Rules::convert_tally_to_rational(total_first_preferences.clone()).to_integer().to_usize().unwrap()); // usually trivial and valid, unless there are papers with TV other than 1, in which case rounded down.
             self.quota = Rules::Tally::from(total_first_preferences.0/(1+self.candidates_to_be_elected.0)+1);
             self.transcript.quota = Some(QuotaInfo{
                 papers: total_first_preferences,
@@ -360,7 +364,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             });
             if self.print_progress_to_stdout { println!("Quota = {}", self.quota); }
         } else {
-            self.quota = Rules::Tally::from(total_first_preferences.0+1000); // effectively infinity.
+            self.quota = total_first_preferences+Rules::Tally::from(1000); // effectively infinity.
         }
     }
 
@@ -381,6 +385,105 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         self.candidate_elected_at_count[who.0]=Some(self.current_count);
     }
 
+    /// Make new election data consisting of the votes that were used to elect this candidate, using the ACT legislation for Casual Vacancies, Part 4.3 of schedule 4
+    ///
+    /// There seem to be some ambiguities, or at least very strange things. In particular, if the MLA got elected with much less than
+    /// a quota - e.g. the number of continuing candidates = number of vacancies,
+    /// then at the count `at which the former MLS became successful`, there may be just one ballot paper received, and
+    /// this paper may have a next candidate.
+    fn extract_votes_electing_act(&self, who:CandidateIndex) -> ElectionData {
+        let votes_prior_round : Rules::Tally = self.transcript.counts.last().map(|c|c.status.tallies.candidate[who.0].clone()).unwrap_or(Rules::Tally::zero()); // N in 4.3(13) of the ACT legislation
+        let mut metadata = self.data.metadata.clone();
+        metadata.vacancies=Some(NumberOfCandidates(1));
+        metadata.name.modifications.push(format!("Votes that resulted in {} becoming elected",self.data.metadata.candidate(who).name));
+        let mut by_transfer_value : HashMap<TransferValue,Vec<VotesWithSameTransferValue<'a>>> = HashMap::new();
+        let mut add_votes = |tv:TransferValue,votes:VotesWithSameTransferValue<'a>|{
+            by_transfer_value.entry(tv).or_default().push(votes);
+        };
+        let got_votes_this_count = self.papers[who.0].last_parcel_count_index()==Some(self.current_count);
+        let (non_last_parcel_votes,last_parcel_votes) = self.papers[who.0].duplicate_all_votes(got_votes_this_count);
+        for (tv,votes) in non_last_parcel_votes {
+            add_votes(tv,votes)
+        }
+        if let Some((tv,votes)) = last_parcel_votes {
+            let q_minus_n : BigRational = Rules::convert_tally_to_rational(self.quota.clone()-votes_prior_round.clone());
+            let mut ballots_with_next_available_preference = VotesWithSameTransferValue::default();
+            let mut ballots_without_next_available_preference = VotesWithSameTransferValue::default();
+            for vote in votes.votes {
+                if vote.next(&self.continuing_candidates).is_some() { ballots_with_next_available_preference.add_vote(vote); }
+                else { ballots_without_next_available_preference.add_vote(vote); }
+            }
+            let ncp : BigRational = BigRational::from_integer(BigInt::from(ballots_without_next_available_preference.num_ballots.0));
+            let ncp_times_tv : BigRational = ncp.clone().mul(&tv.0);
+            if ncp_times_tv>=q_minus_n {
+                // (2) If, at the count at which the former MLA became successful,
+                // NCP * TV was greater than or equal to Q – N—
+                // (a) for a ballot paper that did not specify a next
+                // preference—the value is calculated as follows: (Q-N)/NCP
+                // ; and
+                // (b) for a ballot paper that specified a next available preference—the value is zero.
+                let new_tv = TransferValue(q_minus_n.div(&ncp));
+                add_votes(new_tv,ballots_without_next_available_preference);
+            } else {
+                // If, at the count at which the former MLA became successful,
+                // NCP * TV was less than Q – N—
+                // (a) for a ballot paper that did not specify a next available
+                // preference—the value is the transfer value of the ballot paper
+                // when counted for the purpose of allotting count votes to the
+                // former MLA; and
+                add_votes(tv,ballots_without_next_available_preference);
+                // (b) for a ballot paper that specified a next available preference—the
+                // value is calculated as follows:
+                // (Q – N – (NCP * TV))/CP
+                let cp : BigRational = BigRational::from_integer(BigInt::from(ballots_with_next_available_preference.num_ballots.0));
+                let new_tv = TransferValue(q_minus_n.sub(ncp_times_tv).div(&cp));
+                add_votes(new_tv,ballots_with_next_available_preference);
+            }
+        };
+        // got all the votes in by_transfer_value, now just need to order them and convert to ElectionData.
+        let mut atl : Vec<ATL> = vec![];
+        let mut atl_transfer_values : Vec<VoteValueSpecification> = vec![];
+        let mut btl : Vec<BTL> = vec![];
+        let mut btl_transfer_values : Vec<VoteValueSpecification> = vec![];
+        let mut ordered_transfer_values : Vec<(TransferValue,Vec<VotesWithSameTransferValue<'a>>)> = by_transfer_value.into_iter().collect();
+        ordered_transfer_values.sort_by(|(tv1,_),(tv2,_)|tv2.cmp(tv1));
+        for (tv,votes_vec) in ordered_transfer_values {
+            let atl_start = atl.len();
+            let btl_start = btl.len();
+            for votes in votes_vec {
+                for vote in votes.votes {
+                    match vote.source {
+                        VoteSource::Btl(source) => { btl.push(BTL{ candidates: source.candidates.clone(), n: vote.n.0 }); }
+                        VoteSource::Atl(source) => { atl.push(ATL{ parties: source.parties.clone(), n: vote.n.0, ticket_index: None }); }
+                    }
+                }
+            }
+            if atl_start!=atl.len() {
+                atl_transfer_values.push(VoteValueSpecification{
+                    value: tv.clone(),
+                    first_index_inclusive: atl_start,
+                    last_index_exclusive: atl.len(),
+                })
+            }
+            if btl_start!=btl.len() {
+                btl_transfer_values.push(VoteValueSpecification{
+                    value: tv,
+                    first_index_inclusive: btl_start,
+                    last_index_exclusive: btl.len(),
+                })
+            }
+        };
+        ElectionData{
+            metadata,
+            atl,
+            atl_types: vec![],
+            atl_transfer_values,
+            btl,
+            btl_types: vec![],
+            btl_transfer_values,
+            informal: 0,
+        }
+    }
 
 
     /// See if there are any ties in the tallys for the candidates in
@@ -545,7 +648,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn end_of_count_step(&mut self,reason : ReasonForCount,portion : PortionOfReasonBeingDoneThisCount,reason_completed : bool) {
         self.resort_candidates();
         let should_check_elected = reason_completed || match reason {
-            ReasonForCount::FirstPreferenceCount => true,
+            ReasonForCount::FirstPreferenceCount => reason_completed, // don't check in the middle of the first preference count.
             ReasonForCount::ExcessDistribution(_) => Rules::check_elected_if_in_middle_of_surplus_distribution(),
             ReasonForCount::Elimination(_) => Rules::check_elected_if_in_middle_of_exclusion(),
         };
@@ -571,6 +674,15 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 }
             }),
         };
+        // see if need to extract anything.
+        for e in self.extractors {
+            match &e.what_to_extract {
+                WhatToExtract::ACTVotesUsedToElectCandidate(who) if self.in_this_count.elected.iter().any(|c|c.who==*who) => {
+                    e.what_to_do_with_it.do_it(self.extract_votes_electing_act(*who))
+                }
+                _ => {}
+            }
+        }
         self.transcript.counts.push(SingleCount{
             reason,
             portion,
@@ -789,7 +901,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 
     /// Parcel out votes by next continuing candidate with a given transfer value.
-    pub fn parcel_out_votes_with_given_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,when_tv_created:Option<CountIndex>,original_worth:Rules::Tally,distribute_exhausted_votes:bool,is_exclusion:bool,extra_multiple_for_exhausted:Option<&BigRational>) {
+    /// Returns the (total value of votes distributed to candidates,total value of votes distributed to candidates and exhausted)
+    pub fn parcel_out_votes_with_given_transfer_value(&mut self,transfer_value:TransferValue,distributed:DistributedVotes<'a>,when_tv_created:Option<CountIndex>,original_worth:Rules::Tally,distribute_exhausted_votes:bool,is_exclusion:bool,extra_multiple_for_exhausted:Option<&BigRational>) -> (Rules::Tally,Rules::Tally) {
         let mut tally_distributed = Rules::Tally::zero();
         for (candidate_index,candidate_ballots) in distributed.by_candidate.into_iter().enumerate() {
             if candidate_ballots.num_ballots.0>0 {
@@ -799,20 +912,22 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 self.papers[candidate_index].add(&candidate_ballots, transfer_value.clone(), self.current_count, when_tv_created, worth);
             }
         }
+        let tally_distributed_to_candidates = tally_distributed.clone();
         if distributed.exhausted.0>0 {
             if distribute_exhausted_votes {
                 let exhausted_tv = if let Some(em) = extra_multiple_for_exhausted { TransferValue(transfer_value.0*em) } else { transfer_value };
                 let worth:Rules::Tally = Rules::use_transfer_value(&exhausted_tv,distributed.exhausted);
                 let worth:Rules::Tally = Rules::munge_exhausted_votes(worth,is_exclusion); // support emulation of weird bugs.
                 self.tally_exhausted+=worth.clone();
-                tally_distributed +=worth.clone();
+                tally_distributed+=worth.clone();
             }
             // always distribute the papers.
             self.exhausted+=distributed.exhausted;
             self.exhausted_atl+=distributed.exhausted_atl;
         }
         self.tally_lost_to_rounding+=original_worth;
-        self.tally_lost_to_rounding-= tally_distributed;
+        self.tally_lost_to_rounding-=tally_distributed.clone();
+        (tally_distributed_to_candidates,tally_distributed)
     }
 
 
@@ -1172,12 +1287,14 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 }
 
-
-
-pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool,randomness:&mut Randomness) -> Transcript<Rules::Tally> {
+pub fn distribute_preferences_with_extractors<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool,randomness:&mut Randomness,extractors:&[ExtractionRequest]) -> Transcript<Rules::Tally> {
     let arena = typed_arena::Arena::<CandidateIndex>::new();
-    let votes = data.resolve_atl(&arena,vote_types);
-    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates,ec_resolutions,print_progress_to_stdout,None,randomness);
+    let votes = data.resolve_atl_including_weights(&arena,vote_types);
+    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates,ec_resolutions,print_progress_to_stdout,None,randomness,extractors);
     work.go();
     work.transcript
+}
+
+pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool,randomness:&mut Randomness) -> Transcript<Rules::Tally> {
+    distribute_preferences_with_extractors::<Rules>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,&[])
 }

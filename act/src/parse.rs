@@ -141,7 +141,7 @@ impl RawDataSource for ACTDataLoader {
             }
         }
         if !prefs.is_empty() { btl.add(prefs.clone()); }
-        Ok(ElectionData{ metadata, atl:vec![], atl_types: vec![], btl:btl.to_btls(), btl_types: vec![], informal:0 })
+        Ok(ElectionData{ metadata, atl:vec![], atl_types: vec![], atl_transfer_values: vec![], btl:btl.to_btls(), btl_types: vec![], btl_transfer_values: vec![], informal:0 })
     }
 
     fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> {

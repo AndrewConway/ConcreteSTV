@@ -93,8 +93,10 @@ pub fn parse<P:AsRef<Path>>(path:P) -> anyhow::Result<ElectionData> {
         metadata,
         atl: vec![],
         atl_types: vec![],
+        atl_transfer_values: vec![],
         btl,
         btl_types: vec![],
+        btl_transfer_values: vec![],
         informal: 0,
     };
     Ok(data)

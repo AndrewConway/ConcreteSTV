@@ -241,16 +241,18 @@ pub fn distribute_preferences_using_official_results<Rules:PreferenceDistributio
         metadata: metadata.clone(),
         atl: vec![],
         atl_types: vec![],
+        atl_transfer_values: vec![],
         btl,
         btl_types: vec![],
+        btl_transfer_values: vec![],
         informal: 0,
     };
     let ec_resolutions = metadata.tie_resolutions.clone(); // TODO make EC resolutions correct.
     let arena = typed_arena::Arena::<CandidateIndex>::new();
-    let votes = data.resolve_atl(&arena,None);
+    let votes = data.resolve_atl_including_weights(&arena,None);
     let oracle = OracleFromOfficialDOP{official, tie_resolutions: Default::default() };
     let mut randomness = Randomness::ReverseDonkeyVote;
-    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(&data,&votes,candidates_to_be_elected,&excluded_candidates,&ec_resolutions,print_progress_to_stdout,Some(oracle),&mut randomness);
+    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(&data,&votes,candidates_to_be_elected,&excluded_candidates,&ec_resolutions,print_progress_to_stdout,Some(oracle),&mut randomness,&[]);
     work.go();
     Ok(work.transcript)
 }

@@ -197,6 +197,22 @@ impl <'a> VotesWithSameTransferValue<'a> {
         self.num_ballots-=res.num_ballots;
         res
     }
+    /// Like extract_last_parcel, but don't change the current state.
+    fn duplicate_last_parcel(&self,old_state:StateBeforeAddition) -> VotesWithSameTransferValue<'a> {
+        let mut res = VotesWithSameTransferValue::default();
+        for v in &self.votes[old_state.votes_len..] {
+            res.add_vote(v.clone());
+        }
+        res
+    }
+    /// Like duplicate_last_parcel, but get all the _other_ votes..
+    fn duplicate_excluding_last_parcel(&self,old_state:StateBeforeAddition) -> VotesWithSameTransferValue<'a> {
+        let mut res = VotesWithSameTransferValue::default();
+        for v in &self.votes[..old_state.votes_len] {
+            res.add_vote(v.clone());
+        }
+        res
+    }
 
     /// Set aside randomly some number of ballots, and return (the chosen ones,the ones set aside).
     pub fn set_aside(&self,num_to_set_aside:BallotPaperCount,randomness:&mut Randomness) -> (VotesWithSameTransferValue<'a>,VotesWithSameTransferValue<'a>) {
@@ -446,6 +462,9 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero+Clone+Display+FromStr+Part
         res
     }
 
+    pub fn last_parcel_count_index(&self) -> Option<CountIndex> {
+        self.last_parcel.as_ref().map(|lp|lp.count_index)
+    }
     /// Removes the last parcel from this object, returning the object created.
     pub fn extract_last_parcel(&'_ mut self) -> (Tally,VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount) {
         if let Some(last_parcel) = self.last_parcel.take() {
@@ -462,6 +481,33 @@ impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero+Clone+Display+FromStr+Part
             panic!("No last parcel");
         }
     }
+
+    /// Duplicate all the votes, split by transfer value.  Used when extracting votes at some point in the transcript.
+    ///
+    /// If special_handling_last_parcel is true, then deal with the last parcel separately
+    ///
+    /// returns all the votes in the first vector, other than optionally the votes in the last parcel which are in the second, option, value
+    pub fn duplicate_all_votes(&'_ self, special_handling_last_parcel:bool) -> (Vec<(TransferValue, VotesWithSameTransferValue<'a>)>, Option<(TransferValue, VotesWithSameTransferValue<'a>)>) {
+        let mut res_non_last_parcel : Vec<(TransferValue,VotesWithSameTransferValue)> = vec![];
+        let mut res_last_parcel : Option<(TransferValue,VotesWithSameTransferValue)>= None;
+        for (k,v) in &self.by_provenance {
+            if special_handling_last_parcel {
+                if let Some(last_parcel) = self.last_parcel.as_ref() {
+                    let key = (S::key(last_parcel.count_index, last_parcel.when_tv_created), last_parcel.transfer_value.clone());
+                    if *k==key { // special handling for last parcel.
+                        let in_last_parcel = v.1.duplicate_last_parcel(last_parcel.prior_state);
+                        let others = v.1.duplicate_excluding_last_parcel(last_parcel.prior_state);
+                        res_non_last_parcel.push((key.1.clone(),others));
+                        res_last_parcel=Some((key.1.clone(),in_last_parcel));
+                        continue;
+                    }
+                }
+            }
+            res_non_last_parcel.push((k.1.clone(),v.1.clone()));
+        }
+        (res_non_last_parcel,res_last_parcel)
+    }
+
     /// Like extract_last_parcel, except parcels that arrived at first_count_wanted or later.
     pub fn parcels_starting_at_count(&'_ mut self,first_count_wanted:CountIndex) -> (Tally,VotesWithSameTransferValue<'a>,PortionOfReasonBeingDoneThisCount) {
         let mut helper = MergeVotesHelper::default();
