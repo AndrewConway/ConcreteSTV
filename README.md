@@ -23,7 +23,9 @@ which led the NSW Parliament to simplify the rules. Everyone is encouraged to us
 Results from this project were used to find bugs [in the 2013, 2016 and 2019 Federal counts](reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf) resulting in legislation change resolving some of the issues.
 
 Other STV counting programs include Grahame Bowland's [Dividebatur](https://github.com/grahame/dividebatur)
-and its successor [Dividebatur2](https://github.com/grahame/dividebatur2), Lee Yingtong Li's [OpenTally](https://yingtongli.me/git/OpenTally/), and Milad Ghale's [formally verified STV](https://github.com/MiladKetabGhale/STV-Counting-ProtocolVerification).
+and its successor [Dividebatur2](https://github.com/grahame/dividebatur2), Lee Yingtong Li's [OpenTally](https://yingtongli.me/git/OpenTally/), Milad Ghale's [formally verified STV](https://github.com/MiladKetabGhale/STV-Counting-ProtocolVerification),
+and Ramon Bouckaert's [CountBack](https://github.com/ramonbouckaert/countback). Please contact me (address at the
+bottom) if you would like to be added to this list.
 
 
 ## Currently Supported Election Rules
