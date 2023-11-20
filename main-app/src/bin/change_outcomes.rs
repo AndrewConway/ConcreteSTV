@@ -59,7 +59,7 @@ fn main() -> anyhow::Result<()> {
     let result_file = opt.input_options.result_file_name(&opt.votes,opt.out.as_ref(),".vchange",&opt.rules);
 
     // make sure the default elected people are correct.
-    let normal_elected_transcript = opt.rules.count(&votes,votes.metadata.vacancies.ok_or_else(||anyhow!("Need to specify number of vacancies"))?,&votes.metadata.excluded.iter().cloned().collect(),&votes.metadata.tie_resolutions,None,false,&mut Randomness::ReverseDonkeyVote);
+    let normal_elected_transcript = opt.rules.count(&votes,votes.metadata.vacancies.ok_or_else(||anyhow!("Need to specify number of vacancies"))?,&votes.metadata.excluded.iter().cloned().collect(),&votes.metadata.tie_resolutions,None,false,&mut Randomness::ReverseDonkeyVote,&[]);
     votes.metadata.results=Some(normal_elected_transcript.elected().clone());
 
 

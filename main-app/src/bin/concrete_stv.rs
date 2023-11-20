@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::fs::File;
 use main_app::ModifyStvFileOptions;
 use main_app::rules::Rules;
+use stv::extract_votes_in_pile::ExtractionRequest;
 use stv::random_util::Randomness;
 
 #[derive(Parser)]
@@ -41,6 +42,18 @@ struct Opts {
     /// If not specified, then reverse donkey vote is used.
     #[clap(short, long,value_parser)]
     seed : Option<u64>,
+
+    /// It is possible to extract the particular votes at some point in the transcript. The
+    /// general format for this is --extract what_to_extract;what_to_do_with_it, where
+    ///
+    /// what_to_extract can currently only be UsedToElectACT:candidate_number where candidate_number
+    /// is an integer 0 to the number of candidates-1 and will extract the votes used to elect the
+    /// candidate according to the ACT casual vacancies legislation.
+    ///
+    /// what_to_do_with_it can currently only be file:file_name where file_name is the name of a .stv
+    /// file that you want to store the extracted votes in.
+    #[clap(long)]
+    extract : Vec<ExtractionRequest>
 }
 
 fn main() -> anyhow::Result<()> {
@@ -49,7 +62,7 @@ fn main() -> anyhow::Result<()> {
     let votes = opt.input_options.get_data(&opt.votes,opt.verbose)?;
     let transcript_file = opt.input_options.result_file_name(&opt.votes,opt.transcript.as_ref(),".transcript",&opt.rules);
     let mut randomness : Randomness = opt.seed.into();
-    let transcript = opt.rules.count_simple(&votes,opt.verbose,&mut randomness)?;
+    let transcript = opt.rules.count_simple(&votes,opt.verbose,&mut randomness,&opt.extract)?;
 
     if let Some(parent) = transcript_file.parent() { std::fs::create_dir_all(parent)? }
     serde_json::to_writer(File::create(&transcript_file)?,&transcript)?;

@@ -2,10 +2,14 @@
 
 The ACT counting legislation is generally well written and unambiguous. Indeed it is better in
 this regard than most such legislation in Australia IMO. However the ACT casual vacancy legislation
-is significantly more ambiguous. My thoughts and implementation decisions are documented below.
+is significantly more ambiguous, although one can reasonably easily make a reasonable choice of interpretations.
+
+My thoughts and implementation decisions are documented below.
 The references below are to the Electoral Act 1992, Schedule 4.
 Part 4.3 is specific to the casual vacancies, and references to section 11-17 refer to it, earlier
 sections to the general legislation in part 4.1 and 4.2.
+
+Remember I am not a lawyer; these are just my rather pedantic thoughts as a reader of English.
 
 ## Section 12 Quota ambiguity.
 
@@ -33,9 +37,11 @@ In the discussion below, assume candidate `i` has `Vi` votes, which will not nec
 * TVA is the rounded down version of the sum over `i` of `Vi`, then the quota is calculated, which may be fractional if TVA is odd.
 * TVA is the sum over `i` of the rounded down version of `Vi`, then the quota is calculated, which may be fractional if TVA is odd.
 * TVA is the sum over `i` of `Vi`, then the quota is calculated, then the quota is rounded down.
-* Multiple round downs may occur
+* Multiple round downs may occur.
 
-I will ignore the last as it is the least plausible interpretation of the English. 
+I will ignore the last as it is the least plausible interpretation of the English, and, besides, 
+any combination involving rounding down each `Vi` has the same problem as described in the next paragraph, 
+and the remaining combination is equivalent to the third option above.
 
 I reject the second of these also as it is surely not what any sane drafter would have intended as it means the quota could
 end up being less than half the continuing votes, and a candidate could get elected when another candidate is preferenced higher
@@ -47,7 +53,8 @@ a somewhat obscure parsing. More strong support for this was the presence of the
 2016 version of the legislation, when the vote tallies were integers rather than the 2020 6 decimal places. In this
 case the first two interpretations were meaningless (although see discussion of (14) below).
 
-So I interpret section 12 as `TVA is the sum over `i` of `Vi`, then the quota is calculated, then the quota is rounded down`.
+So I interpret section 12 as 
+ * TVA is the sum over `i` of `Vi`, then the quota is calculated, then the quota is rounded down to an integer.
 
 Elections ACT in their fact sheet do not address rounding of the transfer value, saying
 - "To be
@@ -203,5 +210,14 @@ far fewer than half the votes, so this seems very unlikely to be the intended in
 The Elections ACT fact sheet does not mention rounding here.
 
 The example in 2021 of the casual vacancy of Alistair Coe supports the second of these
-interpretations. I therefore adopt this interepretation.
+interpretations. I therefore adopt this interpretation.
 
+# Implementation note:
+
+The main effort is extracting the votes. Then counting them, the standard ACT STV algorithm
+works fine apart from not recomputing the quota each time. This will not change who wins, it just
+means the standard ACT STV algorithm may continue counting slightly beyond the necessary point. 
+
+As this is a minor issue, I have not added complexity by adding new count algorithms that only
+apply in this special case. Use the standard ACT STV algorithm, and understand that there is a chance
+that there may be some extra irrelevant counts.

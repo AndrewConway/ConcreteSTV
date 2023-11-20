@@ -387,10 +387,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
     /// Make new election data consisting of the votes that were used to elect this candidate, using the ACT legislation for Casual Vacancies, Part 4.3 of schedule 4
     ///
-    /// There seem to be some ambiguities, or at least very strange things. In particular, if the MLA got elected with much less than
-    /// a quota - e.g. the number of continuing candidates = number of vacancies,
-    /// then at the count `at which the former MLS became successful`, there may be just one ballot paper received, and
-    /// this paper may have a next candidate.
+    /// See discussion in [../CasualVacanciesAmbiguities.md] for my interpretation of some ambiguities.
     fn extract_votes_electing_act(&self, who:CandidateIndex) -> ElectionData {
         let votes_prior_round : Rules::Tally = self.transcript.counts.last().map(|c|c.status.tallies.candidate[who.0].clone()).unwrap_or(Rules::Tally::zero()); // N in 4.3(13) of the ACT legislation
         let mut metadata = self.data.metadata.clone();
@@ -424,6 +421,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 // (b) for a ballot paper that specified a next available preference—the value is zero.
                 let new_tv = TransferValue(q_minus_n.div(&ncp));
                 add_votes(new_tv,ballots_without_next_available_preference);
+                add_votes(TransferValue(BigRational::zero()),ballots_with_next_available_preference);
             } else {
                 // If, at the count at which the former MLA became successful,
                 // NCP * TV was less than Q – N—

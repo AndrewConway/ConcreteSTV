@@ -39,9 +39,9 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **FederalPre2021** Federal Senate, my interpretation of the correct rules prior to the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md). Formerly named **Federal**.
 - **FederalPost2021** Federal Senate, my interpretation of the correct rules for electronic counting after the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md).
 - **FederalPost2021Manual** Federal Senate, my interpretation of the correct rules for manual counting after the [2021 changes](federal/legislation/AssuranceOfSenateCountingAct2021.md).
-- **AEC2013** Buggy rules used by AEC in 2013 and 2014 Federal Senate election (bug never came up in 2014)
+- **AEC2013** Buggy rules used by AEC in 2013 and 2014 Federal Senate elections (bug never came up in 2014)
 - **AEC2016** Buggy rules used by AEC in 2016 Federal Senate election
-- **AEC2019** Buggy rules used by AEC in 2019 and 2022 Federal Senate election
+- **AEC2019** Buggy rules used by AEC in 2019 and 2022 Federal Senate elections
 - **ACTPre2020** Rules used for ACT Legislative Assembly by ElectionsACT prior to 2020.
 - **ACT2020** Very buggy rules used by ElectionsACT in 2020
 - **ACT2021** Rules that should have been used by ElectionsACT in 2020 and were used for the 2021 recount.
@@ -56,6 +56,8 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **WA2008** My interpretation of the Western Australian Legislative Council rules consistent with the 2008 published official distribution of preferences.
 
 This list is expected to grow as ConcreteSTV supports more jurisdictions.
+
+There is some beginning support for countbacks, such as the [ACT](act/HowToRunCasualVacancies.md).
 
 Note that when I describe rules as "buggy" it means I have had to purposefully introduce bugs into
 my interpretation of the rules in order to accurately reproduce the official results. These bugs have 
@@ -198,7 +200,8 @@ Note that you can pass --help as an option to either of these programs for detai
 ## To view a transcript
 
 The `docs` folder of this project contains a web based viewer for transcript files.
-Open `docs/Viewer.html` in a web browser. 
+Open `docs/Viewer.html` in a web browser. Alternatively this is hosted on github at
+[https://andrewconway.github.io/ConcreteSTV/Viewer.html](https://andrewconway.github.io/ConcreteSTV/Viewer.html)
 
 In the upper left corner, there will be a *Browse* button. Use it to select the `TAS2019_AEC2019.transcript`
 file from before.
