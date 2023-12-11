@@ -5,7 +5,7 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-//! This runs the federal elections and compares the results to the AEC provided transcripts.
+//! This runs the casual vacancy ACT elections and compares the results to the Elections ACT provided transcripts.
 
 
 #[cfg(test)]
@@ -45,7 +45,7 @@ mod tests {
             excluded_in_recount.insert(c);
         }
         for &c in excluded_names_in_recount {
-            excluded_in_recount.insert(*candidate_name_lookup.get(c).unwrap());
+            excluded_in_recount.insert(*candidate_name_lookup.get(c).expect(c));
         }
         let transcript = TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript };
         std::fs::create_dir_all("test_transcripts/extract")?;
@@ -61,12 +61,6 @@ mod tests {
         let file = File::create(format!("test_transcripts/extract/Casual Vacancy {} Transcript {} {}.json",ex_mla,electorate,transcript.metadata.name.year))?;
         serde_json::to_writer_pretty(file,&transcript)?;
         Ok(transcript)
-    }
-    #[test]
-    #[allow(non_snake_case)]
-    fn test_JohnathonDavis() {
-        let _transcript = test_extract_votes2020::<ACT2021>("Brindabella", "DAVIS, Johnathan",&[]).unwrap();
-        // TODO test transcript once official transcript is released.
     }
 
     #[test]
@@ -105,34 +99,59 @@ mod tests {
     #[test]
     #[allow(non_snake_case)]
     fn test_GiuliaJones() {
-        let transcript = test_extract_votes2020::<ACT2021>("Murrumbidgee", "JONES, Giulia",&["STRANG, Bernie","KEARSLEY, John","YOUNG, Scott","WILLIAMS, Bethany","BRENNAN, Bernie","HORNE, Francine","FISCHER, Tom","ORR, Suzanne","PHILLIPS, Georgia","CROSS, Helen"]).unwrap();
-        // numbers here are from the official scrutiny sheet.
-        assert_eq!(2,transcript.transcript.counts.len());
+        let transcript = test_extract_votes2020::<ACT2021>("Murrumbidgee", "JONES, Giulia",&["HANDBY, Edmund","del VALLE, Yana","MAIL, Jill","BUCKMASTER, Geoff","BAKER, Terry","GORENG GORENG, Tjanara","DAVIDSON, Emma",
+            "YEATMAN, Gordon","GILMAYER, Mark","LONG, Brendan","CODY, Bec","STEEL, Chris","PATERSON, Marisa","DOBSON, Tim","BYRNES, Rohan","HILLMAN, Jackson","VEENSTRA, Peter","FORNER, Richard","DEMETRIOS, Andrew","KNIGHT, Robert","PERREN-LEVERIDGE, Lee"]).unwrap();
+        // The official scrutiny sheet is incorrect and should have terminated at count 13. This is an error I did not emulate.
+        assert_eq!(13,transcript.transcript.counts.len());
         let candidate_from_names = transcript.metadata.get_candidate_name_lookup_multiple_ways();
-        // check the tallies for a particular candidate. There should be 2 counts, at the first count the candidate gets papers1 papers and votes. At the second count the candidate gets papers2 papers and votes2 votes.
+        // check the tallies for a particular candidate, for the first two counts. At the first count the candidate gets papers1 papers and votes. At the second count the candidate gets papers2 papers and votes2 votes.
         let check = |candidate:&str,papers1:usize,papers2:usize,votes2:&str| {
             println!("Testing {}",candidate);
-            let candidate = *candidate_from_names.get(candidate).unwrap();
+            let candidate = *candidate_from_names.get(candidate).expect(candidate);
             assert_eq!(BallotPaperCount(papers1),transcript.transcript.counts[0].status.papers.candidate[candidate.0]);
             assert_eq!(BallotPaperCount(papers1+papers2),transcript.transcript.counts[1].status.papers.candidate[candidate.0]);
             assert_eq!(papers1.to_string(),transcript.transcript.counts[0].status.tallies.candidate[candidate.0].to_string());
             let expected_votes_at_count_2 = FixedPrecisionDecimal::<6>::from(papers1)+FixedPrecisionDecimal::<6>::from_str(votes2).unwrap();
             assert_eq!(expected_votes_at_count_2,transcript.transcript.counts[1].status.tallies.candidate[candidate.0]);
         };
-        check("HELMORE, Olivia",118,0,"0");
-        check("NADIMPALLI, Krishna",1007,1,"0.641025");
-        check("MILLIGAN, James",5194,7,"4.487179");
-        check("VADAKKEDATHU, Jacob",1485,2,"1.282051");
-        check("HAQUE, Mainul",151,0,"0");
-        check("STELZIG, Mike",65,23,"14.743589");
-        check("POLLARD, Stephanie",122,2,"1.282051");
-        check("POLLARD, David",195,1,"0.641025");
-        check("GUPTA, Deepak-Raj",164,1,"0.641025");
-        check("LI, Fuxin",124,1,"0.641025");
-        check("HUSSAIN, Mohammad Munir",34,0,"0");
-        assert_eq!(BallotPaperCount(226),transcript.transcript.counts[0].status.papers.exhausted);
-        assert_eq!(BallotPaperCount(227),transcript.transcript.counts[1].status.papers.exhausted);
-        assert_eq!(vec![*candidate_from_names.get("MILLIGAN, James").unwrap()],transcript.transcript.elected);
+        check("SINGH, Amardeep",952,2110,"2060.453889");
+        check("SUINE, Sarah",1945,285,"278.307752");
+        check("COCKS, Ed",2544,688,"671.844680");
+        check("LIN, Stephen",69,15,"14.647776");
+        check("WHYTE, Brendan",55,5,"4.882592");
+        check("CARRICK, Fiona",125,0,"0");
+        assert_eq!(BallotPaperCount(235),transcript.transcript.counts[0].status.papers.exhausted);
+        assert_eq!(BallotPaperCount(235),transcript.transcript.counts[1].status.papers.exhausted);
+        assert_eq!(vec![*candidate_from_names.get("COCKS, Ed").unwrap()],transcript.transcript.elected);
+    }
+
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_JohnathanDavis() {
+        let transcript = test_extract_votes2020::<ACT2021>("Brindabella", "DAVIS, Johnathan",&["DAY, Cathy","FAHIZ, Jannah","ELLERMAN, Sue","HIATT, Jane","WALL, Andrew","GOWOR, Jacob","KNIGHT, Matthew","CLAPHAM, Andrew","WILLETT, Bruce","OLLEY, Adrian","SANDFORD, Scott","POTTER, Jason"]).unwrap();
+        // numbers here are from the official scrutiny sheet.
+        assert_eq!(2,transcript.transcript.counts.len());
+        let candidate_from_names = transcript.metadata.get_candidate_name_lookup_multiple_ways();
+        // check the tallies for a particular candidate. There should be 2 counts, at the first count the candidate gets papers1 papers and votes. At the second count the candidate gets papers2 papers and votes2 votes.
+        let check = |candidate:&str,papers1:usize,papers2:usize,votes2:&str| {
+            println!("Testing {}",candidate);
+            let candidate = *candidate_from_names.get(candidate).expect(candidate);
+            assert_eq!(BallotPaperCount(papers1),transcript.transcript.counts[0].status.papers.candidate[candidate.0]);
+            assert_eq!(BallotPaperCount(papers1+papers2),transcript.transcript.counts[1].status.papers.candidate[candidate.0]);
+            assert_eq!(papers1.to_string(),transcript.transcript.counts[0].status.tallies.candidate[candidate.0].to_string());
+            let expected_votes_at_count_2 = FixedPrecisionDecimal::<6>::from(papers1)+FixedPrecisionDecimal::<6>::from_str(votes2).unwrap();
+            assert_eq!(expected_votes_at_count_2,transcript.transcript.counts[1].status.tallies.candidate[candidate.0]);
+        };
+        check("WERNER-GIBBINGS, Taimus",2078,14,"10.736842");
+        check("FORDE, Brendan",650,3,"2.300751");
+        check("SOXSMITH, Robyn",592,5,"3.834586");
+        check("NUTTALL, Laura",4913,4,"3.067669");
+        check("DANIELS, James",317,189,"144.947368");
+        check("BAYNHAM, Greg",252,39,"29.909774");
+        assert_eq!(BallotPaperCount(230),transcript.transcript.counts[0].status.papers.exhausted);
+        assert_eq!(BallotPaperCount(242),transcript.transcript.counts[1].status.papers.exhausted);
+        assert_eq!(vec![*candidate_from_names.get("NUTTALL, Laura").unwrap()],transcript.transcript.elected);
     }
 
 
