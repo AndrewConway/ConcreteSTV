@@ -282,7 +282,7 @@ table to a small number of candidates, use the `--candidates` option. Use the `-
 option for details.
 
 
-## To import data from Preflib
+## To import data from Preflib .soi or .soc formats, or .blt format
 
 [Preflib](https://www.preflib.org/) contains some election data. The `soi` and `soc` formats can be
 converted to the ConcreteSTV format using the `preflib_to_stv` program:
@@ -298,6 +298,13 @@ run it with ConcreteSTV with one vacancy.
 
 Note that this will do a poor job of parsing metadata (like year, electorate, authority, copyright, name), and will not
 specify vacancies, so one _must_ specify vacancies when running `concrete_stv` on it.
+
+Similarly one can transform a `.blt` format to ConcreteSTV format (say at `/path/to/your_file.blt`) using
+```bash
+cargo build --release
+./target/release/blt_to_stv /path/to/your_file.blt
+./target/release/concrete_stv AEC2013 your_file.stv --verbose
+```
 
 ## Webserver
 
