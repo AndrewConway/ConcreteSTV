@@ -306,6 +306,8 @@ cargo build --release
 ./target/release/concrete_stv AEC2013 your_file.stv --verbose
 ```
 
+Of course, the `cargo build --release` only needs to be done once; it will compile (all) the ConcreteSTV executables.
+
 ## Webserver
 
 The webserver running on [https://vote.andrewconway.org](https://vote.andrewconway.org) uses ConcreteSTV. Running your
