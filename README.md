@@ -299,14 +299,19 @@ run it with ConcreteSTV with one vacancy.
 Note that this will do a poor job of parsing metadata (like year, electorate, authority, copyright, name), and will not
 specify vacancies, so one _must_ specify vacancies when running `concrete_stv` on it.
 
-Similarly one can transform a `.blt` format to ConcreteSTV format (say at `/path/to/your_file.blt`) using
+Similarly one can transform a `.blt` format to ConcreteSTV format (example given is
+for the Argyll Bute Council, Scotland, 
+kudos for [public release](https://www.argyll-bute.gov.uk/sites/default/files/migrated_files/guidance-for-preferences-by-ballot-box_3.pdf)) 
+using the `blt_to_stv` program:
 ```bash
 cargo build --release
-./target/release/blt_to_stv /path/to/your_file.blt
-./target/release/concrete_stv AEC2013 your_file.stv --verbose
+wget https://www.argyll-bute.gov.uk/sites/default/files/migrated_files/Unknown/preferenceprofile_v0001_ward-1-south-kintyre_06052022_120128.blt
+./target/release/blt_to_stv preferenceprofile_v0001_ward-1-south-kintyre_06052022_120128.blt
+./target/release/concrete_stv AEC2013 preferenceprofile_v0001_ward-1-south-kintyre_06052022_120128.stv --verbose
 ```
 
-Of course, the `cargo build --release` only needs to be done once; it will compile (all) the ConcreteSTV executables.
+Of course, the `cargo build --release` only needs to be done once; it will compile (all) the ConcreteSTV executables,
+and the Australian rules used are inappropriate for the Irish and Scottish elections given as examples above.
 
 ## Webserver
 
@@ -320,7 +325,7 @@ appropriate electoral commissions. See [ElectionDatabase.md](ElectionDatabase.md
 
 ## Copyright
 
-This program is Copyright 2021 to 2023 Andrew Conway.
+This program is Copyright 2021 to 2024 Andrew Conway.
 
 This file is part of ConcreteSTV.
 
