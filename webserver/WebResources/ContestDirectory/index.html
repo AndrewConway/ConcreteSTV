@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/common.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="/util.js"></script>
+    <script src="/common.js"></script>
+    <script src="/contest_index.js"></script>
+
+    <title>Loading...</title>
+</head>
+<body>
+
+<div id="MainBody">
+    <h2 id="TitleHeading">Loading...</h2>
+    <div id="InfoPlaceholder"><img src="/ajax-loader.gif"/> </div>
+    <div id="MetadataPlaceholder"></div>
+    <div id="ElectionDataAvailableSection" class="hidden">
+        <h3>Statistics for psephologists</h3>
+        <ul>
+            <li><a href="MeanPreferences.html">Average preference</a> given to each candidate.</li>
+            <li><a href="Correlations.html">Compare parties and candidates</a> based on the way that people voted.</li>
+            <li><a href="IntentTable.html">See which major party</a> was preferred by voters depending upon their first preference.</li>
+            <li><a href="WhoGotVotes.html">Above and Below the line</a> statistics by party or candidate.</li>
+            <li id="NeedsRawAccess1"><a href="RepeatedNumbers.html">Look for repeated preferences</a> marked below the line by voters.</li>
+        </ul>
+        <div></div>
+        <h3>Recount the election yourself</h3>
+        <p>You can <a href="Recount.html">recount</a> the election, possibly with some candidates excluded or different rules.</p>
+        <h3>Download data</h3>
+        <p>You can <a href="data.stv">download</a> the election data in a format usable with <a href="https://github.com/AndrewConway/ConcreteSTV/">ConcreteSTV</a>. Note the copyright messages at the top of the page stating where the data is derived.</p>
+        <div id="NeedsRawAccess2">
+            <h3>Vote search</h3>
+            You can <a href="PrepareVote.html">enter your vote and search</a> published votes to see if yours was recorded.
+        </div>
+    </div>
+    <div id="ElectionDataNotAvailableSection" class="hidden">
+        Election data is not currently available.
+        <h3>Vote Preparation</h3>
+        You can <a href="PrepareVote.html">prepare your vote</a> and possibly later search published votes to see if yours was recorded.
+    </div>
+</div>
+
+</body>
+</html>

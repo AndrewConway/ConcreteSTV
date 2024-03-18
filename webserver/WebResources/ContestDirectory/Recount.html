@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/Viewer/Viewer.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="/util.js"></script>
+    <script src="/common.js"></script>
+    <script src="/Viewer/Viewer.js"></script>
+    <script src="/Recount.js"></script>
+
+    <title>Recount</title>
+</head>
+<body>
+
+<div id="MainBody">
+    <h1>Recount</h1>
+    <p class="noprint">This page enables one to recount an election, possibly with some candidates excluded or using
+        a different rule set. </p>
+
+    <h2 id="TitleHeading">Loading...</h2>
+    <fieldset>
+        <legend>Ineligible Candidates</legend>
+        <div id="paperDiv"><img src="/ajax-loader.gif" alt="Loading"/></div>
+    </fieldset>
+    <fieldset>
+        <legend>Vacancies.</legend>
+        <label for="NumVacancies">Number of candidates to elect</label>: <input type="number" id="NumVacancies" min="1"/>
+    </fieldset>
+    <fieldset>
+        <legend>Tie resolutions</legend>
+        <div id="TieResolutionsDisplay"></div>
+        <div>
+            <button onclick="addFavour();" id="AddFavour"> Add </button> <select id="FavouredCandidate1"></select> <span id="extraFavourChoices"></span> <button id="RemoveFavourChoiceButton" onclick="removeFavourChoice()" class="hidden">-</button><button id="AddFavourChoiceButton" onclick="addFavourChoice()">+</button> favoured over <select id="DisFavouredCandidate"></select>
+        </div>
+        <label for="RandomSeed" title="When all else fails, ties are broken randomly if a number is provided here, and reverse donkey vote order if not. Results will be repeatable for a given number here.">Random seed</label>: <input id="RandomSeed" type="text" inputmode="numeric" pattern="\d*" />
+
+    </fieldset>
+    <fieldset id="VoteTypes" class="hidden">
+        <legend>Vote Types</legend>
+        <table>
+            <thead>
+                <tr>
+                    <th>Allow</th><th>Type</th><th>ATL</th><th>BTL</th>
+                </tr>
+            </thead>
+            <tbody id="VoteTypeBody">
+            </tbody>
+        </table>
+    </fieldset>
+    <fieldset>
+        <legend>Vote counting rules</legend>
+        <div id="appropriateRules"><img src="/ajax-loader.gif" alt="Loading"/></div>
+        <label for="RulesChoice">Rules to use</label>: <select id="RulesChoice"></select> <span id="RulesDescription"></span>
+    </fieldset>
+
+    <div id="whyNotCount" class="ErrorMessages"></div>
+
+
+    <button onclick="doRecount();" id="RecountButton" style="font-size: 28pt; display:block; margin-left:auto; margin-right: auto; margin-top: 10px; margin-bottom: 10px; padding: 10px;"><img src="/favicon.svg"/> ⇓ Recount ⇓</button>
+
+    <div id="RecountOptionsDescriptions"></div>
+    <div id="TranscriptViewControls" class="hidden">
+        <select id="heading-orientation">
+            <option value="horiz">Horizontal Candidate Names</option>
+            <option value="vert">Vertical Candidate Names</option>
+            <option value="slanted" selected>Slanted Candidate Names</option>
+        </select>
+
+        <input type="checkbox" id="ShowPapers"> <label for="ShowPapers">Show Papers</label>
+        <input type="checkbox" id="ShowSetAside"> <label id="ShowSetAsideLabel" for="ShowPapers">Show Set Aside</label>
+        <button type="button" onclick="saveHTML('RenderThingToView',document.getElementById('TitleHeading').innerText);">Save as HTML</button>
+
+    </div>
+    <div id="RenderThingToView"></div>
+
+</div>
+
+</body>
+</html>

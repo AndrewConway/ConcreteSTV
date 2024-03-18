@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -6,26 +6,57 @@
 
 //! Functions to parse NSW election data
 
+use std::borrow::Cow;
 use std::collections::{HashSet};
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use stv::ballot_metadata::{Candidate, CandidateIndex, ElectionMetadata, ElectionName, NumberOfCandidates, Party, PartyIndex};
+use stv::ballot_metadata::{Candidate, CandidateIndex, DataSource, ElectionMetadata, ElectionName, NumberOfCandidates, Party, PartyIndex};
 use stv::election_data::ElectionData;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use scraper::{ElementRef, Html, Selector};
 use stv::ballot_paper::PreferencesComingOutOfOrderHelper;
-use stv::parse_util::{file_to_string, FileFinder, MissingFile, RawDataSource};
-use stv::tie_resolution::TieResolutionsMadeByEC;
+use stv::parse_util::{file_to_string, file_to_string_windows_1252, FileFinder, KnowsAboutRawMarkings, MissingAlternateNamedFiles, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionExplicitDecisionInCount, TieResolutionsMadeByEC};
 use serde::{Serialize,Deserialize};
+use url::Url;
 use stv::ballot_pile::BallotPaperCount;
-use stv::distribution_of_preferences_transcript::{PerCandidate, QuotaInfo};
+use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
+use stv::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo};
+use stv::download::CacheDir;
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use stv::parse_util::parse_xlsx_by_converting_to_csv_using_openoffice;
-use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
+use crate::{NSWECLocalGov2021, SimpleIRVAnyDifferenceBreaksTies};
+use crate::parse_lc::read_official_dop_transcript_html_index_page_then_one_html_page_per_count;
 
 
 pub fn get_nsw_lge_data_loader_2021(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
-    NSWLGEDataLoader::new(finder,"2021","https://vtr.elections.nsw.gov.au/LG2101/results")
+    NSWLGEDataLoader::new(finder,"2021","https://pastvtr.elections.nsw.gov.au/LG2101/results","/LG2101")
+}
+pub fn get_nsw_lge_data_loader_2017(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
+    NSWLGEDataLoader::new(finder,"2017","https://pastvtr.elections.nsw.gov.au/LGE2017/index.htm","/LGE2017")
+}
+pub fn get_nsw_lge_data_loader_2016(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
+    NSWLGEDataLoader::new(finder,"2016","https://pastvtr.elections.nsw.gov.au/LGE2016/lge-index.htm","/LGE2016")
+}
+pub fn get_nsw_lge_data_loader_2012(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
+    NSWLGEDataLoader::new(finder,"2012","https://pastvtr.elections.nsw.gov.au/LGE2012/lge-index.htm","/LGE2012")
+}
+pub struct NSWLGEDataSource {}
+
+impl ElectionDataSource for NSWLGEDataSource {
+    fn name(&self) -> Cow<'static, str> { "NSW Local Government".into() }
+    fn ec_name(&self) -> Cow<'static, str> { "NSW Electoral Commission".into() }
+    fn ec_url(&self) -> Cow<'static, str> { "https://www.elections.nsw.gov.au/".into() }
+    fn years(&self) -> Vec<String> { vec!["2012".to_string(),"2016".to_string(),"2017".to_string(),"2021".to_string()] }
+    fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
+        match year {
+            "2021" => Ok(Box::new(get_nsw_lge_data_loader_2021(finder)?)),
+            "2017" => Ok(Box::new(get_nsw_lge_data_loader_2017(finder)?)),
+            "2016" => Ok(Box::new(get_nsw_lge_data_loader_2016(finder)?)),
+            "2012" => Ok(Box::new(get_nsw_lge_data_loader_2012(finder)?)),
+            _ => Err(anyhow!("Not a valid year")),
+        }
+    }
 }
 
 pub struct NSWLGEDataLoader {
@@ -48,80 +79,185 @@ pub struct NSWLGEContest {
     pub vacancies : NumberOfCandidates,
 }
 
+impl KnowsAboutRawMarkings for NSWLGEDataLoader {}
+
 impl RawDataSource for NSWLGEDataLoader {
-    fn name(&self,electorate:&str) -> ElectionName {
+    fn name(&self, electorate: &str) -> ElectionName {
         ElectionName {
             year: self.year.clone(),
             authority: "NSW Electoral Commission".to_string(),
-            name: "Local Government".to_string(),
+            name: "NSW Local Government".to_string(),
             electorate: electorate.to_string(),
             modifications: vec![],
             comment: None,
         }
     }
 
-    fn candidates_to_be_elected(&self,region:&str) -> NumberOfCandidates {
+    fn candidates_to_be_elected(&self, region: &str) -> NumberOfCandidates {
         self.find_contest(region).unwrap().vacancies
     }
 
     /// These are deduced by looking at the actual transcript of results.
     /// I have not included anything if all decisions are handled by the fallback "earlier on the ballot paper candidates are listed in worse positions.
-    fn ec_decisions(&self,_electorate:&str) -> TieResolutionsMadeByEC {
-            Default::default()
-    }
-
-    /// These are due to a variety of events.
-    fn excluded_candidates(&self,_electorate:&str) -> Vec<CandidateIndex> {
+    fn ec_decisions(&self, _electorate: &str) -> TieResolutionsMadeByEC {
         Default::default()
     }
 
-    fn find_raw_data_file(&self,filename:&str) -> Result<PathBuf,MissingFile> {
-        self.finder.find_raw_data_file(filename,&self.archive_location,&self.page_url)
+    /// These are due to a variety of events.
+    fn excluded_candidates(&self, _electorate: &str) -> Vec<CandidateIndex> {
+        Default::default()
+    }
+
+    fn find_raw_data_file(&self, filename: &str) -> Result<PathBuf, MissingFile> {
+        self.finder.find_raw_data_file(filename, &self.archive_location, &self.page_url)
     }
     fn all_electorates(&self) -> Vec<String> {
-        self.contests.iter().map(|c|c.name.clone()).collect()
+        self.contests.iter().map(|c| c.name.clone()).collect()
     }
-    fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> { self.read_raw_data_possibly_rejecting_some_types(electorate,None) }
+    fn read_raw_data(&self, electorate: &str) -> anyhow::Result<ElectionData> { self.read_raw_data_possibly_rejecting_some_types(electorate, None) }
 
-}
-
-fn decode(tally:usize) -> f64 { tally as f64 }
-impl NSWLGEDataLoader {
-
-    /// Like read_raw_data, except also try to deduce the tie breaking decisions that were used by NSWEC.
-    /// This is a powerful function, but it will be slow and panic if anything goes even slightly wrong.
-    pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions<Rules:PreferenceDistributionRules<Tally=usize>>(&self, electorate: &str) -> anyhow::Result<ElectionData>  {
-        let mut data = self.read_raw_data(electorate)?;
-        if electorate.ends_with("Mayoral") { return Ok(data); } // don't have DOP file for mayoral elections. Besides, STV is not necessarily exactly a generalization of IRV... e.g. early termination conditions.
-        // let mut tie_resolutions = TieResolutionsMadeByEC::default();
-        let official_transcript = self.read_official_dop_transcript(&data.metadata)?;
-        loop {
-            let transcript = distribute_preferences::<Rules>(&data, data.metadata.vacancies.unwrap(), &data.metadata.excluded.iter().cloned().collect(), &data.metadata.tie_resolutions, false);
-            if let Some((favoured_candidate, unfavoured_candidate)) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript, decode,false) {
-                println!("Observed tie resolution favouring {} over {}", favoured_candidate, unfavoured_candidate);
-                assert!(favoured_candidate.0 < unfavoured_candidate.0, "favoured candidate should be lower as higher candidates are assumed favoured.");
-                if data.metadata.tie_resolutions.tie_resolutions.contains(&vec![unfavoured_candidate, favoured_candidate]) {
-                    panic!("That tie resolution is already in the list.")
-                }
-                data.metadata.tie_resolutions.tie_resolutions.push(vec![unfavoured_candidate, favoured_candidate]);
-            } else {
-                return Ok(data);
+    fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> {
+        match self.year.as_str() {
+            "2012" | "2016" | "2017" => self.read_raw_data(electorate), // too hard to get ec resolutions from the probabilistic years.
+            _ => {
+                if electorate.ends_with("Mayoral") { read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<SimpleIRVAnyDifferenceBreaksTies,Self>(self, electorate) }
+                else { read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021,Self>(self,electorate) }
             }
         }
     }
 
-    pub fn read_raw_data_possibly_rejecting_some_types(&self, electorate: &str, reject_vote_type : Option<HashSet<String>>) -> anyhow::Result<ElectionData> {
+    fn read_raw_metadata(&self, electorate: &str) -> anyhow::Result<ElectionMetadata> {
+        let (metadata,_) = self.read_raw_metadata_and_preferences_loc(electorate)?;
+        Ok(metadata)
+    }
+
+    fn copyright(&self) -> Copyright {
+        Copyright {
+            statement: Some("© State of New South Wales through the NSW Electoral Commission".into()),
+            url: Some("https://www.elections.nsw.gov.au/Copyright".into()),
+            license_name: Some("Creative Commons Attribution 4.0 License".into()),
+            license_url: Some("https://creativecommons.org/licenses/by/4.0/".into())
+        }
+    }
+
+    fn rules(&self, electorate: &str) -> AssociatedRules {
+        match self.year.as_str() {
+            "2021" if electorate.ends_with("Mayoral") => AssociatedRules {
+                rules_used: Some("IRV".into()),
+                rules_recommended: Some("IRV".into()),
+                comment: Some("This is not actually a STV election, having only one candidate. It is an IRV election. The legislation is ambiguous about tie resolution. The NSWEC transcripts frequently continue far beyond when the mayor is elected; this is harmless if bizarre and confusing and I do not bother emulating this bug.".into()),
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2021Report.pdf".into()],
+            },
+            "2021" => AssociatedRules {
+                rules_used: Some("NSWECLocalGov2021".into()),
+                rules_recommended: None,
+                comment: Some("The legislation is very ambiguous. My interpretation of the rules is NSWLocalGov2021 but NSWECLocalGov2021 seems a plausible interpretation.".into()),
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2021Report.pdf".into()],
+            },
+            "2012" => AssociatedRules {
+                rules_used: Some("NSWECRandomLGE2012".into()),
+                rules_recommended: Some("NSWECRandomLGE2017".into()),
+                comment: Some("The legislation is poorly written and involves significant randomness - a repeat count may produce a different outcome.".into()),
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2012CountErrorTechReport.pdf".into()],
+            },
+            "2016" => AssociatedRules {
+                rules_used: Some("NSWECRandomLGE2016".into()),
+                rules_recommended: Some("NSWECRandomLGE2017".into()),
+                comment: Some("The legislation is poorly written and involves significant randomness - a repeat count may produce a different outcome.".into()),
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/2016%20NSW%20LGE%20Errors.pdf".into()],
+            },
+            "2017" => AssociatedRules {
+                rules_used: Some("NSWECRandomLGE2017".into()),
+                rules_recommended: Some("NSWECRandomLGE2017".into()),
+                comment: Some("The legislation is poorly written and involves significant randomness - a repeat count may produce a different outcome.".into()),
+                reports: vec![],
+            },
+            _ => AssociatedRules { rules_used: None, rules_recommended: None, comment: None, reports: vec![] },
+        }
+    }
+
+    fn read_official_dop_transcript(&self, metadata: &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+        match self.year.as_str() {
+            "2012" => { return Err(anyhow!("Sorry, I have not parsed the multiple PDF files containing the 2012 DoP.")); }
+            "2017" | "2016" => {
+                let cache = CacheDir::new(self.finder.path.join("NSW/LGE".to_string()+&self.year));
+                let contest = &self.find_contest(&metadata.name.electorate)?.url;
+                let dop_url = Url::parse(&self.page_url)?.join(&(contest.to_string()+"/dop_index.htm"))?;
+                read_official_dop_transcript_html_index_page_then_one_html_page_per_count(&cache,dop_url.as_str(),metadata)
+            }
+            "2021" => {
+                if metadata.name.electorate.ends_with("Mayoral") { self.read_official_dop_transcript_mayoral(metadata) }
+                else { self.read_official_dop_transcript_councillor(metadata).context("read_official_dop_transcript_councillor") }
+            }
+            _ => { return Err(anyhow!("Invalid year")); }
+        }
+    }
+}
+
+impl NSWLGEDataLoader {
+
+    /// Like read_raw_metadata but also return, for 2012, the path of the results zip datafile.
+    fn read_raw_metadata_and_preferences_loc(&self, electorate: &str) -> anyhow::Result<(ElectionMetadata,Option<PathBuf>)> {
         let contest = &self.find_contest(electorate)?.url;
         let mayoral = electorate.ends_with(" Mayoral");
-        let metadata_data_file = self.find_raw_data_file_relative(contest,
-                                                                  if mayoral {"mayoral/report"} else {"councillor/report"},
-                                                                  if mayoral {"mayoral-fp-by-candidate.html"} else {"fp-by-grp-and-candidate-by-vote-type.html"},
-                                                                  if mayoral {"mayoral/report/fp-by-grp-and-candidate-by-vote-type"} else {"councillor/report/fp-by-grp-and-candidate-by-vote-type"})?;
-        let mut metadata = self.parse_candidate_list(File::open(metadata_data_file)?,mayoral,electorate)?;
-        let winner_info_file = self.find_raw_data_file_relative(contest,"",
-                                                                if mayoral {"mayoral.html"} else {"councillor.html"},
-                                                                if mayoral {"mayoral"} else {"councillor"})?;
-        let winner_info = NSWLGESingleContestMainPageInfo::extract_file(winner_info_file)?;
+        let mut preferences_loc : Option<PathBuf>= None;
+        // get winners
+        let winner_info_file = match self.year.as_str() {
+            "2012" => {
+                self.find_raw_data_file_relative(contest,"","summary/index.htm","summary/index.htm")?
+            }
+            "2016" => {
+                self.find_raw_data_file_relative_may_have_alt_names(contest,"",&vec!["summary.htm","index.htm"])?
+            }
+            "2017" => {
+                self.find_raw_data_file_relative(contest,"","summary.htm","summary.htm")?
+            }
+            "2021" => {
+                self.find_raw_data_file_relative(contest,"",
+                                                 if mayoral {"mayoral.html"} else {"councillor.html"},
+                                                 if mayoral {"mayoral"} else {"councillor"})?
+            }
+            _ => { return Err(anyhow!("Invalid year")); }
+        };
+        let mut winner_info = NSWLGESingleContestMainPageInfo::extract_file(winner_info_file)?;
+        let mut metadata : ElectionMetadata = {
+            if self.year=="2012" {
+                let final_results = self.find_raw_data_file_relative(contest,"","final-results/index.htm","final-results/index.htm")?;
+                winner_info.add_relative_files(&Html::parse_document(&file_to_string_windows_1252(&mut File::open(&final_results)?)?));
+                if let Some(prefs_name) = &winner_info.preferences {
+                    let prefs_loc = self.finder.find_raw_data_file_with_extra_url_info(&prefs_name.trim_start_matches("/LGE2012/").replace("%20"," "),&self.archive_location,&self.page_url,prefs_name)?;
+                    let mut metadata = self.parse_zip_election_file_getting_candidates_list_2012(File::open(&prefs_loc)?, electorate, prefs_name)?;
+                    preferences_loc = Some(prefs_loc);
+                    if let Some(mayoral) = &winner_info.mayoral_summary_page {
+                        let mayor_page = self.finder.find_raw_data_file_with_extra_url_info(&mayoral.trim_start_matches("/LGE2012/").replace("%20"," "),&self.archive_location,&self.page_url,mayoral)?;
+                        let mayor_info =  NSWLGESingleContestMainPageInfo::extract_file(&mayor_page)?;
+                        //println!("Mayor {:?}",mayor_info.elected_candidates);
+                        let interpret_names = metadata.get_candidate_name_lookup_with_capital_letters_afterwards();
+                        for mayor_name in &mayor_info.elected_candidates {
+                            if let Some(&candidate) = interpret_names.get(mayor_name) {
+                                metadata.excluded.push(candidate);
+                            }
+                        }
+                    }
+                    metadata
+                } else { return Err(anyhow!("Can't find preferences file in html page description"))}
+            } else {
+                let metadata_data_file = match self.year.as_str() {
+                    "2017" | "2016" => {
+                        self.find_raw_data_file_relative(contest,"","fp_by_grp_and_candidate_by_vote_type.htm","fp_by_grp_and_candidate_by_vote_type.htm")?
+                    }
+                    "2021" => {
+                        self.find_raw_data_file_relative(contest,
+                                                         if mayoral { "mayoral/report" } else { "councillor/report" },
+                                                         if mayoral { "mayoral-fp-by-candidate.html" } else { "fp-by-grp-and-candidate-by-vote-type.html" },
+                                                         if mayoral { "mayoral/report/fp-by-grp-and-candidate-by-vote-type" } else { "councillor/report/fp-by-grp-and-candidate-by-vote-type" })?
+                    }
+                    _ => { return Err(anyhow!("Invalid year")); }
+                };
+                self.parse_candidate_list(File::open(metadata_data_file)?, mayoral, electorate)?
+            }
+        };
+        // extract winners from info file.
         if !winner_info.elected_candidates.is_empty() {
             let candidates = metadata.get_candidate_name_lookup_with_capital_letters_afterwards();
             fn remove_excess_whitespace(s:&str) -> String {
@@ -132,23 +268,64 @@ impl NSWLGEDataLoader {
         }
         // get excluded candidates
         if !mayoral {
-            let ineligible_info_file = self.find_raw_data_file_relative(contest,"councillor/report","grp-and-candidates-result.html","councillor/report/grp-and-candidates-result")?;
-            let ineligible = get_ineligible_candidates(&Html::parse_document(&std::fs::read_to_string(ineligible_info_file)?))?;
-            metadata.excluded=ineligible;
+            if let Some(ineligible_info_file) = match self.year.as_str() {
+                "2017" | "2016" => {
+                    Some(self.find_raw_data_file_relative(contest,"","grp_and_candidates_result.htm","grp_and_candidates_result.htm")?)
+                }
+                "2021" => {
+                    Some(self.find_raw_data_file_relative(contest,"councillor/report","grp-and-candidates-result.html","councillor/report/grp-and-candidates-result")?)
+                }
+                "2012" => None, // done above
+                _ => { return Err(anyhow!("Invalid year")); }
+            } {
+                let ineligible = get_ineligible_candidates(&Html::parse_document(&std::fs::read_to_string(ineligible_info_file)?))?;
+                metadata.excluded=ineligible;
+            }
         }
-        let zip_name = if mayoral {"mayoral-finalpreferencedatafile.zip"} else {"finalpreferencedatafile.zip"};
-        let zip_preferences_list = self.find_raw_data_file_relative(contest,"download",zip_name,&("download/".to_string()+zip_name))?;
-        parse_zip_election_file(File::open(zip_preferences_list)?,metadata,reject_vote_type,mayoral)
+        if electorate=="Port Stephens - Central Ward" && self.year.as_str()=="2017" {
+            let favoured = vec![CandidateIndex(1)];
+            let disfavoured = vec![CandidateIndex(15)];
+            metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecisionInCount {
+                decision: TieResolutionExplicitDecision::two_lists(disfavoured,favoured),
+                came_up_in: Some(CountIndex(1)),
+            }))
+        }
+        Ok((metadata,preferences_loc))
     }
 
-    pub fn new(finder:&FileFinder,year:&'static str,page_url:&'static str) -> anyhow::Result<Self> {
-        let archive_location = "NSW/LGE".to_string()+year+"/vtr.elections.nsw.gov.au/LG2101"; // The 2101 should not be hardcoded.
+    pub fn read_raw_data_possibly_rejecting_some_types(&self, electorate: &str, reject_vote_type : Option<HashSet<String>>) -> anyhow::Result<ElectionData> {
+        let contest = &self.find_contest(electorate)?.url;
+        let mayoral = electorate.ends_with(" Mayoral");
+        let (metadata,preferences_loc) = self.read_raw_metadata_and_preferences_loc(electorate)?;
+        match self.year.as_str() {
+            "2012" => {
+                parse_zip_election_file_2012(File::open(preferences_loc.unwrap())?,metadata)
+            }
+            "2016" | "2017" | "2021" => {
+                let zip_name = if mayoral {"mayoral-finalpreferencedatafile.zip"} else {"finalpreferencedatafile.zip"};
+                let zip_preferences_list = self.find_raw_data_file_relative(contest,if self.year=="2021"{"download"} else {""},zip_name,&((if self.year=="2021"{"download/"} else {""}).to_string()+zip_name))?;
+                parse_zip_election_file(File::open(zip_preferences_list)?,metadata,reject_vote_type,mayoral)
+            }
+            _ => return Err(anyhow!("can't read raw data for NSW LGE year {}",&self.year)),
+        }
+    }
+
+    pub fn new(finder:&FileFinder,year:&'static str,page_url:&'static str,archive_location_prefix:&str) -> anyhow::Result<Self> {
+
+        let archive_location = "NSW/LGE".to_string()+year+"/pastvtr.elections.nsw.gov.au"+archive_location_prefix;
+        let contest_list = match year {
+            "2012" => include_str!("NSWLGE2012_contest_list.json"),
+            "2016" => include_str!("NSWLGE2016_contest_list.json"),
+            "2017" => include_str!("NSWLGE2017_contest_list.json"),
+            "2021" => include_str!("NSWLGE2021_contest_list.json"),
+            _ => return Err(anyhow!("Illegal year {}",year)),
+        };
         Ok(NSWLGEDataLoader {
             finder : finder.clone(),
             archive_location,
             year: year.to_string(),
             page_url: page_url.to_string(),
-            contests : serde_json::from_str(include_str!("NSWLGE2021_contest_list.json"))?,
+            contests : serde_json::from_str(contest_list)?,
         })
     }
 
@@ -158,89 +335,89 @@ impl NSWLGEDataLoader {
 
     pub fn find_raw_data_file_relative(&self,contest:&str,relfolder:&str,filename:&str,url_relative:&str) -> Result<PathBuf,MissingFile> {
         let archive_location = self.archive_location.clone()+"/"+contest+(if relfolder.is_empty() {""} else {"/"})+relfolder;
-        // println!("Archive location {}",archive_location);
+        //println!("Archive location {}",archive_location);
         self.finder.find_raw_data_file_with_extra_url_info(filename,&archive_location,&self.page_url,&(contest.to_string()+"/"+url_relative))
     }
-    /// parse a file like https://vtr.elections.nsw.gov.au/LG2101/albury/councillor/report/fp-by-grp-and-candidate-by-vote-type or https://vtr.elections.nsw.gov.au/LG2101/ballina/a-ward/councillor/report/fp-by-grp-and-candidate-by-vote-type
-    /// or, for mayoral, like https://vtr.elections.nsw.gov.au/LG2101/ballina/mayoral/report/mayoral-fp-by-candidate
-    fn parse_candidate_list(&self,mut file:File,mayoral:bool,electorate:&str) -> anyhow::Result<ElectionMetadata> {
-        let html = scraper::Html::parse_document(&file_to_string(&mut file)?);
-        // the title has hypens missing - see Ballina - A Ward
-        // let electorate = html.select(&Selector::parse("head > title").unwrap()).flat_map(|e|e.text()).collect::<Vec<_>>().join("")+if mayoral {" Mayoral"} else {""};
-        let electorate = electorate.to_string(); // +if mayoral {" Mayoral"} else {""};
-        if electorate.is_empty() { return Err(anyhow!("Empty page title")); }
-        let table = html.select(&Selector::parse("table").unwrap()).next().ok_or_else(||anyhow!("No table element"))?;
-        let thead_first = table.select(&Selector::parse("thead > tr > th").unwrap()).next().ok_or_else(||anyhow!("No table headings"))?;
-        let has_groups = thead_first.inner_html()=="Group";
-        let selector_td = Selector::parse("td").unwrap();
-        let mut candidates = vec![];
-        let mut parties = vec![];
-        let mut current_position = 0;
-        // parse <div><strong>A</strong>B</div> into (A,B) if possible.
-        fn parse_note(e:ElementRef) -> Option<(String,String)> {
-            let text = e.text().map(|s|s.trim()).filter(|s|!s.is_empty()).collect::<Vec<_>>();
-            if text.len()==2 { Some((text[0].to_string(),text[1].to_string()))} else { None }
-        }
-        let notes : Vec<(String,String)> = html.select(&Selector::parse("div.note").unwrap()).map(|e|parse_note(e)).flatten().collect::<Vec<_>>();
-        let get_note = |note_name:&str| notes.iter().find(|(name,_)|name.starts_with(note_name)).map(|(_,v)|v.clone()).ok_or_else(||anyhow!("Could not find note {}",note_name));
-        let vacancies = NumberOfCandidates(if mayoral {1} else {get_note("Candidates to be Elected:")?.chars().filter(|&c|c!=',').collect::<String>().parse()?});
-        let enrolment = NumberOfCandidates(get_note(if mayoral {"Electors Enrolled as on"} else {"Enrolment:"})?.chars().filter(|&c|c!=',').collect::<String>().parse()?);
-        for row in table.select(&Selector::parse("tbody tr").unwrap()) {
-            let mut cols = row.select(&selector_td);
-            let col1 = cols.next().ok_or_else(||anyhow!("No first column"))?;
-            let col2 = cols.next().ok_or_else(||anyhow!("No second column"))?;
-            let col1_text = col1.text().map(|s|s.trim()).collect::<Vec<_>>().join("");
-            let col2_text = col2.text().map(|s|s.trim()).collect::<Vec<_>>().join("");
-            if let Some(row_class) = row.value().attr("class") {
-                if row_class == "tr-total" && has_groups && (col2_text == "UNGROUPED CANDIDATES" || !col1_text.is_empty()) { // a party!
-                    parties.push(Party {
-                        column_id: (if col1_text.is_empty() { "UG" } else { &col1_text }).to_string(),
-                        name: col2_text,
-                        abbreviation: None,
-                        atl_allowed: !col1_text.is_empty(),
-                        candidates: vec![],
-                        tickets: vec![]
-                    });
-                    current_position = 0;
-                }
-            } else if mayoral && col1.value().attr("class").is_some() {
-                // this is a footnote. Do nothing.
-            } else { // it is a candidate
-                let name = if has_groups { col2_text } else { col1_text };
-                if name.is_empty() { return Err(anyhow!("Empty candidate name")); }
-                // could at this point get the second column of the mayoral table to get a party, although it is not so important for a Mayoral contest.
-                current_position+=1;
-                if let Some(current_party)=parties.last_mut() { current_party.candidates.push(CandidateIndex(candidates.len()))}
-                candidates.push(Candidate{
-                    name,
-                    party: if parties.is_empty() { None } else { Some(PartyIndex(parties.len()-1))},
-                    position: Some(current_position),
-                    ec_id: None
-                })
+    pub fn find_raw_data_file_relative_may_have_alt_names(&self,contest:&str,relfolder:&str,alternate_names:&[&str]) -> Result<PathBuf,MissingAlternateNamedFiles> {
+        let mut alternates = vec![];
+        for name in alternate_names {
+            match self.find_raw_data_file_relative(contest,relfolder,name,name) {
+                Ok(path) => { return Ok(path); }
+                Err(e) => { alternates.push(e); }
             }
+        }
+        Err(MissingAlternateNamedFiles{alternates})
+    }
+    /// parse a file like https://pastvtr.elections.nsw.gov.au/LG2101/albury/councillor/fp-by-grp-and-candidate-by-vote-type or https://pastvtr.elections.nsw.gov.au/LG2101/ballina/a-ward/councillor/fp-by-grp-and-candidate-by-vote-type
+    /// or, for mayoral, like https://vtr.elections.nsw.gov.au/LG2101/ballina/mayoral/report/mayoral-fp-by-candidate
+    fn parse_candidate_list(&self,file:File,mayoral:bool,electorate:&str) -> anyhow::Result<ElectionMetadata> {
+        let headings_in_tbody = match self.year.as_str() {
+            "2017" | "2016" => true,
+            "2021" => false,
+            _ => return Err(anyhow!("Illegal Year"))
+        };
+        parse_fp_by_grp_and_candidate_by_vote_type(file,mayoral,None,headings_in_tbody,self.name(electorate))
+    }
+
+    /// Parse the 2012 election preferences zip file, extracting the candidates list.
+    fn parse_zip_election_file_getting_candidates_list_2012(&self, zipfile : File, electorate:&str, url_path:&str) -> anyhow::Result<ElectionMetadata> {
+        let contest = self.find_contest(electorate)?;
+        let mut zipfile = zip::ZipArchive::new(zipfile)?;
+        let entry_name = zipfile.file_names().find(|n|n.ends_with("CANDIDATES.txt")).ok_or_else(||anyhow!("Could not find CANDIDATES.txt in zip file"))?.to_string();
+        let zip_contents = zipfile.by_name(&entry_name)?;
+        let mut reader = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(zip_contents);
+        let mut candidates = vec![];
+        let mut parties : Vec<Party> = vec![];
+        for record in reader.records() {
+            let record = record?;
+            let candidate_id = record[0].to_string();
+            let name = record[1].to_string();
+            let group_code = if record[2].is_empty() {"UG".to_string()} else { record[2].to_string()};
+            if parties.last().map(|p|p.column_id!=group_code).unwrap_or(true) {
+                parties.push(Party{
+                    column_id: group_code.clone(),
+                    name : group_code.clone(),
+                    abbreviation: None,
+                    atl_allowed: group_code!="UG",
+                    candidates: vec![],
+                    tickets: vec![],
+                });
+            }
+            parties.last_mut().unwrap().candidates.push(CandidateIndex(candidates.len()));
+            candidates.push(Candidate{
+                name,
+                party: Some(PartyIndex(parties.len()-1)),
+                position: Some(parties.last().unwrap().candidates.len()),
+                ec_id: Some(candidate_id),
+            });
         }
         Ok(ElectionMetadata{
             name: self.name(&electorate),
             candidates,
             parties,
-            source: vec![],
+            source: vec![DataSource{
+                url: format!("https://pastvtr.elections.nsw.gov.au{}",url_path),
+                files: vec!["11 - Details Preference for Count.zip".to_string()],
+                comments: None,
+            }],
             results: None,
-            vacancies: Some(vacancies),
-            enrolment: Some(enrolment),
+            vacancies: Some(contest.vacancies),
+            enrolment: None,
             secondary_vacancies: None,
             excluded: vec![],
             tie_resolutions: Default::default()
         })
     }
 
-    pub fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+    pub fn read_official_dop_transcript_councillor(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let contest = &self.find_contest(&metadata.name.electorate)?.url;
         let dop_file = self.find_raw_data_file_relative(contest,"download","dopfulldetails.xlsx","download/dopfulldetails.xlsx")?;
-        let table = parse_xlsx_by_converting_to_csv_using_openoffice(&dop_file)?; // do it this way as calamine does not read this file properly.
+        let table = parse_xlsx_by_converting_to_csv_using_openoffice(&dop_file).context("parsing dopfulldetails.xlsx")?; // do it this way as calamine does not read this file properly.
         if table.len() < 7 { return Err(anyhow!("DoP spreadsheet is too short"))}
         let expected_number_columns = 11+4*metadata.candidates.len()+14;
         if table[0].len() != expected_number_columns { return Err(anyhow!("DoP spreadsheet has {} columns expecting {}",table[0].len(),expected_number_columns)) }
-        // println!("Read into a table with {} rows and {} columns",table.len(),table[0].len());
+        //println!("Read into a table with {} rows and {} columns",table.len(),table[0].len());
+        //for line in &table { println!("{:?}",line); }
         let candidate_lookup = metadata.get_candidate_name_lookup();
         let col_candidate_papers = |c:CandidateIndex| 12+4*c.0;
         let col_count = 1;
@@ -258,9 +435,9 @@ impl NSWLGEDataLoader {
         let col_votes_lost = col_lost_rounding+4;
         let col_result = col_votes_lost+1;
         let quota = Some(QuotaInfo{
-            papers: BallotPaperCount(table[1][2].parse::<usize>()?-table[7][col_exhausted_bps].parse::<usize>()?),
-            vacancies: NumberOfCandidates(table[2][2].parse::<usize>()?),
-            quota: table[3][2].parse::<f64>()?
+            papers: BallotPaperCount(remove_comma(&table[1][2]).parse::<usize>()?-remove_comma(&table[7][col_exhausted_bps]).parse::<usize>()?),
+            vacancies: NumberOfCandidates(remove_comma(&table[2][2]).parse::<usize>()?),
+            quota: remove_comma(&table[3][2]).parse::<f64>()?
         });
         assert_eq!(col_result+1,expected_number_columns);
         let mut counts = vec![];
@@ -270,7 +447,7 @@ impl NSWLGEDataLoader {
             if line.len()!=expected_number_columns { return Err(anyhow!("DoP spreadsheet has {} columns on line {} expecting {}",line.len(),line_upto+1,expected_number_columns)) }
             let excluded_candidate_0_ballots = line[col_description].trim()=="Total" && about_to_be_excluded.is_some();
             if (line[col_description].is_empty() && !line[col_count].is_empty() && line[col_count].chars().all(|c|c=='.'||c.is_ascii_digit())) || excluded_candidate_0_ballots { // line is an actual count!
-                let transfer_value = if excluded_candidate_0_ballots { None} else { Some(if line[col_ctv].is_empty() {1.0} else {line[col_ctv].parse::<f64>()?})};
+                let transfer_value = if excluded_candidate_0_ballots { None} else { Some(if line[col_ctv].is_empty() {1.0} else {remove_comma(&line[col_ctv]).parse::<f64>()?})};
                 let mut vote_delta = PerCandidate::default();
                 let mut paper_delta = PerCandidate::default();
                 for c in metadata.candidate_indices() {
@@ -279,7 +456,7 @@ impl NSWLGEDataLoader {
                 }
                 vote_delta.exhausted=parse_number_blank_as_nan(&line[col_votes_set_aside]);
                 paper_delta.exhausted=parse_number_blank_as_zero(&line[col_exhausted_bps]);
-                //vote_delta.rounding=parse_number_blank_as_NaN(&line[col_votes_set_aside]).into();// they track a different way. I compute the number of votes represented as a delta for the appropriate candidate, and round down. They don't round down (good, but messy), and don't display (bad, but avoids mess). Their rounding thus takes this into account.  TODO be able to track this.
+                //vote_delta.rounding=parse_number_blank_as_NaN(&line[col_votes_set_aside]).into();// they track a different way. I compute the number of votes represented as a delta for the appropriate candidate, and round down. They don't round down (good, but messy), and don't display (bad, but avoids mess). Their rounding thus takes this into account.  It would be nice to be able to track this.
                 vote_delta.rounding=f64::NAN.into();
                 counts.push(OfficialDOPForOneCount{
                     transfer_value,
@@ -289,7 +466,9 @@ impl NSWLGEDataLoader {
                     paper_total: None,
                     vote_delta: Some(vote_delta),
                     paper_delta: Some(paper_delta),
-                    count_name: Some(line[col_count].clone())
+                    paper_set_aside_for_quota: None,
+                    count_name: Some(line[col_count].clone()),
+                    papers_came_from_counts : None,
                 });
             }
             if (line_upto==table.len()-1 || table[line_upto+1][col_count].is_empty() || table[line_upto+1][col_count]=="Candidate(s) marked with an asterisk were elected without reaching quota.") && !counts.is_empty() { // last line for a major count. People can get elected here, and cumulative tallies are available.
@@ -326,24 +505,234 @@ impl NSWLGEDataLoader {
             missing_negatives_in_papers_delta: true,
             elected_candidates_are_in_order: false,
             all_exhausted_go_to_rounding : true,
+            negative_values_in_surplus_distributions_and_rounding_may_be_off: false,
         })
     }
+
+    const FIX_NSWEC_MAYORAL_TRANSCRIPT_BUG_AT_TRANSCRIPT: bool = true;
+
+    pub fn read_official_dop_transcript_mayoral(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+        let contest = &self.find_contest(&metadata.name.electorate)?.url;
+        let dop_file = self.find_raw_data_file_relative(contest,"mayoral/report","mayoral-dop","mayoral/report/mayoral-dop")?;
+        let html = Html::parse_document(&std::fs::read_to_string(dop_file)?);
+        let selector_td = Selector::parse("td").unwrap();
+        let mut candidates_in_order_of_exclusion : Vec<CandidateIndex> = vec![];
+        let mut candidates_tallys : Vec<Vec<usize>> = vec![];
+        let mut exhausted = vec![];
+        let mut elected_candidate : Option<CandidateIndex> = None;
+        //let mut elected_round : Option<usize> = None;
+        fn get_candidate_from_name_and_suffix(name:&str,metadata:&ElectionMetadata) -> CandidateIndex {
+            for i in 0..metadata.candidates.len() {
+                if name.starts_with(&metadata.candidates[i].name) { return CandidateIndex(i); }
+            }
+            panic!("Could not find candidate {}",name);
+        }
+        fn parse_number_with_comma(s:&str) -> usize {
+            if s.is_empty() || s=="EXCLUDED" || s=="-" {0}
+            else {s.replace(',',"").parse().unwrap()}
+        }
+        for row in html.select(&Selector::parse("table tbody tr").unwrap()) {
+            let cols = row.select(&selector_td);
+            let mut cols : Vec<String> = cols.map(|c|c.text().map(|s|s.trim()).collect::<Vec<_>>().join("")).collect();
+            if cols[0]=="Candidates" {
+            } else if cols[0].is_empty() { // list of excluded candidates
+                candidates_in_order_of_exclusion = cols[2..cols.len()-1].iter().map(|s|get_candidate_from_name_and_suffix(s,metadata)).collect::<Vec<_>>();
+            } else { // everything else is mostly a set of numbers, possibly with "ELECTED" added. Extract it.
+                let elected_position = cols.len()-2;
+                let elected = if cols[elected_position].starts_with("ELECTED") {
+                    cols[elected_position] = cols[elected_position].trim_start_matches("ELECTED").trim().to_string();
+                    // deal with a bug in NSWEC count, don't stop counting just because a candidate was elected on first round, see https://pastvtr.elections.nsw.gov.au/LG2101/bellingen/mayoral/mayoral-dop
+                    // sometimes to be really special they continue for more than just one extra round : https://pastvtr.elections.nsw.gov.au/LG2101/burwood/mayoral/mayoral-dop
+                    // Or Rina Mercuri shows off a bug again, the first time it occurs when not elected on first round, https://pastvtr.elections.nsw.gov.au/LG2101/griffith/mayoral/mayoral-dop
+                    for i in 1..cols.len() {
+                        if cols[i].starts_with("ELECTED") {
+                            cols[i] = cols[i].trim_start_matches("ELECTED").trim().to_string();
+                            // elected_round=Some((i-1)/2);
+                            if Self::FIX_NSWEC_MAYORAL_TRANSCRIPT_BUG_AT_TRANSCRIPT {
+                                // In this case we will make sure all future rounds are ignored. So we will fix the bug at the transcript rather than emulating the bug.
+                                candidates_in_order_of_exclusion.truncate((i-1)/2);
+                            }
+                        }
+                    }
+                    true
+                } else { false };
+
+                let counts = cols[1..cols.len()-1].iter().map(|s|parse_number_with_comma(s)).collect::<Vec<_>>();
+                if cols[0]=="Total Votes in Count" { // do nothing
+                } else if cols[0]=="Exhausted Votes" {
+                    exhausted=counts;
+                } else if cols[0]=="Informal" {// do nothing
+                } else if cols[0]=="Total Votes / Ballot Papers" {// do nothing
+                } else if cols[0]=="Absolute Majority" { // do nothing
+                } else {
+                    let candidate = get_candidate_from_name_and_suffix(&cols[0],metadata);
+                    if candidate.0 == candidates_tallys.len() {
+                        candidates_tallys.push(counts);
+                        if elected { elected_candidate=Some(candidate); }
+                    } else { panic!("Candidates out of order")}
+                }
+            }
+        }
+        let mut counts:Vec<OfficialDOPForOneCount> = vec![];
+        let column = |col:usize|Some(PerCandidate{
+            candidate: candidates_tallys.iter().map(|v|v[col]).collect(),
+            exhausted: exhausted[col],
+            rounding: 0.into(),
+            set_aside: None
+        });
+        let columnf64 = |col:usize|Some(PerCandidate{
+            candidate: candidates_tallys.iter().map(|v|v[col] as f64).collect(),
+            exhausted: exhausted[col] as f64,
+            rounding: 0.0.into(),
+            set_aside: None
+        });
+        let columnisize = |col:usize|Some(PerCandidate{
+            candidate: candidates_tallys.iter().map(|v|v[col] as isize).collect(),
+            exhausted: exhausted[col] as isize,
+            rounding: 0.into(),
+            set_aside: None
+        });
+        // do first prefs.
+        let mut add_col= |col_delta:usize,col_total:usize,excluded:Option<CandidateIndex>| {
+            let mut count = OfficialDOPForOneCount{
+                transfer_value: None,
+                elected: vec![],
+                excluded: excluded.into_iter().collect(),
+                vote_total: columnf64(col_total),
+                paper_total: column(col_total),
+                vote_delta: columnf64(col_delta),
+                paper_delta: columnisize(col_delta),
+                paper_set_aside_for_quota: None,
+                count_name: None,
+                papers_came_from_counts : None,
+            };
+            if let Some(candidate) = excluded {
+                let old_total = counts.last().unwrap().paper_total.as_ref().unwrap().candidate[candidate.0];
+                count.vote_delta.as_mut().unwrap().candidate[candidate.0] = - (old_total as f64);
+                count.paper_delta.as_mut().unwrap().candidate[candidate.0] = - (old_total as isize);
+            }
+            counts.push(count);
+        };
+        add_col(0,0,None);
+        for i in 0..candidates_in_order_of_exclusion.len() {
+            add_col(i*2+1,i*2+2,Some(candidates_in_order_of_exclusion[i]));
+        }
+        counts.last_mut().unwrap().elected.push(elected_candidate.unwrap());
+        Ok(OfficialDistributionOfPreferencesTranscript{
+            quota : None,
+            counts,
+            missing_negatives_in_papers_delta: false,
+            elected_candidates_are_in_order: true,
+            all_exhausted_go_to_rounding : false,
+            negative_values_in_surplus_distributions_and_rounding_may_be_off: false,
+        })
+    }
+
+}
+
+/// parse a file like https://pastvtr.elections.nsw.gov.au/LG2101/albury/councillor/fp-by-grp-and-candidate-by-vote-type or https://pastvtr.elections.nsw.gov.au/LG2101/ballina/a-ward/councillor/fp-by-grp-and-candidate-by-vote-type
+/// or, for mayoral, like https://pastvtr.elections.nsw.gov.au/LG2101/ballina/mayoral/mayoral-fp-by-candidate
+/// or for LC, https://vtr.elections.nsw.gov.au/SG2301/LC/state/dop/fp_by_grp_and_candidate_by_vote_type
+pub(crate) fn parse_fp_by_grp_and_candidate_by_vote_type(mut file:File,mayoral:bool,vacancies_if_known:Option<NumberOfCandidates>,headings_in_tbody:bool,election_name:ElectionName) -> anyhow::Result<ElectionMetadata> {
+    let html = Html::parse_document(&file_to_string(&mut file)?);
+    // the title has hypens missing - see Ballina - A Ward
+    // let electorate = html.select(&Selector::parse("head > title").unwrap()).flat_map(|e|e.text()).collect::<Vec<_>>().join("")+if mayoral {" Mayoral"} else {""};
+    // let electorate = electorate.to_string(); // +if mayoral {" Mayoral"} else {""};
+    // if electorate.is_empty() { return Err(anyhow!("Empty page title")); }
+    let tables = html.select(&Selector::parse("table").unwrap()).collect::<Vec<_>>();
+    if tables.is_empty() { return Err(anyhow!("No table element"))};
+    let thead_first = tables[0].select(&Selector::parse(if headings_in_tbody {"tbody > tr > th"} else {"thead > tr > th"}).unwrap()).next().ok_or_else(||anyhow!("No table headings"))?;
+    let has_groups = thead_first.inner_html()=="Group";
+    let selector_td = Selector::parse("td").unwrap();
+    let mut candidates = vec![];
+    let mut parties = vec![];
+    let mut current_position = 0;
+    // parse <div><strong>A</strong>B</div> into (A,B) if possible.
+    fn parse_note(e:ElementRef) -> Option<(String,String)> {
+        let text = e.text().map(|s|s.trim()).filter(|s|!s.is_empty()).collect::<Vec<_>>();
+        if text.len()==2 { Some((text[0].to_string(),text[1].to_string()))} else { None }
+    }
+    let notes : Vec<(String,String)> = html.select(&Selector::parse("div.note, p.note_p").unwrap()).map(|e|parse_note(e)).flatten().collect::<Vec<_>>();
+    let get_note = |note_name:&str| notes.iter().find(|(name,_)|name.starts_with(note_name)).map(|(_,v)|v.clone()).ok_or_else(||anyhow!("Could not find note {}",note_name));
+    let vacancies =
+        if let Some(vacancies) = vacancies_if_known { vacancies }
+        else { NumberOfCandidates(if mayoral {1} else {get_note("Candidates to be Elected:")?.chars().filter(|&c|c!=',').collect::<String>().parse()?})};
+    let enrolment =
+        if let Ok(s) = get_note(if mayoral {"Electors Enrolled as on"} else {"Enrolment:"}) {
+            Some(NumberOfCandidates(remove_comma(&s).parse()?))
+        } else { None };
+    let select_rows = Selector::parse("tbody tr").unwrap();
+    for table in tables {
+        let mut rows = table.select(&select_rows);
+        let rows = if headings_in_tbody { rows.next(); rows } else { rows }; // skip first row.
+        for row in rows {
+            let mut cols = row.select(&selector_td);
+            let col1 = cols.next().ok_or_else(||anyhow!("No first column"))?;
+            let col1_text = col1.text().map(|s|s.trim()).collect::<Vec<_>>().join("");
+            if mayoral && col1_text=="Polling Place" { break; } // LGE2021, starting a new table of irrelevant stuff.
+            let col2 = cols.next().ok_or_else(||anyhow!("No second column"))?;
+            let col2_text = col2.text().map(|s|s.trim()).collect::<Vec<_>>().join("");
+            // println!("col1={} col2={}",col1_text,col2_text);
+            let is_group_row = row.value().attr("class").is_some() // LGE
+                      || col1.value().attr("class").map(|s|s=="bold_highlight").unwrap_or(false); // LC 2023
+            if is_group_row { // let Some(_row_class) = row.value().attr("class").or_else(||col1.value().attr("class")) { // LC has attributes in td, LGE has in row
+                if /* row_class == "tr-total" &&*/ has_groups && (col2_text == "UNGROUPED CANDIDATES" || (col1_text!="Group Total" && !col1_text.is_empty())) { // a party!
+                    parties.push(Party {
+                        column_id: (if col1_text.is_empty() { "UG" } else { &col1_text }).to_string(),
+                        name: col2_text,
+                        abbreviation: None,
+                        atl_allowed: !col1_text.is_empty(),
+                        candidates: vec![],
+                        tickets: vec![],
+                    });
+                    current_position = 0;
+                }
+            } else if mayoral && col1.value().attr("class").is_some() {
+                // this is a footnote. Do nothing.
+            } else { // it is a candidate
+                let name = if has_groups { col2_text } else { col1_text };
+                if name.is_empty() { return Err(anyhow!("Empty candidate name")); }
+                // could at this point get the second column of the mayoral table to get a party, although it is not so important for a Mayoral contest.
+                current_position+=1;
+                if let Some(current_party)=parties.last_mut() { current_party.candidates.push(CandidateIndex(candidates.len()))}
+                candidates.push(Candidate{
+                    name,
+                    party: if parties.is_empty() { None } else { Some(PartyIndex(parties.len()-1))},
+                    position: Some(current_position),
+                    ec_id: None
+                })
+            }
+        }
+    }
+    Ok(ElectionMetadata{
+        name: election_name,
+        candidates,
+        parties,
+        source: vec![],
+        results: None,
+        vacancies: Some(vacancies),
+        enrolment,
+        secondary_vacancies: None,
+        excluded: vec![],
+        tie_resolutions: Default::default()
+    })
 }
 
 fn parse_number_blank_as_nan(s:&str) -> f64 {
     let s = s.trim();
-    if s.is_empty() { f64::NAN} else { s.parse().unwrap() }
+    if s.is_empty() { f64::NAN} else { remove_comma(s).parse().unwrap() }
 }
 fn parse_number_blank_as_zero(s:&str) -> isize {
     let s = s.trim();
-    if s.is_empty() { 0 } else { s.parse().unwrap() }
+    if s.is_empty() { 0 } else { remove_comma(s).parse().unwrap() }
 }
+fn remove_comma(s:&str) -> String { s.chars().filter(|c|*c!=',').collect() }
 
 
 /// Parse the zipped election file.
 /// The function currently ignores non-formal markings.
 /// Optionally, some particular vote types can be suppressed.
-fn parse_zip_election_file(zipfile : File, metadata:ElectionMetadata, reject_vote_type : Option<HashSet<String>>, mayoral: bool) -> anyhow::Result<ElectionData> {
+pub(crate) fn parse_zip_election_file(zipfile : File, metadata:ElectionMetadata, reject_vote_type : Option<HashSet<String>>, mayoral: bool) -> anyhow::Result<ElectionData> {
     let mut zipfile = zip::ZipArchive::new(zipfile)?;
     let zip_contents = zipfile.by_index(0)?;
     let mut reader = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(zip_contents);
@@ -382,6 +771,36 @@ fn parse_zip_election_file(zipfile : File, metadata:ElectionMetadata, reject_vot
     Ok(helper.done(metadata))
 }
 
+/// Parse the zipped election file, 2012 LGE format.
+/// This is already decoded into BTL equivalents.
+/// There is a column, TYPE, that could be used to decode back into ATL votes, but this is not currently done.
+pub(crate) fn parse_zip_election_file_2012(zipfile : File, metadata:ElectionMetadata) -> anyhow::Result<ElectionData> {
+    let mut zipfile = zip::ZipArchive::new(zipfile)?;
+    let entry_name = zipfile.file_names().find(|n|n.ends_with("PREFERENCES.txt")).ok_or_else(||anyhow!("Could not find PREFERENCES.txt in zip file"))?.to_string();
+    let zip_contents = zipfile.by_name(&entry_name)?;
+    let mut reader = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(zip_contents);
+    let headings = reader.headers()?;
+    let find_col = |heading_name:&str|headings.iter().position(|s|s==heading_name).ok_or_else(||anyhow!("Could not find {} column",heading_name));
+    let paper_id_column = find_col("VC_BALLOT_PAPER_ID")?;
+    let preference_number_column = find_col("PREFERENCE")?; // if formal, the number written
+    let candidate_name_column = find_col("CANDIDATE_ID")?; // if BTL, the candidate name
+    let mut helper = PreferencesComingOutOfOrderHelper::default();
+    let candidate_id_lookup = metadata.get_candidate_ec_id_lookup();
+    for record in reader.records() {
+        let record = record?;
+        helper.set_current_paper(&record[paper_id_column]);
+        let preference = &record[preference_number_column];
+        if !preference.is_empty() { // part of a formal vote
+            let preference : usize = preference.parse()?;
+            let candidate_name = &record[candidate_name_column];
+            let candidate = *candidate_id_lookup.get(candidate_name).ok_or_else(||anyhow!("Unknown candidate name {}",candidate_name))?;
+            helper.add_btl_pref(preference,candidate)?;
+        }
+    }
+    Ok(helper.done(metadata))
+}
+
+
 
 /// Information from a file like https://vtr.elections.nsw.gov.au/LG2101/albury/councillor
 pub struct NSWLGESingleContestMainPageInfo {
@@ -393,58 +812,94 @@ pub struct NSWLGESingleContestMainPageInfo {
     pub name : String,
     /// The relative url to a the preferences zip file, if present.
     pub preferences : Option<String>,
-    /// The relative url to a distribution of preferences zip file, if present.
+    /// The relative url to a distribution of preferences zip file, if present. Used in 2021.
     pub dop : Option<String>,
+    /// The relative url to a DoP index file, if present. Generally used prior to 2021.
+    pub dop_index : Option<String>,
     /// The relative url to the table of votes by candidate, which can be used to get the names and groups of candidates.
     pub candidates_page : Option<String>,
     /// The relative url to the mayoral dop page, which can be used to find ineligible candidates.
     pub mayoral_dop : Option<String>,
+    /// like above, but 2012.
+    pub mayoral_summary_page : Option<String>,
     /// The relative url to the candidate results page, which can be used to find ineligible candidates.
     pub candidate_results : Option<String>,
+    /// Sometimes the links are on a different page called "final results".
+    pub final_results_page : Option<String>,
 }
 
 impl NSWLGESingleContestMainPageInfo {
     fn extract_file<P:AsRef<Path>>(path:P) -> anyhow::Result<Self> {
         Self::extract_html(&Html::parse_document(&std::fs::read_to_string(path)?))
     }
+    /// Sometimes this is in the main page (2021), sometimes in the final_results_page file (2017)
+    pub fn add_relative_files(&mut self,html:&Html) {
+        for e in html.select(&Selector::parse("a").unwrap()) {
+            if let Some(href) = e.value().attr("href") {
+                if href.ends_with("dopfulldetails.xlsx") { self.dop=Some(href.to_string()); }
+                if href.contains("dop_index") { self.dop_index=Some(href.to_string()); }
+                if href.ends_with("finalpreferencedatafile.zip") { self.preferences=Some(href.to_string()); }
+                if href.ends_with("11 - Details Preference for Count.zip") { self.preferences=Some(href.to_string()); }
+                if href.ends_with("fp-by-grp-and-candidate-by-vote-type") || href.ends_with("fp_by_grp_and_candidate_by_vote_type.htm") { self.candidates_page=Some(href.to_string()); }
+                if href.ends_with("mayoral-fp-by-candidate") { self.candidates_page=Some(href.to_string()); }
+                if href.ends_with("mayoral-dop") { self.mayoral_dop=Some(href.to_string()); }
+                if href.ends_with("grp-and-candidates-result") || href.ends_with("grp_and_candidates_result.htm") { self.candidate_results=Some(href.to_string()); }
+                if href.contains("final-results") { self.final_results_page=Some(href.to_string()); }
+                if href.contains("mayoral/summary/index.htm") { self.mayoral_summary_page=Some(href.to_string()); }
+            }
+        }
+    }
     /// Extract required information from a file like https://vtr.elections.nsw.gov.au/LG2101/albury/councillor
     pub fn extract_html(html: &Html) -> anyhow::Result<Self> {
-        let name = html.select(&Selector::parse("h1").unwrap()).next().ok_or_else(||anyhow!("No h1 element"))?.text().collect::<Vec<_>>().join("");
+        let name = html.select(&Selector::parse("h1").unwrap()).last().ok_or_else(||anyhow!("No h1 element"))?.text().collect::<Vec<_>>().join("");
         let mut res = NSWLGESingleContestMainPageInfo{
             to_be_elected: Some(usize::MAX),
             elected_candidates: vec![],
             name,
             preferences: None,
             dop: None,
+            dop_index: None,
             candidates_page: None,
             mayoral_dop: None,
-            candidate_results: None
+            mayoral_summary_page: None,
+            candidate_results: None,
+            final_results_page: None,
         };
         // get relative files.
-        for e in html.select(&Selector::parse("a").unwrap()) {
-            if let Some(href) = e.value().attr("href") {
-                if href.ends_with("dopfulldetails.xlsx") { res.dop=Some(href.to_string()); }
-                if href.ends_with("finalpreferencedatafile.zip") { res.preferences=Some(href.to_string()); }
-                if href.ends_with("fp-by-grp-and-candidate-by-vote-type") { res.candidates_page=Some(href.to_string()); }
-                if href.ends_with("mayoral-fp-by-candidate") { res.candidates_page=Some(href.to_string()); }
-                if href.ends_with("mayoral-dop") { res.mayoral_dop=Some(href.to_string()); }
-                if href.ends_with("grp-and-candidates-result") { res.candidate_results=Some(href.to_string()); }
-            }
-        }
+        res.add_relative_files(html);
         // get number of councillors. Look for string like  `There are 9 Councillors to be elected from 51 candidates.` or `This election was UNCONTESTED, and there was no need to vote.`
         for e in html.root_element().text() {
             let e = e.trim();
-            //println!("    {}",e);
-            if e.starts_with("There are ") || e.starts_with("There is ") /* && e.contains("Councillors to be elected from") */ {
-                let num : String = e.trim_start_matches("There are").trim_start_matches("There is").trim_start().chars().take_while(|&c|c.is_ascii_digit()).collect();
-                res.to_be_elected=Some(num.parse()?);
+            if let Some(rest) = e.strip_prefix("There") {
+                let rest=rest.trim();
+                if rest.starts_with("is") || rest.starts_with("are") || rest.starts_with("was") || rest.starts_with("were") {
+                    let num : String = rest.trim_start_matches("is").trim_start_matches("are").trim_start_matches("was").trim_start_matches("were").trim_start().chars().take_while(|&c|c.is_ascii_digit()).collect();
+                    res.to_be_elected=Some(num.parse()?);
+                }
             }
-            if e.contains("This election was UNCONTESTED") { res.to_be_elected=None; }
+            //println!("    {}",e);
+            if e.contains("This election was UNCONTESTED")||e.contains("The election was uncontested") { res.to_be_elected=None; }
         }
+        if res.name.contains("Mayoral") { res.to_be_elected=Some(1); }
         if res.to_be_elected==Some(usize::MAX) { return Err(anyhow!("Could not find the number of people to be elected."))}
         // find elected councillors
-        for e in html.select(&Selector::parse("div.declared-elected > span.candidate-name").unwrap()) {
-            res.elected_candidates.push(e.inner_html());
+        for e in html.select(&Selector::parse("span.candidate-name, span.candidate_name").unwrap()) {
+            let name = e.inner_html();
+            let name = if name.ends_with(')') {
+                if let Some(ind) = name.find('(') { name[..ind].to_string() }
+                else { name }
+            } else { name };
+            res.elected_candidates.push(name.trim().to_string());
+        }
+        if let Some(to_be_elected) = res.to_be_elected {
+            if res.elected_candidates.len()!=to_be_elected {
+                // there is an error in the 2016 shire of Bourke page, "There were 0 Councillors to be elected from 13 candidates." A similar error in Campbelltown City Council 5 instead of 15 means they probably just enter the last digit.
+                if res.elected_candidates.len()%10==to_be_elected { res.to_be_elected=Some(res.elected_candidates.len()); }
+                else if res.name=="Leeton Shire Council" && to_be_elected==9 {} // There are only 8 candidates
+                else {
+                    return Err(anyhow!("Wrong number of candidates elected."));
+                }
+            }
         }
         Ok(res)
     }
@@ -457,12 +912,13 @@ fn inner_text(element:&ElementRef) -> String {
 fn get_ineligible_candidates(html:&Html) -> anyhow::Result<Vec<CandidateIndex>> {
     let mut res = vec![];
     let table = html.select(&Selector::parse("table").unwrap()).next().ok_or_else(||anyhow!("No table element"))?;
-    let thead_first = table.select(&Selector::parse("thead > tr > th").unwrap()).next().ok_or_else(||anyhow!("No table headings"))?;
+    let thead_first = table.select(&Selector::parse("thead > tr > th, tbody > tr > th").unwrap()).next().ok_or_else(||anyhow!("No table headings"))?;
     let has_groups = thead_first.inner_html()=="Group";
     let selector_td = Selector::parse("td").unwrap();
     let mut candidate_index = 0;
     for row in table.select(&Selector::parse("tbody tr").unwrap()) {
         let col = row.select(&selector_td).map(|e|inner_text(&e)).collect::<Vec<_>>();
+        if col.is_empty() { continue; } // first row of headings
         if col.len()<3 {return Err(anyhow!("Fewer than 3 columns")); }
         let is_group_row = has_groups && (col[0].len()>0 || col[1]=="UNGROUPED CANDIDATES");
         if !is_group_row {

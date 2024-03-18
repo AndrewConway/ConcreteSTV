@@ -8,9 +8,21 @@ members= [
     "act",
     "federal",
     "nsw",
+    "vic",
+    "wa",
+    "sa",
+    "statistics",
+    "preflib",
     "main-app",
+    "webserver"
 ]
-
+resolver = "2"
 
 [profile.dev]
 opt-level = 1
+
+[profile.bench]
+lto="thin"
+
+[profile.release]
+lto="thin"

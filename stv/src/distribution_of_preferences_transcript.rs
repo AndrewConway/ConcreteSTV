@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -12,16 +12,23 @@ use crate::ballot_pile::BallotPaperCount;
 use crate::ballot_metadata::{CandidateIndex, ElectionMetadata, NumberOfCandidates};
 use crate::transfer_value::{TransferValue, StringSerializedRational};
 use serde::{Serialize,Deserialize};
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug, Display, Formatter};
 use crate::preference_distribution::TransferValueMethod;
 use crate::signed_version::SignedVersion;
 use std::str::FromStr;
+use crate::tie_resolution::TieResolutionExplicitDecision;
 
 
 /// The index of a count. 0 means the first. This is different from the human readable
 /// count, which may be more complex and have sub-counts as well.
 #[derive(Copy,Clone,Debug,Ord, PartialOrd, Eq, PartialEq,Hash,Serialize,Deserialize)]
 pub struct CountIndex(pub usize);
+
+impl Display for CountIndex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"{}",self.0)
+    }
+}
 
 /// A value that is primarily per candidate, but may also go to some other source.
 /// Generally, this is used for preserved properties such that the sum over all candidates and other destinations is always the same.
@@ -46,6 +53,106 @@ impl <X:Default+PartialEq+Clone+Display+FromStr> Default for PerCandidate<X> {
             exhausted: X::default(),
             rounding: Default::default(),
             set_aside: None
+        }
+    }
+}
+
+impl <X:Default+PartialEq+Clone+Display+FromStr> PerCandidate<X> {
+    pub fn from_num_candidates(len:usize,unknown_value:X) -> Self {
+        PerCandidate{
+            candidate: vec![unknown_value;len],
+            exhausted: X::default(),
+            rounding: Default::default(),
+            set_aside: None
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("Not an integer")]
+pub struct NotInteger {}
+
+#[derive(thiserror::Error, Debug)]
+#[error("Not a non-negative integer")]
+pub struct NotNonnegativeInteger {}
+
+impl TryFrom<PerCandidate<f64>> for PerCandidate<isize> {
+    type Error = NotInteger;
+
+    fn try_from(value: PerCandidate<f64>) -> Result<Self, Self::Error> {
+        let as_int = |f:f64| -> Result<isize,NotInteger> {
+            if f.is_nan() { Ok(isize::MAX) }
+            else if f == (f as isize) as f64 { Ok(f as isize) }
+            else { Err(NotInteger{}) }
+        };
+        Ok(PerCandidate::<isize>{
+            candidate: value.candidate.into_iter().map(as_int).collect::<Result<Vec<isize>,NotInteger>>()?,
+            exhausted: as_int(value.exhausted)?,
+            rounding: SignedVersion{ negative: value.rounding.negative, value: as_int(value.rounding.value)? },
+            set_aside:  value.set_aside.map(as_int).transpose()?,
+        })
+    }
+}
+
+impl TryFrom<PerCandidate<f64>> for PerCandidate<usize> {
+    type Error = NotNonnegativeInteger;
+
+    fn try_from(value: PerCandidate<f64>) -> Result<Self, Self::Error> {
+        let as_int = |f:f64| -> Result<usize,NotNonnegativeInteger> {
+            if f.is_nan() { Ok(usize::MAX) }
+            else if f == (f as usize) as f64 { Ok(f as usize) }
+            else { Err(NotNonnegativeInteger{}) }
+        };
+        Ok(PerCandidate::<usize>{
+            candidate: value.candidate.into_iter().map(as_int).collect::<Result<Vec<usize>,NotNonnegativeInteger>>()?,
+            exhausted: as_int(value.exhausted)?,
+            rounding: SignedVersion{ negative: value.rounding.negative, value: as_int(value.rounding.value)? },
+            set_aside:  value.set_aside.map(as_int).transpose()?,
+        })
+    }
+}
+
+impl PerCandidate<usize> {
+    /// See if every field is either 0 or usize::MAX (often meaning unknown).
+    pub fn is_empty(&self) -> bool {
+        fn zero(i:usize) -> bool { i==0 || i==usize::MAX}
+        zero(self.exhausted) && self.candidate.iter().all(|v|zero(*v)) && self.set_aside.iter().all(|v|zero(*v)) && zero(self.rounding.value)
+    }
+
+    pub fn sum(&self) -> usize {
+        let mut res = self.exhausted;
+        for s in &self.candidate { res+=*s; }
+        for s in &self.set_aside { res+=*s; }
+        if self.rounding.negative { res-=self.rounding.value } else { res+=self.rounding.value }
+        res
+    }
+}
+
+impl From<PerCandidate<isize>> for PerCandidate<f64> {
+    fn from(value: PerCandidate<isize>) -> Self {
+        let from_int = |f:isize| -> f64 {
+            if f==isize::MAX { f64::NAN }
+            else { f as f64 }
+        };
+        PerCandidate::<f64>{
+            candidate: value.candidate.into_iter().map(from_int).collect(),
+            exhausted: from_int(value.exhausted),
+            rounding: SignedVersion{ negative: value.rounding.negative, value: from_int(value.rounding.value) },
+            set_aside:  value.set_aside.map(from_int),
+        }
+    }
+}
+impl From<PerCandidate<usize>> for PerCandidate<f64> {
+    fn from(value: PerCandidate<usize>) -> Self {
+        let from_int = |f:usize| -> f64 {
+            if f==usize::MAX { f64::NAN }
+            else { f as f64 }
+        };
+        PerCandidate::<f64>{
+            candidate: value.candidate.into_iter().map(from_int).collect(),
+            exhausted: from_int(value.exhausted),
+            rounding: SignedVersion{ negative: value.rounding.negative, value: from_int(value.rounding.value) },
+            set_aside:  value.set_aside.map(from_int),
         }
     }
 }
@@ -124,9 +231,16 @@ pub struct TransferValueCreation<Tally> {
 /// Sometimes the Electoral Commission needs to make a decision, such as tie resolution.
 /// Sometimes legislation mandates this be random, sometimes the returning officer.
 /// Regardless, this records that the decision needs to be made.
+/// TODO remove.
 #[derive(Clone,Serialize,Deserialize)]
 pub struct DecisionMadeByEC {
     pub affected : Vec<CandidateIndex>
+}
+
+impl Display for DecisionMadeByEC {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"Decision({})",self.affected.iter().map(|c|c.to_string()).collect::<Vec<_>>().join(","))
+    }
 }
 
 
@@ -147,8 +261,11 @@ pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
     pub not_continuing : Vec<CandidateIndex>,
     /// If a transfer value was created, how
     pub created_transfer_value : Option<TransferValueCreation<Tally>>,
-    /// whether the EC needs to make any decisions
-    pub decisions : Vec<DecisionMadeByEC>,
+    /// the decisions made by the EC (possibly randomly)
+    pub decisions : Vec<TieResolutionExplicitDecision>,
+    /// if there are any set aside for quota votes on this distribution (at time of writing only used for old NSW)
+    #[serde(skip_serializing_if = "Option::is_none",default)]
+    pub set_aside_for_quota: Option<PerCandidate<BallotPaperCount>>,
     /// status at end of count.
     pub status : EndCountStatus<Tally>,
     /// A special name for the count, if not 1,2,3,... Mainly used so that each exclusion or surplus distribution is a single "major" count with possibly minor counts included.
@@ -156,30 +273,39 @@ pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
     pub count_name : Option<String>,
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct QuotaInfo<Tally> {
+#[derive(Clone,Serialize,Deserialize,Debug)]
+pub struct QuotaInfo<Tally:Debug> {
     pub papers : BallotPaperCount,
     pub vacancies : NumberOfCandidates,
     pub quota : Tally,
 }
 
+impl <Tally:Display+Debug> Display for QuotaInfo<Tally> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"({} Papers)/({} vacancies+1) -> quota {}",self.papers,self.vacancies,self.quota)
+    }
+}
+
 #[derive(Clone,Serialize,Deserialize)]
-pub struct Transcript<Tally:PartialEq+Clone+Display+FromStr> {
+pub struct Transcript<Tally:PartialEq+Clone+Display+FromStr+Debug> {
     /// The rules that were used to compute this transcript.
     pub rules : String,
-    pub quota : QuotaInfo<Tally>,
+    #[serde(skip_serializing_if = "Option::is_none",default="produce_none")] // can't just have default as there is no default on Tally, which is needed for some reason.
+    pub quota : Option<QuotaInfo<Tally>>,
     pub counts : Vec<SingleCount<Tally>>,
     pub elected : Vec<CandidateIndex>,
 }
 
-impl <Tally:PartialEq+Clone+Display+FromStr> Transcript<Tally> {
+fn produce_none<T>() -> Option<T> { None }
+
+impl <Tally:PartialEq+Clone+Display+FromStr+Debug> Transcript<Tally> {
     pub fn count(&self,index:CountIndex) -> &SingleCount<Tally> {
         &self.counts[index.0]
     }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct TranscriptWithMetadata<Tally:PartialEq+Clone+Display+FromStr> {
+pub struct TranscriptWithMetadata<Tally:PartialEq+Clone+Display+FromStr+Debug> {
     pub metadata : ElectionMetadata,
     pub transcript : Transcript<Tally>,
 }

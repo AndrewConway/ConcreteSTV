@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/common.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="/util.js"></script>
+    <script src="/common.js"></script>
+    <script src="/RepeatedNumbers.js"></script>
+
+    <title>BTL Errors</title>
+</head>
+<body>
+
+<div id="MainBody">
+    <h1>Repeated Numbers</h1>
+    <div class="noprint">
+        <p>This table shows the total number of repeated preference numbers or missing preference numbers in below the line
+            votes published by the electoral commission, as a function of the preference number.</p>
+        <h4>Precise definitions</h4>
+        <ul>
+            <li>The <em>Ok up to</em> column contains the number of papers that contain a BTL vote of a given length (which may or may not be formal).
+                For the row with preference <em>n</em>, this means that each number from <em>1..n</em> inclusive appears exactly once,
+                and <em>n+1</em> does not appear exactly once.
+            </li>
+            <li>The <em>Repeated Papers</em> column contains the number of papers that contain a BTL preference of a given value present
+            more than one time.</li>
+            <li>The <em>Repeated</em> column contains the number of times that a BTL preference of a given value is repeated. If, for example,
+                in a given paper there are three occurrences of the preference <em>42</em>, that counts as two repeats. This number can never
+                be lower than the prior column, <em>Repeated Papers</em>.</li>
+            <li>The <em>Missing</em> column contains the number of times that a BTL preference of a given value seems to be missing.
+                For the row with preference <em>n</em>, this means that <em>n-1</em> and <em>n+1</em> are both present exactly
+                once, and <em>n</em> is not present. As special cases, for the first preferences, a prior preference is not required, and a subsequent preference
+                is not required for the last preference.</li>
+        </ul>
+    </div>
+    <h2 id="TitleHeading">Loading...</h2>
+    <table>
+        <thead>
+            <tr><th>Preference</th><th title="Number of papers with BTL valid BTL preferences up to exactly this preference">Ok up to</th><th title="Number of papers with at least one repeated preference">Repeated Papers</th><th title="Number of times a repeated preference is found">Repeated</th><th>Missing</th></tr>
+        </thead>
+        <tbody id="resultsBody">
+             <tr><td><img src="/ajax-loader.gif" alt="Loading"/></td></tr>
+        </tbody>
+    </table>
+
+</div>
+
+</body>
+</html>

@@ -1,27 +1,26 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-use crate::preference_distribution::{PreferenceDistributionRules, distribute_preferences, WhenToDoElectCandidateClauseChecking, TransferValueMethod, SurplusTransferMethod};
+use crate::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, SurplusTransferMethod, LastParcelUse};
 use crate::election_data::ElectionData;
 use crate::distribution_of_preferences_transcript::{Transcript, TranscriptWithMetadata};
-use std::collections::HashSet;
 use std::fs::File;
 use std::path::PathBuf;
 use crate::ballot_metadata::ElectionMetadata;
 use crate::compare_transcripts::{DifferenceBetweenTranscripts, compare_transcripts};
 use serde::{Serialize,Deserialize};
-use std::iter::FromIterator;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use crate::ballot_pile::BallotPaperCount;
-use crate::transfer_value::{TransferValue};
+use crate::transfer_value::TransferValue;
 use crate::tie_resolution::MethodOfTieResolution;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use num::BigRational;
+use crate::random_util::Randomness;
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct CompareRules {
@@ -69,7 +68,7 @@ impl CompareRules {
     }
 
     fn compute<Rules:PreferenceDistributionRules>(&self,data:&ElectionData) -> anyhow::Result<Transcript<Rules::Tally>> {
-        let transcript = distribute_preferences::<Rules>(&data,data.metadata.vacancies.unwrap(), &HashSet::from_iter(data.metadata.excluded.iter().cloned()), &data.metadata.tie_resolutions,false);
+        let transcript = data.distribute_preferences::<Rules>(&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript };
         let name = data.metadata.name.identifier()+"_"+&Rules::name()+".transcript";
         self.save(&transcript,&name)?;
@@ -85,7 +84,7 @@ impl CompareRules {
                 type Tally = R::Tally;
                 type SplitByNumber = R::SplitByNumber;
 
-                fn use_last_parcel_for_surplus_distribution() -> bool { R::use_last_parcel_for_surplus_distribution() }
+                fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { R::use_last_parcel_for_surplus_distribution() }
                 fn transfer_value_method() -> TransferValueMethod { R::transfer_value_method() }
                 fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { R::convert_tally_to_rational(tally) }
                 fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { R::convert_rational_to_tally_after_applying_transfer_value(rational) }
@@ -126,7 +125,7 @@ impl CompareRules {
             impl <R:PreferenceDistributionRules> PreferenceDistributionRules for AltRule<R> {
                 type Tally = R::Tally;
                 type SplitByNumber = R::SplitByNumber;
-                fn use_last_parcel_for_surplus_distribution() -> bool { R::use_last_parcel_for_surplus_distribution() }
+                fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { R::use_last_parcel_for_surplus_distribution() }
                 fn transfer_value_method() -> TransferValueMethod { R::transfer_value_method() }
                 fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { R::convert_tally_to_rational(tally) }
                 fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { R::convert_rational_to_tally_after_applying_transfer_value(rational) }
@@ -167,7 +166,7 @@ impl CompareRules {
     }
 
     /// This should be more general, rather than restricted to 4 rules.
-    pub fn compute_dataset<CommonTally:PartialEq+Clone+FromStr+Display,R1,R2,R3,R4>(&self,data:&ElectionData) -> anyhow::Result<(Vec<RuleComparisonDefinition>,CompareRulesOneDataset)>
+    pub fn compute_dataset<CommonTally:PartialEq+Clone+FromStr+Display+Debug,R1,R2,R3,R4>(&self,data:&ElectionData) -> anyhow::Result<(Vec<RuleComparisonDefinition>,CompareRulesOneDataset)>
     where
         R1: PreferenceDistributionRules<Tally=CommonTally>,
         R2: PreferenceDistributionRules<Tally=CommonTally>,
@@ -197,7 +196,7 @@ impl CompareRules {
         Ok((comparisons,CompareRulesOneDataset{ dataset: data.metadata.clone(), results }))
     }
 
-    pub fn compare_datasets<CommonTally:PartialEq+Clone+FromStr+Display,R1,R2,R3,R4,I>(&self,data_iterator:I) -> anyhow::Result<CompareRulesResults>
+    pub fn compare_datasets<CommonTally:PartialEq+Clone+FromStr+Display+Debug,R1,R2,R3,R4,I>(&self,data_iterator:I) -> anyhow::Result<CompareRulesResults>
         where
             R1: PreferenceDistributionRules<Tally=CommonTally>,
             R2: PreferenceDistributionRules<Tally=CommonTally>,

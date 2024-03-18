@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="common.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="util.js"></script>
+    <script>window.onload =addHeaderAndFooter; </script>
+    <title>Why these results may differ from the official results</title>
+</head>
+<body>
+<div id="MainBody">
+    <h2 id="heading">Why these results may differ from the official results</h2>
+
+    <p>These are not official results or official code. There are many reasons why the official results may end up differently, some of which are
+        listed below. This is provided with no warranty. Having said that, with the appropriate choice of rules (including emulation of electoral commission bugs)
+        this tool provides exactly the same distribution of preferences for all provided elections, modulo table formatting.</p>
+
+    <h3>Programming Errors</h3>
+    <p>This is a computer program, and like all computer programs, it probably contains errors. Errors either in my program or in the electoral commission's program could
+        cause their results to be different. Similarly an incorrect understanding of the law, either by me or the appropriate electoral commission could cause a different
+        result. There is no a priori reason to trust either, but having more than one available makes checking possible (although one error I found in my code
+        was an identical error to one that the AEC had). One can also compare with other programs that do the same job like <a href="https://github.com/grahame/dividebatur">Grahame Bowland's program</a>.
+        These problems are particularly likely to come up in untested scenarios, such as the legal question of whether a party is eligible for above the line votes
+        if all but one of their candidates are disqualified. Similarly, if a formal vote requires a certain number of numbers to be filled in, and one of those
+        candidates ends up excluded, is it still a formal vote? Does a vote contribute to setting the quota if the first person voted for is excluded? I am not a lawyer.</p>
+
+    <p>Using this code and an <a href="https://github.com/SiliconEconometrics/PublicService">earlier</a> project, colleagues and I have discovered
+    errors in the counts of the <a href="https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2012CountErrorTechReport.pdf">NSWEC in 2016</a>,
+        again <a href="https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/2016%20NSW%20LGE%20Errors.pdf">NSWEC in 2016</a>,
+        <a href="https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/2020%20Errors%20In%20ACT%20Counting.pdf">Elections ACT in 2020</a>,
+        and the <a href="https://github.com/AndrewConway/ConcreteSTV/tree/main/reports/RecommendedAmendmentsSenateCountingAndScrutinyResponse">Australian Electroral Commission in 2021</a>.
+        These have all been acknowledged by the relevent electoral commissions, who have either fixed their program to match the
+        legislation, or changed the legislation to match their program. <em>This should not be taken as an indication that
+        these electoral commissions are particularly bad. To the contrary, these are the electoral commissions who make
+        the list of votes that they count available to the public, and this probably indicates that they are better than average.</em>
+
+        <p>The errors in the official counts are emulated by ConcreteSTV to be able to match the official transcripts perfectly,
+    but a set of rules without said errors are also available.</p>
+
+    <h3>Hackers</h3>
+    <p>Hackers may infiltrate or intercept the process, and change either my results or an electoral commission's result.</p>
+
+    <h3>Random or discretionary tie breaking</h3>
+    <p>In some elections, there are ties, such as for the candidate with the lowest tally who should be excluded. Such ties are
+        resolved in a variety of manners. For the federal senate, the AEC used to be given discretion but has recently changed to randomness.
+        I generally cannot accurately pick this, although I generally include the decisions made by the electoral commission as part
+        of the metadata for an election so they can be recreated.</p>
+
+    <h3>Random sampling</h3>
+    <p>In NSW state elections (not the NSW senators in the federal senate), rather than dealing with fractional votes in surplus redistribution, a random sampling
+        of ballots is used. I cannot predict this, and the NSW EC does not make their method of choosing votes public. For this reason I do not
+        include these elections on this site.</p>
+
+    <h3>Ambiguous legislation</h3>
+
+    <p>Some of the legislation covering vote counting is ambiguous. See for example <a href="https://github.com/AndrewConway/ConcreteSTV/blob/main/nsw/NSWLocalCouncilLegislation2021Commentary.md">NSW local government</a>.</p>
+
+
+</div>
+
+</body>
+</html>

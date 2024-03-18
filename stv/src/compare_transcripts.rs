@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2022 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -12,7 +12,7 @@ use crate::ballot_metadata::{CandidateIndex, ElectionMetadata};
 use crate::distribution_of_preferences_transcript::{CountIndex, Transcript};
 use std::cmp::min;
 use serde::{Serialize,Deserialize};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
 /// The result of comparing two transcripts, in order of most
@@ -85,7 +85,7 @@ impl DeltasInCandidateLists {
 }
 
 
-pub fn compare_transcripts<Tally:PartialEq+Clone+Display+FromStr>(transcript1:&Transcript<Tally>,transcript2:&Transcript<Tally>) -> DifferenceBetweenTranscripts {
+pub fn compare_transcripts<Tally:PartialEq+Clone+Display+FromStr+Debug>(transcript1:&Transcript<Tally>,transcript2:&Transcript<Tally>) -> DifferenceBetweenTranscripts {
     // first compare who was elected.
     if transcript1.elected!=transcript2.elected { // High priority!
         let dcl = DifferentCandidateLists{list1:transcript1.elected.clone(),list2:transcript2.elected.clone()};

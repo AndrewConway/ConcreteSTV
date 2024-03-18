@@ -10,10 +10,11 @@
 
 use std::ops::{AddAssign, SubAssign, Sub, Add, Div};
 use num::{Zero, BigRational, BigInt, ToPrimitive};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use std::str::FromStr;
+use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
 use crate::preference_distribution::RoundUpToUsize;
 
 /// Stores a fixed precision decimal number as an integer scaled by 10^DIGITS
@@ -51,6 +52,11 @@ impl <const DIGITS:usize> From<FixedPrecisionDecimal<DIGITS>> for f64 {
         v.scaled_value as f64/((FixedPrecisionDecimal::<DIGITS>::SCALE) as f64)
     }
 }
+impl <const DIGITS:usize> CanConvertToF64PossiblyLossily for FixedPrecisionDecimal<DIGITS> {
+    fn convert_to_f64(&self) -> f64 {
+        self.scaled_value as f64/((FixedPrecisionDecimal::<DIGITS>::SCALE) as f64)
+    }
+}
 
 impl <const DIGITS:usize> AddAssign for FixedPrecisionDecimal<DIGITS> {
     fn add_assign(&mut self, rhs: Self) {
@@ -84,6 +90,12 @@ impl <const DIGITS:usize> Display for FixedPrecisionDecimal<DIGITS> {
             let decimal_digits : String = format!("{:01$}",frac_portion,DIGITS);
             write!(f,"{}.{}",int_portion,decimal_digits.trim_end_matches("0"))
         }
+    }
+}
+
+impl <const DIGITS:usize> Debug for FixedPrecisionDecimal<DIGITS> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"{}",self)
     }
 }
 

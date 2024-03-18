@@ -6,6 +6,9 @@
     <script src="util.js"></script>
     <script src="Viewer.js"></script>
     <title>View Election Transcript</title>
+    <script>
+        window.onload = () => MainViewerOnLoadFunction();
+    </script>
 </head>
 <body>
 
@@ -20,6 +23,9 @@
         </select>
 
         <input type="checkbox" id="ShowPapers"> <label for="ShowPapers">Show Papers</label>
+        <input type="checkbox" id="ShowSetAside"> <label id="ShowSetAsideLabel" for="ShowPapers">Show Set Aside</label>
+        <button type="button" onclick="saveHTML('RenderThingToView',document.getElementById('MainHeading').innerText);">Save as HTML</button>
+
     </div>
     <div id="NothingChosen" class="">
         Please choose a .transcript file to view a transcript, or a .vchange file to view election changes using the Browse button above.
@@ -51,7 +57,7 @@
 </div>
 
 <h2 id="MainHeading"></h2>
-<div id="render">
+<div id="RenderThingToView">
 </div>
 
 

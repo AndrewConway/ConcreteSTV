@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -14,14 +14,14 @@ use std::fs::File;
 use std::io::stdout;
 use stv::ballot_metadata::CandidateIndex;
 use stv::parse_util::FileFinder;
-use stv::tie_resolution::TieResolutionsMadeByEC;
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionsMadeByEC};
 
 #[derive(Parser)]
 #[clap(version = "0.2", author = "Andrew Conway", name="ConcreteSTV")]
 /// Produce a .stv file with actual election data from a download from an Electoral Commission.
 struct Opts {
     /// The election to load data from.
-    /// Currently accepted AEC2013, AEC2016, AEC2019, ACT2008, ACT2012, ACT2016, ACT2020, NSWLG2021
+    /// Currently accepted AEC2013, AEC2016, AEC2019, AEC2022, ACT2008, ACT2012, ACT2016, ACT2020, NSWLG2021, VIC2014, VIC2018, VIC2022,
     election : ECDataSource,
 
     /// The electorate to load data for the given election.
@@ -30,12 +30,12 @@ struct Opts {
 
     /// An optional output file. If not specified, stdout is used.
     /// It is strongly recommended that this be used as stdout is also used for other information.
-    #[clap(short, long,parse(from_os_str))]
+    #[clap(short, long,value_parser)]
     out : Option<PathBuf>,
 
     /// An optional list of candidate numbers (starting counting at 0) to mark as to be excluded (ineligible).
     /// Separate with commas.
-    #[clap(short, long,use_delimiter=true,require_delimiter=true)]
+    #[clap(short, long,value_delimiter=',')]
     exclude : Option<Vec<CandidateIndex>>,
 
     /// An optional directory to use for finding raw data files.
@@ -50,8 +50,8 @@ struct Opts {
     /// For example in a tie resolved between candidates 27 and 43, ConcreteSTV would favour 43 by default. Enter `--tie 43,27` to
     /// indicate that 27 should be favoured over 43 in a decision between them.
     /// This flag may be used multiple times for multiple tie resolutions.
-    #[clap(long,parse(try_from_str=main_app::try_parse_candidate_list))]
-    tie : Vec<Vec<CandidateIndex>>,
+    #[clap(long,value_parser=main_app::try_parse_candidate_list)]
+    tie : Vec<TieResolutionAtom>,
 }
 
 

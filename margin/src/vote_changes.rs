@@ -1,4 +1,4 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -10,7 +10,7 @@
 
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::iter::Sum;
 use std::ops::{AddAssign, Sub, SubAssign};
@@ -24,6 +24,7 @@ use stv::ballot_pile::BallotPaperCount;
 use stv::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
 use stv::election_data::ElectionData;
 use stv::preference_distribution::{PreferenceDistributionRules, RoundUpToUsize};
+use stv::random_util::Randomness;
 use stv::transfer_value::TransferValue;
 use crate::choose_votes::{BallotsWithGivenTransferValue, ChooseVotes, ChooseVotesOptions, TakeVotes};
 use crate::retroscope::{Retroscope};
@@ -207,7 +208,7 @@ impl <Tally> BallotChanges<Tally> {
                                 if verbose {
                                     println!("Changed {} ATL from [{}] to [{}]", wv.n, data.metadata.party_list_to_string(&data.atl[wv.from.0].parties), data.metadata.party_list_to_string(&new_parties));
                                 }
-                                data.atl.push(ATL { parties: new_parties, n: wv.n })
+                                data.atl.push(ATL { parties: new_parties, n: wv.n, ticket_index: if data.atl[wv.from.0].ticket_index.is_some() { Some(0)} else {None} }) // the ticket index is a hack, and is not accurate. The margin computation is not designed for ticket ATL modifications.
                             } else {
                                 panic!("Candidate {} got ATL vote but doesn't have a party.", election_data.metadata.candidate(from.candidate).name);
                             }
@@ -237,10 +238,10 @@ impl <Tally> BallotChanges<Tally> {
         data
     }
 }
-impl <Tally:PartialEq+Clone+Display+FromStr> BallotChanges<Tally> {
+impl <Tally:PartialEq+Clone+Display+FromStr+Debug> BallotChanges<Tally> {
     pub fn see_effect<R:PreferenceDistributionRules<Tally=Tally>>(&self, election_data:&ElectionData) -> DeltasInCandidateLists {
         let changed_data = self.apply_to_votes(election_data,false);
-        let transcript = changed_data.distribute_preferences::<R>();
+        let transcript = changed_data.distribute_preferences::<R>(&mut Randomness::ReverseDonkeyVote);
         let diffs  : DeltasInCandidateLists = DifferentCandidateLists{ list1: transcript.elected.clone(), list2: election_data.metadata.results.as_ref().unwrap().clone() }.into();
         diffs
     }

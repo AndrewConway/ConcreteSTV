@@ -6,44 +6,39 @@
 
 
 use std::fs::File;
-use nsw::NSWECLocalGov2021;
+use nsw::{NSWECLocalGov2021, SimpleIRVAnyDifferenceBreaksTies};
 use nsw::parse_lge::{get_nsw_lge_data_loader_2021, NSWLGEDataLoader};
 use stv::ballot_metadata::CandidateIndex;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::parse_util::{FileFinder, RawDataSource};
 use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
-use stv::tie_resolution::TieResolutionsMadeByEC;
+use stv::random_util::Randomness;
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionsMadeByEC};
 
 mod test_nsw_lge;
 
 
-fn test<Rules:PreferenceDistributionRules,F:Fn(Rules::Tally)->f64>(electorate:&str,loader:&NSWLGEDataLoader,decode:F) {
-    let data = loader.load_cached_data(electorate).unwrap();
+fn test<Rules:PreferenceDistributionRules>(electorate:&str,loader:&NSWLGEDataLoader) {
+    let data = loader.read_raw_data(electorate).unwrap();
     data.print_summary();
     let mut tie_resolutions = TieResolutionsMadeByEC::default();
     let official_transcript = loader.read_official_dop_transcript(&data.metadata).unwrap();
     loop {
-        let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &data.metadata.excluded.iter().cloned().collect(), &tie_resolutions,false);
+        let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &data.metadata.excluded.iter().cloned().collect(), &tie_resolutions,None,false,&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript };
         std::fs::create_dir_all("test_transcripts").unwrap();
         {
             let file = File::create(format!("test_transcripts/NSW LG{} {}.transcript",transcript.metadata.name.year,electorate)).unwrap();
             serde_json::to_writer_pretty(file,&transcript).unwrap();
         }
-        if let Some((favoured_candidate,unfavoured_candidate)) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,&decode,true) {
-            println!("Adding tie resolution {}>{}",favoured_candidate,unfavoured_candidate);
-            assert!(favoured_candidate.0<unfavoured_candidate.0,"favoured candidate should be lower as higher candidates are assumed favoured.");
-            if tie_resolutions.tie_resolutions.contains(&vec![unfavoured_candidate,favoured_candidate]) {
-                panic!("That tie resolution is already in the list.")
-            }
-            tie_resolutions.tie_resolutions.push(vec![unfavoured_candidate,favoured_candidate]);
+        if let Some(decision) = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,true).unwrap() {
+            println!("Observed tie resolution {}", decision.decision);
+            tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(decision));
         } else {
             return;
         }
     }
 }
-
-fn decode(tally:usize) -> f64 { tally as f64 }
 
 #[test]
 fn test_ineligible() {
@@ -53,6 +48,7 @@ fn test_ineligible() {
     let data = loader.read_raw_data_checking_electorate_valid("Ballina - B Ward").unwrap();
     assert_eq!(data.metadata.excluded,vec![CandidateIndex(2)]);
 }
+/*
 #[test]
 fn test_all_council_races() {
     let finder = FileFinder::find_ec_data_repository();
@@ -62,13 +58,47 @@ fn test_all_council_races() {
     let electorate =&loader.all_electorates()[0];
     assert_eq!(electorate,"City of Albury");
     for electorate in &loader.all_electorates() {
-        if !electorate.ends_with(" Mayoral") {
+        if electorate.ends_with(" Mayoral") {
             println!("Testing Electorate {}",electorate);
-            test::<NSWECLocalGov2021,_>(electorate,&loader,decode);
+            test::<SimpleIRVAnyDifferenceBreaksTies>(electorate, &loader);
+        } else {
+            println!("Testing Electorate {}",electorate);
+            test::<NSWECLocalGov2021>(electorate,&loader);
+        }
+    }
+}*/
+
+#[test]
+/// Test all 2021 Mayoral elections
+fn test_2021_mayoral() {
+    let finder = FileFinder::find_ec_data_repository();
+    println!("Found files at {:?}",finder.path);
+    let loader = get_nsw_lge_data_loader_2021(&finder).unwrap();
+    println!("Made loader");
+    let electorate =&loader.all_electorates()[0];
+    assert_eq!(electorate,"City of Albury");
+    for electorate in &loader.all_electorates() {
+        if electorate.ends_with(" Mayoral") {
+            println!("Testing Electorate {}",electorate);
+            test::<SimpleIRVAnyDifferenceBreaksTies>(electorate, &loader);
         }
     }
 }
-
+#[test]
+fn test_2021_council() {
+    let finder = FileFinder::find_ec_data_repository();
+    println!("Found files at {:?}",finder.path);
+    let loader = get_nsw_lge_data_loader_2021(&finder).unwrap();
+    println!("Made loader");
+    let electorate =&loader.all_electorates()[0];
+    assert_eq!(electorate,"City of Albury");
+    for electorate in &loader.all_electorates() {
+        if !electorate.ends_with(" Mayoral") {
+            println!("Testing Electorate {}",electorate);
+            test::<NSWECLocalGov2021>(electorate,&loader);
+        }
+    }
+}
 /*
 #[test]
 fn make_stv_file_of_everything() {

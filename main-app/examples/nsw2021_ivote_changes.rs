@@ -41,7 +41,7 @@ fn main() -> anyhow::Result <()> {
                 let old_min_manipulation = old_changes.changes.iter().filter( |vc | vc.requires.changed_ballots).map(|vc| vc.ballots.n).min();
                 (old_changes.original,old_min_add,old_min_manipulation,old_changes.changes)
             } else {
-                let data = loader.read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021>(electorate)?;
+                let data = loader.read_raw_data_best_quality(electorate)?;
                 (data,None,None,vec![])
             }
         };

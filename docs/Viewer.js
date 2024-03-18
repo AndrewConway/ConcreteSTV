@@ -44,9 +44,14 @@ function effect_to_string(metadata,list) {
     return list.map(c=>metadata.candidates[c].name).join(" & ");
 }
 
+function SayLoading() {
+    const render_div = document.getElementById("RenderThingToView");
+    removeAllChildElements(render_div);
+    render_div.innerText="Reading file. Please wait."
+}
 function Render() {
     // general purpose clearing up.
-    const render_div = document.getElementById("render");
+    const render_div = document.getElementById("RenderThingToView");
     removeAllChildElements(render_div);
     const heading = document.getElementById("MainHeading");
     heading.innerHTML="";
@@ -66,6 +71,9 @@ function Render() {
     document.getElementById("NothingChosen").className="hidden";
     if (document_to_show.transcript) {
         document.getElementById("TranscriptOnly").className="";
+        const has_set_aside = document_to_show.transcript.counts.some(a=>a.set_aside_for_quota);
+        document.getElementById("ShowSetAside").className=has_set_aside?"":"hidden";
+        document.getElementById("ShowSetAsideLabel").className=has_set_aside?"":"hidden";
         RenderTranscript(document_to_show,render_div);
     } else if (document_to_show.original && document_to_show.changes) {
         document.getElementById("ChangeOnly").className="";
@@ -149,12 +157,15 @@ function RenderChanges(vote_changes_document,render_div) {
 function RenderTranscript(full_transcript,render_div) {
     let heading_orientation = document.getElementById("heading-orientation").value;
     let show_papers = document.getElementById("ShowPapers").checked;
+    let show_set_aside = document.getElementById("ShowSetAside").checked;
     const metadata = full_transcript.metadata;
     const transcript = full_transcript.transcript;
     const rounding_ever_used = transcript.counts.some(c=>c.status.papers.rounding || c.status.tallies.rounding);
     const exhausted_ever_used = transcript.counts.some(c=>c.status.papers.exhausted || c.status.tallies.exhausted);
-    const above_table = add(render_div,"div","quota");
-    above_table.innerText="Quota : "+transcript.quota.quota+" Votes with first preference : "+transcript.quota.papers+" Vacancies : "+transcript.quota.vacancies;
+    if (transcript.quota) {
+        const above_table = add(render_div,"div","quota");
+        above_table.innerText="Quota : "+transcript.quota.quota+" Votes with first preference : "+transcript.quota.papers+" Vacancies : "+transcript.quota.vacancies;
+    }
     const table = add(render_div,"table");
     const elected_list = add(render_div,"div","WinningCandidatesList");
     add(elected_list,"h4").innerText="Winning Candidates";
@@ -170,11 +181,11 @@ function RenderTranscript(full_transcript,render_div) {
         for (const party of metadata.parties) {
             // assume party.candidates is a contiguous sequence, after any previous ones.
             if (party.candidates[0]>num_candidates_done) { // there were some candidates not part of a party in between
-                add(party_row,"td","PartyName").colSpan=(party.candidates[0]-num_candidates_done)*(show_papers?2:1);
+                add(party_row,"td","PartyName").colSpan=(party.candidates[0]-num_candidates_done)*(1+(show_papers?1:0)+(show_set_aside?1:0));
             }
             let td = add(party_row,"td","PartyName");
             td.innerText=party.abbreviation||party.name;
-            td.colSpan=party.candidates.length*(show_papers?2:1);
+            td.colSpan=party.candidates.length*(1+(show_papers?1:0)+(show_set_aside?1:0));
             num_candidates_done=party.candidates[party.candidates.length-1]+1;
             FirstCandidate.add(party.candidates[0]);
             LastCandidate.add(party.candidates[party.candidates.length-1]);
@@ -193,12 +204,12 @@ function RenderTranscript(full_transcript,render_div) {
         const candidate = metadata.candidates[i];
         let td = name_td((FirstCandidate.has(i)?" FirstCandidate":"")+(LastCandidate.has(i)?" LastCandidate":""));
         td.text.innerText=candidate.name;
-        if (show_papers) td.td.colSpan=2;
+        if (show_papers||show_set_aside) td.td.colSpan=1+(show_papers?1:0)+(show_set_aside?1:0);
     }
     if (exhausted_ever_used) {
         const exhausted_name_td = name_td();
         exhausted_name_td.text.innerText="Exhausted";
-        if (show_papers) exhausted_name_td.td.colSpan=2;
+        if (show_papers||show_set_aside) exhausted_name_td.td.colSpan=1+(show_papers?1:0)+(show_set_aside?1:0);
     }
     if (rounding_ever_used) {
         name_td().text.innerText="Rounding";
@@ -241,6 +252,12 @@ function RenderTranscript(full_transcript,render_div) {
                 const papers = add(row,"td",status+" BallotPapers");
                 papers.innerText=zero_is_blank(count.status.papers.candidate[i]);
             }
+            if (show_set_aside) {
+                if (deltarow) {
+                    add(deltarow,"td",status+" SetAside").innerText=count.set_aside_for_quota?zero_is_blank(count.set_aside_for_quota.candidate[i]):"";
+                }
+                const papers = add(row,"td",status);
+            }
             let tally = count.status.tallies.candidate[i];
             let text = zero_is_blank(tally);
             td.innerText=text;
@@ -263,12 +280,16 @@ function RenderTranscript(full_transcript,render_div) {
                 if (deltarow) add(deltarow,"td","Continuing BallotPapers").innerText=delta(count.status.papers.exhausted,last_count.status.papers.exhausted);
                 add(row,"td","Continuing BallotPapers").innerText=zero_is_blank(count.status.papers.exhausted);
             }
+            if (show_set_aside) {
+                if (deltarow) add(deltarow,"td","Continuing SetAside").innerText=count.set_aside_for_quota?zero_is_blank(count.set_aside_for_quota.exhausted):"";
+                add(row,"td","Continuing");
+            }
         }
         if (rounding_ever_used) {
             if (deltarow) add(deltarow,"td","Continuing").innerText=delta(count.status.tallies.rounding,last_count.status.tallies.rounding);
             add(row,"td","Continuing").innerText=zero_is_blank(count.status.tallies.rounding);
         }
-        const tv_td = fullSpanTD();
+        const tv_td = fullSpanTD("TransferValue");
         tv_td.innerText=format_transfer_value(count.created_transfer_value&&count.created_transfer_value.transfer_value || count.portion.transfer_value,count.created_transfer_value?null:format_from(count.portion.when_tv_created));
         if (count.created_transfer_value) {
             let title = "Surplus : "+count.created_transfer_value.surplus+" Ballots considered : "+count.created_transfer_value.ballots_considered+" continuing : "+count.created_transfer_value.continuing_ballots;
@@ -277,9 +298,18 @@ function RenderTranscript(full_transcript,render_div) {
             if (count.created_transfer_value.excluded_exhausted_tally) title+=" exhausted tally "+count.created_transfer_value.excluded_exhausted_tally;
             tv_td.title=title;
         }
-        fullSpanTD().innerText=count.reason==="FirstPreferenceCount"?"First Preference Count":count.reason.hasOwnProperty("ExcessDistribution")?"Surplus distribution for "+cname(count.reason.ExcessDistribution):"Exclusion of "+count.reason.Elimination.map(cname).join(" & "); // TODO prettify
-        fullSpanTD().innerText=count.decisions.map(a=>a.affected.map(candidate=>metadata.candidates[candidate].name+" ("+candidate+")").join(",")).join(" and ");
-        fullSpanTD().innerText=count.portion.papers_came_from_counts.map(format_from).join(", ");
+        fullSpanTD("CountAction").innerText=count.reason==="FirstPreferenceCount"?"First Preference Count":count.reason.hasOwnProperty("ExcessDistribution")?"Surplus distribution for "+cname(count.reason.ExcessDistribution):"Exclusion of "+count.reason.Elimination.map(cname).join(" & "); // TODO prettify
+        function candidate_index_array_to_string(candidate_list) {
+            return candidate_list.map(candidate=>metadata.candidates[candidate].name+" ("+candidate+")").join(",");
+        }
+        function text_description_of_decision(a) {
+            if (a.affected) return candidate_index_array_to_string(a.affected); // deprecated old style, left for compatibility with old transcripts.
+            else {
+                return a.increasing_favour.map(candidate_index_array_to_string).join(" < ");
+            }
+        }
+        fullSpanTD("ECDecisions").innerText=count.decisions.map(text_description_of_decision).join(" and ");
+        fullSpanTD("FromCount").innerText=count.portion.papers_came_from_counts.map(format_from).join(", ");
         count_number+=1;
         last_count=count;
     }
@@ -318,10 +348,13 @@ function GotURLList(baseURL,list) {
 }
 function ChooseTranscript() {
     const files = document.getElementById("ChooseTranscript").files;
-    if (files.length>0) files[0].text().then(text=>{document_to_show=JSON.parse(text); Render(); });
+    if (files.length>0) {
+        SayLoading();
+        files[0].text().then(text=>{document_to_show=JSON.parse(text); Render(); });
+    }
 }
 
-window.onload = function () {
+function MainViewerOnLoadFunction() {
     const url = new URL(document.location.href);
     const provided_list_url = url.searchParams.get("list");
     if (provided_list_url) { // fetch a list of options from the list
@@ -333,7 +366,38 @@ window.onload = function () {
         document.getElementById("ChooseTranscript").onchange = ChooseTranscript;
     }
     document.getElementById("ShowPapers").onchange = Render;
+    document.getElementById("ShowSetAside").onchange = Render;
     document.getElementById("heading-orientation").onchange = Render;
     // function got_std(data) { document_to_show=data; Render(); }
     // getWebJSON("../transcript.json",data=>{full_transcript=data; Render();},null);
+}
+
+function triggerDownload (imgURI,filenamebase,extension) {
+    const evt = new MouseEvent('click', {
+        view: window,
+        bubbles: false,
+        cancelable: true
+    });
+    const a = document.createElement('a');
+    a.setAttribute('download',filenamebase+(extension||".svg"));
+    a.setAttribute('href', imgURI);
+    a.setAttribute('target', '_blank');
+    a.dispatchEvent(evt);
+}
+function saveHTML(name,title) {
+    const desired_section = document.getElementById(name);
+    const desired_section_text = desired_section.outerHTML;
+    let internal_css = "";
+    for (const css of document.getElementsByTagName("link")) {
+        if (css.sheet && css.sheet.cssRules) {
+            for (const rule of css.sheet.cssRules) {
+                internal_css+=rule.cssText+"\n";
+            }
+        }
+    }
+    const full_string = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"/><title>"+title+"</title><style>"+internal_css+"</style></head><body>"+desired_section_text+"</body></html>";
+    const DOM_URL = window.URL || window.webkitURL || window;
+    const blob = new Blob([full_string], {type: 'text/html;charset=utf-8'});
+    const url = DOM_URL.createObjectURL(blob);
+    triggerDownload(url,title,".html");
 }

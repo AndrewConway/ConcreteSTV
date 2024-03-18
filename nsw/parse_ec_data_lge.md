@@ -48,4 +48,6 @@ parse_ec_data --out Albury.stv --tie 43,27 NSWLG2021 "City of Albury"
 ```
 
 
+## Problems
 
+You may need `openoffice` installed on your system to read some NSW data. This is used to help decode some of the files in .xlsx format.

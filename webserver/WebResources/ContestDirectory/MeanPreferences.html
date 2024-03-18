@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/common.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="/util.js"></script>
+    <script src="/common.js"></script>
+    <script src="/MeanPreferences.js"></script>
+
+    <title>Mean Preferences</title>
+</head>
+<body>
+
+<div id="MainBody">
+    <h1>Mean Preferences</h1>
+    <p class="noprint">This site enables one to see the mean (average) preference given for each candidate, possibly restricted to below the line votes and/or
+        votes with a particular candidate as the first preference. Above the line votes are converted first to the equivalent below the line vote.</p>
+    <div class="noprint"><p><em>Usage:</em></p>
+        <ul>
+            <li>The box on the left of a name shows the mean vote.</li>
+            <li>Blanks are considered to be the mean of the unallocated preference numbers.</li>
+            <li>Only the formal part of formal votes are counted.</li>
+            <li>Click on a name to restrict to ballots with said candidate as first preference, or <a href="#" onclick="clearCandidate();">Clear</a>.</li>
+        </ul>
+    </div>
+
+    <h2 id="TitleHeading">Loading...</h2>
+
+    <div id="tools">
+        <p><input type="checkbox" id="showATL" name="showATL"/><label for="showATL" title="If checked, then above the line votes will be included in the analysis.">Include above the line votes</label></p>
+        <p>Showing only people whose first preference was for candidate: <span id="showingCandidate">???</span></p>
+        <p>Number of votes: <span id="numBTL">???</span> below the line and <span id="numATL">???</span> above the line.</p>
+    </div>
+
+
+    <div id="paperDiv"><img src="/ajax-loader.gif"/> </div>
+</div>
+
+</body>
+</html>

@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::iter::Map;
 use std::ops::{Range, Sub};
 use std::str::FromStr;
+use thiserror::Error;
 use crate::tie_resolution::TieResolutionsMadeByEC;
 
 /// a candidate, referred to by position on the ballot paper, 0 being first
@@ -114,6 +115,12 @@ pub struct DataSource {
     pub comments : Option<String>,
 }
 
+impl DataSource {
+    pub fn new(url:&str,path:&PathBuf) -> Self {
+        DataSource{ url:url.to_string(), files:vec![path.file_name().as_ref().unwrap().to_string_lossy().to_string()],comments:None}
+    }
+}
+
 impl ElectionMetadata {
     pub fn party(&self,index:PartyIndex) -> &Party { &self.parties[index.0] }
     pub fn candidate(&self,index:CandidateIndex) -> &Candidate { &self.candidates[index.0] }
@@ -129,7 +136,8 @@ impl ElectionMetadata {
     pub fn get_candidate_name_lookup_with_capital_letters_afterwards(&self) -> HashMap<String,CandidateIndex> {
         let mut res = HashMap::default();
         fn is_surname(s:&str) -> bool {
-            s.len()>1 && s.trim_start_matches("Mac").trim_start_matches("Mc").chars().all(|c|!c.is_lowercase()) // one letter is probably an initial.
+            let no_mac = s.trim_start_matches("Mac").trim_start_matches("Mc");
+            s.len()>1 && no_mac.len()>0 && no_mac.chars().all(|c|!c.is_lowercase()) // one letter is probably an initial.
         }
         for i in 0..self.candidates.len() {
             let name_components = self.candidates[i].name.split_ascii_whitespace().collect::<Vec<_>>();
@@ -242,7 +250,7 @@ pub struct Party {
     pub candidates : Vec<CandidateIndex>,
     /// the group voting tickets for this party, if any.
     #[serde(skip_serializing_if = "Vec::is_empty",default)]
-    pub tickets : Vec<Vec<CandidateIndex>>
+    pub tickets : Vec<Vec<CandidateIndex>>,
 }
 
 impl Party {
@@ -271,5 +279,99 @@ impl Candidate {
         if let Some((surname,first)) = self.name.split_once(',') {
             first.trim().to_string()+" "+surname.trim()
         } else { self.name.clone() }
+    }
+
+    pub fn from_name(name:&str) -> Self { Candidate{name:name.to_string(),party:None,position:None,ec_id:None}}
+}
+
+/// There are lots of places where one needs to parse some file to extract a list of candidates
+/// and parties in order to build the ElectionMetadata. These typically come accross a list
+/// of parties and candidates intermingled. Very frequently in these files the following
+/// things are all true
+/// * The parties are listed in ballot paper order
+/// * The candidates are listed in ballot paper order
+/// * Candidates are listed after the party they are in.
+///
+/// These parsing routines have a lot in common, and this code is designed to encapsulate
+/// the common code. Convenience and correctness is more important than efficiency as the metadata tends
+/// to be small.
+///
+/// It would of course be ideal to refactor all the existing parsing code to use this. Maybe I will get around to that some day.
+#[derive(Debug,Default,Clone)]
+pub struct CandidateAndPartyBuilder {
+    pub candidates : Vec<Candidate>,
+    pub parties : Vec<Party>,
+    pub source : Vec<DataSource>,
+    pub results : Option<Vec<CandidateIndex>>,
+}
+/// An internal error indicating a problem parsing a metadata file
+#[derive(Error, Debug)]
+pub enum ParseMetadataError {
+    #[error("there were no parties when one was expected in CandidateAndPartyBuilder")]
+    PartyExpectedButNotAvailable,
+    #[error("could not find candidate name : {0}")]
+    UnknownCandidateName(String),
+}
+
+impl CandidateAndPartyBuilder {
+    pub fn last_party(&self) -> Result<&Party, ParseMetadataError> { self.parties.last().ok_or(ParseMetadataError::PartyExpectedButNotAvailable {}) }
+    pub fn last_party_mut(&mut self) -> Result<&mut Party, ParseMetadataError> { self.parties.last_mut().ok_or(ParseMetadataError::PartyExpectedButNotAvailable {}) }
+
+    /// Add a new party. Candidates will be added later.
+    pub fn add_party(&mut self,column_id : &str,name:&str,abbreviation:Option<&str>,atl_allowed:bool) {
+        self.parties.push(Party{
+            column_id: column_id.to_string(),
+            name: name.to_string(),
+            abbreviation: abbreviation.map(|s|s.to_string()),
+            atl_allowed,
+            candidates: vec![],
+            tickets: vec![],
+        })
+    }
+
+    /// Add a new candidate to the last party. Assumes that this candidate is next in position for the candidates.
+    /// alternate_name is not currently used but may be added in the future if it is common. Possibly a list of aliases would be better?
+    pub fn add_candidate_to_last_party(&mut self,name:&str,ec_id:Option<&str>,_alternate_name:Option<&str>) -> Result<(), ParseMetadataError> {
+        let candidate_index = CandidateIndex(self.candidates.len());
+        self.last_party_mut()?.candidates.push(candidate_index);
+        self.candidates.push(Candidate{
+            name : name.to_string(),
+            party: Some(PartyIndex(self.parties.len()-1)),
+            position: Some(self.last_party()?.candidates.len()),
+            ec_id: ec_id.map(|s|s.to_string()),
+        });
+        Ok(())
+    }
+
+    /// Returns true if there is a last party added and it has the provided name.
+    pub fn last_party_is_called(&self,name:&str) -> bool {
+        match self.parties.last() {
+            None => false,
+            Some(party) => party.name.as_str()==name,
+        }
+    }
+
+    pub fn add_source(&mut self,url:&str,path:&PathBuf) {
+        self.source.push(DataSource::new(url,path))
+    }
+    pub fn add_source_different_filename(&mut self,url:&str,filename:&str) {
+        self.source.push(DataSource{
+            url: url.to_string(),
+            files: vec![filename.to_string()],
+            comments: None,
+        })
+    }
+
+    pub fn candidate_index(&self,candidate_name:&str) -> Result<CandidateIndex,ParseMetadataError> {
+        for (index,candidate) in self.candidates.iter().enumerate() {
+            if candidate_name==candidate.name.as_str() { return Ok(CandidateIndex(index))}
+        }
+        Err(ParseMetadataError::UnknownCandidateName(candidate_name.to_string()))
+    }
+
+    pub fn declare_elected(&mut self,candidate_name:&str) -> Result<(),ParseMetadataError> {
+        let candidate = self.candidate_index(candidate_name)?;
+        self.results.get_or_insert_with(||vec![]).push(candidate);
+        Ok(())
     }
 }

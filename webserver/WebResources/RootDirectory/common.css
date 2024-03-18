@@ -1,0 +1,202 @@
+
+body {
+    margin : 0;
+}
+
+header {
+    background-color:#eee;
+    color: blue;
+    width:100%;
+    height:32px;
+
+}
+
+header a {
+    text-decoration: none;
+    font-size: 20pt;
+    color: blue;
+}
+
+header span {
+    line-height : 20px;
+    height : 20px;
+    vertical-align: text-top;
+}
+footer {
+    margin-top: 10px;
+    font-size:0.8em;
+    background-color:#eee;
+    width:100%;
+}
+
+span.year {
+    font-weight: bold;
+    margin-left: 1em;
+    margin-right: 1em;
+}
+
+span.rules {
+    font-weight: bold;
+}
+
+a.electorate {
+    margin-left: 1em;
+}
+
+div#ErrorMessages {
+    color: red;
+}
+
+.hidden {
+    display: none;
+}
+
+div#MainBody {
+    margin-left: 3px;
+    margin-right: 3px;
+}
+
+table.rightalign td {
+    text-align: right;
+}
+
+table.rightalign th {
+    text-align: right;
+}
+
+input[type=number] {
+    appearance : textfield;
+    height : 1.2em;
+    width : 1.2em;
+}
+input[type='number'] {
+    -moz-appearance:textfield;
+}
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+}
+input.bad {
+    background-color : red;
+}
+div#paperDiv {
+    display : flex;
+    flex-wrap : wrap;
+}
+div.group {
+    display: inline-block;
+    width : 17em;
+}
+@media print {
+    .noprint { display:none; }
+}
+span.NumberBox {
+    border-style: groove;
+    width: 2em;
+}
+div.CandidateAndNumber {
+    margin-bottom: 5px;
+}
+
+table {
+    color: #333;
+    font-family: Helvetica, Arial, sans-serif;
+    border-collapse:
+            collapse; border-spacing: 0;
+}
+
+td, th {
+    border: 1px solid transparent; /* No more visible border */
+    height: 30px;
+    border-left-width : 0.5em;
+    border-right-width : 0.5em;
+    transition: all 0.3s;  /* Simple transition for hover effect */
+}
+
+th, tr.Head td {
+    background: #DFDFDF;  /* Darken header a bit */
+    font-weight: bold;
+}
+
+tr.Group { background : #CCCCCC; }
+
+/* Cells in even rows (2,4,6...) are one color */
+tr.Striped:nth-child(even) { background: #F1F1F1; }
+
+/* Cells in odd rows (1,3,5...) are another (excludes header cells)  */
+tr.Candidate:nth-child(odd) td { background: #FEFEFE; }
+
+tr.Exhausted { background : #EEFFEE; border-top:2px solid black }
+tr.SetAside{ background : #EEFFEE; }
+tr.Rounding{ background : #EEFFEE; }
+tr.Sum{ background : #EEFFEE; }
+td.Sum{ background : #EEFFEE; }
+
+td.papers { color : #888; }
+td.groupname { color : #666; }
+td p { margin-bottom : 3px; margin-top : 3px; }
+td {
+    text-align: right;
+}
+
+a.subtle:link {
+    color:black;
+    text-decoration: none;
+}
+
+a.subtle:visited {
+    color:black;
+    text-decoration: none;
+}
+
+a.subtle:hover {
+    color:blue;
+    text-decoration: underline;
+}
+
+a.subtle:visited:hover {
+    color:#1a0dab;
+    text-decoration: underline;
+}
+
+span.mismatch {
+    display: inline-block;
+    min-width : 0.5em;
+    border-bottom: 1px dotted red;
+    /* doesn't work for spaces
+    text-decoration-line: underline;
+    text-decoration-style: wavy;
+    text-decoration-color: red;
+    */
+    color:red;
+}
+
+input#preferences {
+    min-width: 30em;
+}
+
+div.ColumnHolder {
+    display: flex;
+}
+
+fieldset.ColumnHolder {
+    display: flex;
+}
+
+div.InColumn {
+    margin-left: 1em;
+    margin-right: 1em;
+}
+
+label.disabled {
+    color: grey;
+}
+
+span.MulticolumnListOfLinks {
+    column-count: 4;
+    display: block;
+}
+
+span.MulticolumnListOfLinks a {
+    display: block;
+}

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/common.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="/util.js"></script>
+    <script src="/common.js"></script>
+    <script src="/PrepareVote.js"></script>
+
+    <title>Prepare Vote</title>
+</head>
+<body>
+
+<div id="MainBody">
+    <h1>Prepare Vote</h1>
+    <p class="noprint">This page enables one to prepare a vote for an upcoming election. Keeping a record of this may allow
+        the use of the Italian attack against you. Don't do this unless you understand this and accept
+        the risks, in particular to vote privacy. </p>
+    <div class="noprint"><p><em>Usage:</em></p>
+        <ul>
+            <li>You can enter numbers by typing in the boxes adjacent to a name. Duplicated numbers will get a red background.</li>
+            <li>As a short cut, clicking on the name (not the box) of a candidate will assign the candidate the best
+                preference not already assigned.</li>
+            <li>Holding down the ALT key while clicking on a name of a candidate will assign the worst preference not already assigned.</li>
+            <li>If the box already contains a number when you click on a name, the current number in the box will be cleared.</li>
+            <li>When you have finished you may print the page to have a record suitable to
+                take to a polling booth. Important: Do not choose "shrink to fit" for Scale when printing; instead choose a
+                fixed percentage, based on how large you want the text to be. Around 50% is likely to fill an A4 page.</li>
+            <li>If you wish to check whether your vote was recorded accurately, record the numbers in the summary section
+                (your preference numbers separated by commas). This can be used as a search string when the electoral
+                commission publishes a list of all votes.</li>
+            <li>If you wish to save a partially completed ballot to resume later, record the numbers in the summary
+                section. Then next time you visit this page, copy the saved numbers into the summary field.</li>
+        </ul>
+    </div>
+    <div id="tools"  class="noprint">
+        <p>Next liked candidate (click a name to assign): <span id="likedCandidate">???</span></p>
+        <p>Next despised candidate (alt-click a name to assign) : <span id="despisedCandidate">???</span></p>
+        <p>Candidates to go : <span id="togoCandidates">???</span> </p>
+    </div>
+    <h2 id="TitleHeading">Loading...</h2>
+    <div id="paperDiv"><img src="/ajax-loader.gif" alt="Loading"/></div>
+    <p class="noprint">Vote summary : <input name="preferences" id="preferences" autocomplete="off"/> </p>
+
+    <div id="SearchDiv">
+        <div class="noprint">
+            <h2>Search</h2>
+            <p> To search for your vote in the published formal results, enter it into the summary box above and press <button onclick="doSearch();">Search</button>.
+                This involves sending said string over the internet to my server,
+                which does the search, sends the results back,
+                and is a privacy threat in a variety of ways. I state that I do not log this string, but I may be coerced into lying about
+                this. You can do a partial search leaving forgotten boxes blank by checking <input type="checkbox" id="blanksMatchAnything"/> this checkbox. </p>
+
+            <p> Alternatively, the ideal, privacy preserving way to do this is you can get the files listing all votes from the electoral commission
+                and search directly in them<span id="searchLocations"></span>. For AEC 2016 and 2019 votes this is easy and can be done with
+                simple string search (leave off trailing commas for 2019). </p>
+        </div>
+        <div id="SearchResults"></div>
+    </div>
+
+    <p class="noprint"><em>Privacy</em>: I want to preserve your <a href="/Privacy.html">privacy</a>. This is particularly important and difficult for this specific page. This web page should not
+        make any network accesses after initial loading<span id="privacyException"> with the exception of
+        the search button</span>, so you can check (using standard network
+        monitoring tools) that your preferences
+        are not being sent anywhere. So I never see what you do, other than the standard
+        things your browser sends when going to a web site.
+        But I may be lying (possibly coerced), so even better than trusting me
+        you can disconnect your computer from the internet after loading this page and
+        before entering your preferences into it.
+        This should protect you against me observing your computer. But there is still the
+        problem of someone looking over your shoulder, etc. and if you actually vote below the line with
+        an uncommon pattern your vote may be detectable in the released list of votes.</p>
+
+</div>
+
+</body>
+</html>

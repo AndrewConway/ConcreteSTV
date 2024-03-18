@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/common.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="/util.js"></script>
+    <script src="/common.js"></script>
+    <script src="/IntentTable.js"></script>
+
+    <title>N-Party Preferred Count</title>
+</head>
+<body>
+
+<div id="MainBody">
+    <h1>N-Party Preferred Count</h1>
+    <div class="noprint">
+        <p>This table allows you to conduct a more general version of the
+            traditional two-party-preferred count, including extra details about
+            how other candidates’ preferences flowed to the preferred parties.
+        </p>
+        <p>
+            Choose at least two "major parties" or candidates. Each formal ballot
+            paper is then assigned to one of the "major parties" based on which of
+            them is highest on the ballot - this simulates what happens when all
+            but the “major parties” are eliminated. If none of them are mentioned,
+            the ballot is considered exhausted. This determines the column in which
+            the ballot is counted. Ballots are allocated to rows according to their
+            first preference.
+        </p>
+        <p>
+            For example, to get the standard two-party-preferred count between two
+            parties, select them both under “who is a major party.” Then each row
+            of the table will represent a candidate or party, and show how their
+            preferences affected the two-party-preferred count.
+
+            If you selected “major parties” A and B, and the row for candidate c
+            shows 100 under party A, 200 under party B and 50 exhausted, this means
+            that candidate c received 350 first preferences, of which 100 preferred
+            A over B, 200 preferred B over A, and 50 mentioned neither A nor B.
+        </p>
+    </div>
+
+    <h2 id="TitleHeading">Loading...</h2>
+    <div> <!-- Decide what data to show -->
+        <input type="checkbox" id="isGroupsColumns" name="isGroupsColumns" checked="true"/><label for="isGroupsColumns">Columns ("major" parties) refer to groups</label>
+        <input type="checkbox" id="isGroupsRows" name="isGroupsRows" checked="true"/><label for="isGroupsRows">Rows (first preference) refer to groups</label>
+        <input type="checkbox" id="useATL" name="useATL" checked="true"/><label for="useATL">Use ATL votes</label>
+        <input type="checkbox" id="useBTL" name="useBTL" checked="true"/><label for="useBTL">Use BTL votes</label>
+    </div>
+    <h4>Who is a "major" party/candidate?</h4>
+    <div id="paperDiv"></div>
+    <h4>Where votes went</h4>
+    <table id="resultTable"></table>
+
+</div>
+
+</body>
+</html>

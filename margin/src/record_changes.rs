@@ -82,7 +82,7 @@ impl ChangeTypes {
                 for b in &from.ballots {
                     if b.from.0<num_atl { // it is an ATL vote
                         res.changed_atl=true;
-                        if from_party.unwrap()==data.atl[b.from.0].parties[0] { res.changed_first_preference=true; }
+                        if from_party.unwrap()==data.atl[b.from.0].first_party() { res.changed_first_preference=true; }
                         if !ballot_types_considered_unverifiable.is_empty() {
                             if data.is_atl_verifiable(b.from.0,ballot_types_considered_unverifiable) { res.affected_verifiable_ballots =true; }
                         }
@@ -173,7 +173,7 @@ impl <Tally:Clone> ElectionChanges<Tally> {
     }
 }
 
-impl <Tally:PartialEq+Clone+Display+FromStr> ElectionChanges<Tally> {
+impl <Tally:PartialEq+Clone+Display+FromStr+Debug> ElectionChanges<Tally> {
     /// Add in a (suspicious, possible old) extra data structure, reevaluating everything
     pub fn merge_reevaluating<R:PreferenceDistributionRules<Tally=Tally>>(&mut self,other:&[ElectionChange<Tally>],election_data:&ElectionData,ballot_types_considered_unverifiable:&HashSet<String>,verbose:bool) {
         for v in other {

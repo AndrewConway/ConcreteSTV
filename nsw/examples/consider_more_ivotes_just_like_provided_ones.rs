@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -16,7 +16,8 @@ use nsw::parse_lge::get_nsw_lge_data_loader_2021;
 use stv::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists, pretty_print_candidate_list};
 use stv::election_data::ElectionData;
 use stv::monte_carlo::SampleWithReplacement;
-use stv::parse_util::{FileFinder};
+use stv::parse_util::{FileFinder, RawDataSource};
+use stv::random_util::Randomness;
 
 const WRITE_CHARACTER_PER_RUN:bool = false;
 
@@ -34,7 +35,7 @@ fn main() -> anyhow::Result<()> {
         if said_to_be_lost.is_empty() { continue; }
         let said_to_be_lost : usize = said_to_be_lost.parse().unwrap();
         num_electorate+=1;
-        let data : ElectionData = loader.read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021>(&electorate)?;
+        let data : ElectionData = loader.read_raw_data_best_quality(&electorate)?;
         // println!("Processing electorate {}",electorate);
         let num_elements_to_add = said_to_be_lost;
         let sampler = build_sampler(&data);
@@ -92,7 +93,7 @@ fn run_elections(data:&ElectionData, sampler:&SampleWithReplacement<usize>, num_
             undos.push(index);
             if index<num_atl { data.atl[index].n+=1; } else { data.btl[index-num_atl].n+=1; }
         }
-        let result = data.distribute_preferences::<NSWECLocalGov2021>().elected;
+        let result = data.distribute_preferences::<NSWECLocalGov2021>(&mut Randomness::ReverseDonkeyVote).elected;
         let diff : DeltasInCandidateLists = DifferentCandidateLists{ list1: data.metadata.results.as_ref().unwrap().clone(), list2: result }.into();
         if WRITE_CHARACTER_PER_RUN {
             if diff.is_empty() { print!("."); } else { print!("*"); }

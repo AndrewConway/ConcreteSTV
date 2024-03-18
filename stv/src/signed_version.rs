@@ -6,7 +6,7 @@
 
 
 use std::fmt::{Display, Formatter};
-use num::Zero;
+use num::{Signed, Zero};
 use std::ops::{Add, Sub, SubAssign, AddAssign};
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use std::str::FromStr;
@@ -15,8 +15,8 @@ use std::cmp::Ordering;
 /// A signed version of some type of number. Used when a number is almost always positive, but in some rare situations may be negative, like votes lost to rounding if rounding isn't always down.
 #[derive(Clone,Eq, PartialEq,Debug)]
 pub struct SignedVersion<Tally> {
-    negative : bool, // should always be false for zero.
-    value : Tally
+    pub negative : bool, // should always be false for zero.
+    pub value : Tally
 }
 
 impl <Tally:Clone+PartialEq> SignedVersion<Tally> {
@@ -29,6 +29,13 @@ impl <Tally:Clone+PartialEq> SignedVersion<Tally> {
     pub fn convert_f64<F:Fn(Tally)->f64>(&self,f:F) -> f64 {
         let res = f(self.value.clone());
         if self.negative { -res} else { res }
+    }
+}
+
+impl <Tally:Signed+Clone+PartialEq> SignedVersion<Tally> {
+    pub fn resolve(&self) -> Tally {
+        if self.negative { self.value.clone().neg() }
+        else { self.value.clone() }
     }
 }
 

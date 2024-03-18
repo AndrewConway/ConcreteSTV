@@ -6,7 +6,8 @@ is licensed under a Creative Commons Attribution 4.0 International licence (CC B
 I reformatted it for md format.
 Based on content from the New South Wales Legislation website at 3 Dec 2021. For the latest information on New South Wales Government legislation please go to https://www.legislation.nsw.gov.au.
 
-This is an extract of the Local Government (General) Regulation 2005.
+This is an extract of the Local Government (General) Regulation 2005. Schedule 5, pertaining to STV elections is listed
+first, with Schedule 4, pertaining to council elections, listed afterwards.
 
 ## Schedule 5 Counting of votes under proportional system
 
@@ -180,4 +181,66 @@ This is an extract of the Local Government (General) Regulation 2005.
 
     If votes are counted using electronic counting equipment, the returning officer may determine that a reference in this Schedule to the physical arrangement or movement of ballot papers is not applicable if the equivalent process is performed electronically.
 
+```
+
+## Schedule 4 Counting of votes under optional preferential system
+
+```text
+1   General
+
+    This Schedule sets out the method of counting votes according to the optional preferential system. The counting is to be carried out under the supervision of the returning officer.
+
+2   Definitions
+
+    In this Schedule—
+    absolute majority of votes means a greater number than one-half of the whole number of ballot-papers other than informal and exhausted ballot-papers.
+    continuing candidate means a candidate not already elected or excluded from the count.
+    exhausted ballot-paper means a ballot-paper on which there is no indication of a next preference for a continuing candidate.
+    next preference means the first of the subsequent preferences marked on a ballot-paper that is not given to an elected or excluded candidate. However, if there is a repetition or omission in the consecutive numbering of preferences marked on a ballot-paper (other than a repetition or omission that makes the ballot-paper informal), only those preferences preceding the repetition or omission can be taken into account.
+    unrejected ballot-papers means all ballot-papers not rejected as informal.
+
+3   Counting of votes
+
+        (1)  The votes are to be counted and the result of the election ascertained in accordance with the following procedures—
+
+            (a)  the unrejected ballot-papers are arranged under the names of the respective candidates by placing in a separate parcel all those on which a first preference is indicated for the same candidate,
+
+            (b)  the total number of first preferences given for each candidate on such ballot-papers are then counted,
+
+            (c)  the candidate who has received the largest number of first preference votes is elected if that number constitutes an absolute majority of votes,
+
+            (d)  if no candidate has received an absolute majority of first preference votes, a second count is made,
+
+            (e)  on the second count the candidate who has received the fewest first preference votes is excluded, and each unexhausted ballot-paper counted to him or her is counted to the candidate next in the order of the voter’s preference,
+
+            (f)  if a candidate then has an absolute majority of votes, he or she is elected, but if no candidate then has an absolute majority of votes, the process of excluding the candidate who has the fewest votes and counting each of his or her unexhausted ballot-papers to the continuing candidate next in the order of the voter’s preference is repeated until one candidate has received an absolute majority of votes,
+
+            (g)  the candidate who has received an absolute majority of votes is elected.
+
+        (2)  Any exhausted ballot-papers are set aside as finally dealt with and are not taken into account in the election of a candidate.
+
+4, 5   (Repealed)
+6   Equality
+
+        (1)  If, on any count at which the candidate with the fewest number of votes has to be excluded, 2 or more candidates have an equal number of votes (that number being fewer than the number of votes that any other candidate has or those candidates being the only continuing candidates)—
+
+            (a)  the candidate who had the fewest votes at the last count before the equality occurred is excluded, or
+
+            (b)  if they had an equal number of votes at all preceding counts, the returning officer is to exclude a candidate by an approved method of random selection (including by electronic means).
+
+        (2)    (Repealed)
+
+7   End of counting
+
+    The process of counting each of the unexhausted ballot-papers of an excluded candidate to the continuing candidate next in the order of the voter’s preference is not repeated if there is only one continuing candidate. Instead, that continuing candidate is elected.
+
+8   Records and returns of voting
+
+        (1)  At each step of the proceedings the returning officer is to keep a record of the number of votes counted for each candidate, the exclusion of candidates and the transfer of their votes, the votes that are found to be informal and the votes that at some stage become exhausted votes.
+
+        (2)  As soon as is reasonably practical after the declaration of the election, the election manager is to publish the results of the election (including a record of the voting, counting and transfers) on the election manager’s website.
+
+9   Electronic counting of votes
+
+    If votes are counted using electronic counting equipment, the returning officer may determine that a reference in this Schedule to the physical arrangement or movement of ballot-papers is not applicable if the equivalent process is performed electronically.
 ```

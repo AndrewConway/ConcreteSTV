@@ -1,30 +1,37 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2023 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use stv::ballot_metadata::{ElectionName, Candidate, CandidateIndex, PartyIndex, ElectionMetadata, DataSource, NumberOfCandidates};
-use stv::ballot_paper::{RawBallotMarking, parse_marking, RawBallotMarkings, FormalVote, ATL, BTL};
+use stv::ballot_paper::{RawBallotMarking, parse_marking, RawBallotMarkings, UniqueVoteBuilderMultipleTypes};
 use std::collections::{HashMap};
 use csv::{StringRecord, StringRecordsIntoIter};
 use zip::ZipArchive;
 use zip::read::ZipFile;
 use anyhow::anyhow;
 use stv::election_data::ElectionData;
-use stv::distribution_of_preferences_transcript::QuotaInfo;
+use stv::distribution_of_preferences_transcript::{CountIndex, QuotaInfo};
 use serde::Deserialize;
 use stv::ballot_pile::BallotPaperCount;
-use stv::official_dop_transcript::{candidate_elem, OfficialDistributionOfPreferencesTranscript};
+use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
+use stv::official_dop_transcript::{candidate_elem, OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use stv::tie_resolution::TieResolutionsMadeByEC;
-use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder, RawDataSource, MissingFile, FileFinder};
+use stv::parse_util::{CandidateAndGroupInformationBuilder, skip_first_line_of_file, GroupBuilder, RawDataSource, MissingFile, FileFinder, RawBallotPaperMetadata, CanReadRawMarkings, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
+use crate::{FederalRulesUsed2013, FederalRulesUsed2016, FederalRulesUsed2019};
 use crate::parse2013::{read_from_senate_group_voting_tickets_download_file2013, read_ticket_votes2013, read_btl_votes2013};
 
 pub fn get_federal_data_loader_2013(finder:&FileFinder) -> FederalDataLoader {
     FederalDataLoader::new(finder,"2013",false,"https://results.aec.gov.au/17496/Website/SenateDownloadsMenu-17496-Csv.htm",17496)
+}
+
+pub fn get_federal_data_loader_2014(finder:&FileFinder) -> FederalDataLoader {
+    FederalDataLoader::new(finder,"2014",false,"https://results.aec.gov.au/17875/Website/SenateDownloadsMenu-17875-csv.htm",17875)
 }
 
 pub fn get_federal_data_loader_2016(finder:&FileFinder) -> FederalDataLoader {
@@ -33,6 +40,31 @@ pub fn get_federal_data_loader_2016(finder:&FileFinder) -> FederalDataLoader {
 
 pub fn get_federal_data_loader_2019(finder:&FileFinder) -> FederalDataLoader {
     FederalDataLoader::new(finder,"2019",false,"https://results.aec.gov.au/24310/Website/SenateDownloadsMenu-24310-Csv.htm",24310)
+}
+
+pub fn get_federal_data_loader_2022(finder:&FileFinder) -> FederalDataLoader {
+    FederalDataLoader::new(finder,"2022",false,"https://results.aec.gov.au/27966/Website/SenateDownloadsMenu-27966-Csv.htm",27966)
+}
+
+
+
+pub struct FederalDataSource {}
+
+impl ElectionDataSource for FederalDataSource {
+    fn name(&self) -> Cow<'static, str> { "Federal Senate".into() }
+    fn ec_name(&self) -> Cow<'static, str> { "Australian Electoral Commission (AEC)".into() }
+    fn ec_url(&self) -> Cow<'static, str> { "https://www.aec.gov.au/".into() }
+    fn years(&self) -> Vec<String> { vec!["2013".to_string(),"2014".to_string(),"2016".to_string(),"2019".to_string(),"2022".to_string()] }
+    fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
+        match year {
+            "2013" => Ok(Box::new(get_federal_data_loader_2013(finder))),
+            "2014" => Ok(Box::new(get_federal_data_loader_2014(finder))),
+            "2016" => Ok(Box::new(get_federal_data_loader_2016(finder))),
+            "2019" => Ok(Box::new(get_federal_data_loader_2019(finder))),
+            "2022" => Ok(Box::new(get_federal_data_loader_2022(finder))),
+            _ => Err(anyhow!("Not a valid year")),
+        }
+    }
 }
 
 
@@ -70,8 +102,8 @@ impl RawDataSource for FederalDataLoader {
     fn ec_decisions(&self,state:&str) -> TieResolutionsMadeByEC {
         match self.year.as_str() {
             "2013" => match state {
-                "VIC" => TieResolutionsMadeByEC{ tie_resolutions: vec![vec![CandidateIndex(54), CandidateIndex(23),CandidateIndex(85),CandidateIndex(88)]] } , // 4 way tie at count 10.
-                "NSW" => TieResolutionsMadeByEC{ tie_resolutions: vec![vec![CandidateIndex(82),CandidateIndex(52),CandidateIndex(54)], vec![CandidateIndex(104),CandidateIndex(68),CandidateIndex(72)], vec![CandidateIndex(56),CandidateIndex(7)], vec![CandidateIndex(20),CandidateIndex(12),CandidateIndex(96)]] } ,
+                "VIC" => TieResolutionsMadeByEC::new(vec![vec![CandidateIndex(54), CandidateIndex(23),CandidateIndex(85),CandidateIndex(88)]]).unwrap() , // 4 way tie at count 10.
+                "NSW" => TieResolutionsMadeByEC::new( vec![vec![CandidateIndex(82),CandidateIndex(52),CandidateIndex(54)], vec![CandidateIndex(104),CandidateIndex(68),CandidateIndex(72)], vec![CandidateIndex(56),CandidateIndex(7)], vec![CandidateIndex(20),CandidateIndex(12),CandidateIndex(96)]]).unwrap() ,
                 _ => Default::default(),
             },
             _ => Default::default(),
@@ -90,76 +122,52 @@ impl RawDataSource for FederalDataLoader {
         }
     }
 
-    // This below should be made more general and most of it factored out into a separate function.
-    fn read_raw_data(&self,state:&str) -> anyhow::Result<ElectionData> {
-        if self.year=="2013" { return self.read_raw_data2013(state); }
-        let mut metadata = self.read_raw_metadata(state)?;
-        let filename = self.name_of_vote_source(state);
-        let preferences_zip_file = self.find_raw_data_file(&filename)?;
-        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
-        metadata.source[0].files.push(filename);
-        let mut parties_that_can_get_atls = vec![];
-        for i in 0..metadata.parties.len() {
-            if metadata.parties[i].atl_allowed { parties_that_can_get_atls.push(PartyIndex(i)); }
-        }
-        let mut zipfile = zip::ZipArchive::new(File::open(preferences_zip_file)?)?;
-        let mut atls : HashMap<Vec<PartyIndex>,usize> = HashMap::default();
-        let mut btls : HashMap<Vec<CandidateIndex>,usize> = HashMap::default();
-        let mut informal = 0;
-        for record in ParsedRawVoteIterator::new(&mut zipfile)? {
-            let record=record?;
-            let markings = RawBallotMarkings::new(&parties_that_can_get_atls,&record.markings);
-            //println!("Markings {:#?}",record.markings);
-            //println!("Interpretatation {:#?}",markings.interpret_vote(1,6));
-            match markings.interpret_vote(1,6) {
-                None => { informal+=1 }
-                Some(FormalVote::Btl(btl)) => { *btls.entry(btl.candidates).or_insert(0)+=btl.n }
-                Some(FormalVote::Atl(atl)) => { *atls.entry(atl.parties).or_insert(0)+=atl.n }
-            }
-        }
-        let atl = atls.into_iter().map(|(parties,n)|ATL{ parties, n }).collect();
-        let btl = btls.into_iter().map(|(candidates,n)|BTL{ candidates , n }).collect();
-        Ok(ElectionData{ metadata, atl, atl_types: vec![], btl, btl_types: vec![], informal })
-    }
-
     fn find_raw_data_file(&self,filename:&str) -> Result<PathBuf,MissingFile> {
         self.finder.find_raw_data_file(filename,&self.archive_location,&self.page_url)
     }
     fn all_electorates(&self) -> Vec<String> {
-        vec!["ACT".to_string(),"NT".to_string(),"TAS".to_string(),"VIC".to_string(),"NSW".to_string(),"QLD".to_string(),"SA".to_string(),"WA".to_string()]
+        match self.year.as_str() {
+            "2014" => vec!["WA".to_string()], // The 2013 WA election was reheld in 2014 due to lost ballots.
+            _ => vec!["ACT".to_string(),"NT".to_string(),"TAS".to_string(),"VIC".to_string(),"NSW".to_string(),"QLD".to_string(),"SA".to_string(),"WA".to_string()]
+        }
+
     }
 
-}
-
-impl FederalDataLoader {
-
-
-    pub fn new(finder:&FileFinder,year:&'static str,double_dissolution:bool,page_url:&'static str,election_number:usize) -> Self {
-        FederalDataLoader {
-            finder : finder.clone(),
-            archive_location: "Federal/".to_string()+year,
-            year: year.to_string(),
-            double_dissolution,
-            page_url: page_url.to_string(),
-            election_number,
+    fn read_raw_data(&self,state:&str) -> anyhow::Result<ElectionData> {
+        match self.year.as_str() {
+            "2013" | "2014" => self.read_raw_data2013(state),
+            _ => {
+                let mut builder = UniqueVoteBuilderMultipleTypes::default();
+                let callback = |markings:&RawBallotMarkings,_meta:&[(&str,&str)]| {
+                    let collection_point = _meta[1].1;
+                    let vote_type = if collection_point.starts_with("PROVISIONAL") { Some("PROVISIONAL") }
+                    else if collection_point.starts_with("PRE_POLL") { Some("PRE_POLL") }
+                    else if collection_point.starts_with("POSTAL") { Some("POSTAL") }
+                    else if collection_point.starts_with("ABSENT") { Some("ABSENT") }
+                    else {None};
+                    builder.add_vote(markings.interpret_vote(1,6),vote_type);
+                };
+                let metadata = self.iterate_over_raw_markings(state,callback)?;
+                Ok(builder.into_election_data(metadata))
+            }
         }
     }
 
-    fn name_of_candidate_source_post_election(&self) -> String {
-        if self.year=="2013" { "SenateGroupVotingTicketsDownload-17496.csv".to_string() }
-        else {
-            format!("SenateFirstPrefsByStateByVoteTypeDownload-{}.csv",self.election_number)
+    fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> {
+        match self.year.as_str() {
+            "2013" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2013,Self>(self,electorate),
+            "2014" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2013,Self>(self,electorate),
+            "2016" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2016,Self>(self,electorate),
+            "2019" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
+            "2022" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
+            _ => Err(anyhow!("Invalid year {}",self.year)),
         }
     }
-    fn name_of_vote_source(&self,state:&str) -> String {
-        format!("aec-senate-formalpreferences-{}-{}.zip",self.election_number,state)
-    }
-    fn name_of_official_transcript_zip_file(&self) -> String {
-        format!("SenateDopDownload-{}.zip",self.election_number)
-    }
-    pub fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata> {
+
+    fn read_raw_metadata(&self,state:&str) -> anyhow::Result<ElectionMetadata> {
         let mut builder = CandidateAndGroupInformationBuilder::default();
-        if self.year=="2013" { read_from_senate_group_voting_tickets_download_file2013(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
+        if self.year=="2013" || self.year=="2014" { read_from_senate_group_voting_tickets_download_file2013(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
+        else if !self.can_load_full_data(state) { read_candidate_list_file_available_before_election2022(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_pre_election()?)?.as_path(),state)?; }
         else { read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(&mut builder,self.find_raw_data_file(&self.name_of_candidate_source_post_election())?.as_path(),state)?; }
         let vacancies = self.candidates_to_be_elected(state);
         Ok(ElectionMetadata{
@@ -179,25 +187,54 @@ impl FederalDataLoader {
             tie_resolutions : self.ec_decisions(state),
         })
     }
-
-
-    fn read_raw_data2013(&self,state:&str) -> anyhow::Result<ElectionData> {
-        let mut metadata = self.read_raw_metadata(state)?;
-        let filename = "SenateUseOfGvtByGroupDownload-17496.csv".to_string();
-        let preferences_zip_file = self.find_raw_data_file(&filename)?;
-        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
-        metadata.source[0].files.push(filename);
-        let ticket_votes = read_ticket_votes2013(&metadata,&preferences_zip_file,state)?;
-        let filename = format!("SenateStateBtlDownload-{}-{}.zip",self.election_number,state);
-        let preferences_zip_file = self.find_raw_data_file(&filename)?;
-        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
-        metadata.source[0].files.push(filename);
-        let (mut btl,informal) = read_btl_votes2013(&metadata, &preferences_zip_file, 1)?; // The 2013 formality rules are quite complex. I am assuming the AEC has applied them already to all with a 1 vote. This is a dubious assumption as there are some without a 1 vote. However since we don't get all the informal votes, it is hard to check formality properly.
-        btl.extend_from_slice(&ticket_votes);
-        Ok(ElectionData{ metadata, atl:vec![], atl_types: vec![], btl, btl_types: vec![], informal })
+    fn copyright(&self) -> Copyright {
+        Copyright{
+            statement: Some("© Commonwealth of Australia 2017".into()),
+            url: Some("https://www.aec.gov.au/footer/Copyright.htm".into()),
+            license_name: Some("Creative Commons Attribution 4.0 International Licence".into()),
+            license_url: Some("https://creativecommons.org/licenses/by/4.0".into())
+        }
     }
 
-    pub fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+    fn rules(&self, _electorate: &str) -> AssociatedRules {
+        match self.year.as_str() {
+            "2013" => AssociatedRules{
+                rules_used: Some("AEC2013".into()),
+                rules_recommended: Some("FederalPre2021".into()),
+                comment: None,
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
+            },
+            "2014" => AssociatedRules{
+                rules_used: Some("AEC2013".into()),
+                rules_recommended: Some("FederalPre2021".into()),
+                comment: None,
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
+            },
+            "2016" => AssociatedRules{
+                rules_used: Some("AEC2016".into()),
+                rules_recommended: Some("FederalPre2021".into()),
+                comment: None,
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
+            },
+            "2019" => AssociatedRules{
+                rules_used: Some("AEC2019".into()),
+                rules_recommended: Some("FederalPre2021".into()),
+                comment: None,
+                reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/RecommendedAmendmentsSenateCountingAndScrutiny.pdf".into()]
+            },
+            "2022" => AssociatedRules{
+                rules_used: Some("AEC2019".into()),
+                rules_recommended: Some("FederalPost2021".into()),
+                comment: Some(Cow::Borrowed("The AEC seems to me to have used the same rules as they used in 2019 (AEC2019). This is similar to my interpretation of the legislation (FederalPost2021) other than in Queensland, where on the last count the AEC did not distribute any votes. This did not change who was elected, or, in this case, the order.")),
+                reports: vec![]
+            },
+            _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
+        }
+    }
+    fn can_read_raw_markings(&self) -> bool  { self.year=="2016" || self.year=="2019" || self.year=="2022" }
+    fn can_load_full_data(&self,_state:&str) -> bool { true }
+
+    fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let filename = self.name_of_official_transcript_zip_file();
         let preferences_zip_file = self.find_raw_data_file(&filename)?;
         println!("Parsing {}",&preferences_zip_file.to_string_lossy());
@@ -210,16 +247,87 @@ impl FederalDataLoader {
                 }
             }
             Err(anyhow!("Could not find file in zipfile for {}",&metadata.name.electorate))
-/*
-            if let Some(file_name) = zipfile.file_names().find(|&n|n.contains(&data.metadata.name.electorate)).map(|file_name|zipfile.by_name(file_name)) {
-                let zip_contents = file_name?; //zipfile.by_name(file_name)?;
-            } else {}*/
         }
     }
 
-    pub fn all_states_data<'a>(&'a self) -> impl Iterator<Item=anyhow::Result<ElectionData>> + 'a {
-        ["ACT","NT","TAS","VIC","NSW","QLD","SA","WA"].iter().map(move |&state|self.load_cached_data(state))
+}
+
+impl CanReadRawMarkings for FederalDataLoader {
+    fn iterate_over_raw_markings<F>(&self,state:&str,mut callback:F)  -> anyhow::Result<ElectionMetadata>
+        where F:FnMut(&RawBallotMarkings,RawBallotPaperMetadata)
+    {
+        if self.year=="2013" { return Err(anyhow!("Iterating over raw btl preferences not supported.")); }
+        let mut metadata = self.read_raw_metadata(state)?;
+        let filename = self.name_of_vote_source(state);
+        let preferences_zip_file = self.find_raw_data_file(&filename)?;
+        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
+        metadata.source[0].files.push(filename);
+        let mut parties_that_can_get_atls = vec![];
+        for i in 0..metadata.parties.len() {
+            if metadata.parties[i].atl_allowed { parties_that_can_get_atls.push(PartyIndex(i)); }
+        }
+        let mut zipfile = zip::ZipArchive::new(File::open(preferences_zip_file)?)?;
+        let num_atl_plus_num_btl_hint = metadata.candidates.len()+metadata.parties.len();
+        for record in ParsedRawVoteIterator::new(&mut zipfile,num_atl_plus_num_btl_hint)? {
+            let record=record?;
+            // if &record.record[4]!="1" { continue; } // test just using batch 1.
+            let markings = RawBallotMarkings::new(&parties_that_can_get_atls,&record.markings);
+            callback(&markings,&[("Electorate",&record.record[record.electorate_column]),("Collection Point",&record.record[record.collection_column])]);
+        }
+        Ok(metadata)
     }
+
+}
+impl FederalDataLoader {
+
+
+    pub fn new(finder:&FileFinder,year:&'static str,double_dissolution:bool,page_url:&'static str,election_number:usize) -> Self {
+        FederalDataLoader {
+            finder : finder.clone(),
+            archive_location: "Federal/".to_string()+year,
+            year: year.to_string(),
+            double_dissolution,
+            page_url: page_url.to_string(),
+            election_number,
+        }
+    }
+
+    fn name_of_candidate_source_post_election(&self) -> String {
+        match self.year.as_str() {
+            "2013" | "2014" => format!("SenateGroupVotingTicketsDownload-{}.csv",self.election_number),
+            _ => format!("SenateFirstPrefsByStateByVoteTypeDownload-{}.csv",self.election_number),
+        }
+    }
+    fn name_of_candidate_source_pre_election(&self) -> anyhow::Result<String> {
+        match self.year.as_str() {
+            "2022" => Ok("senate-candidates.csv".to_string()),
+            _ => Err(anyhow!("No pre election formats for year {}",self.year))
+        }
+    }
+
+    fn name_of_vote_source(&self,state:&str) -> String {
+        format!("aec-senate-formalpreferences-{}-{}.zip",self.election_number,state)
+    }
+    fn name_of_official_transcript_zip_file(&self) -> String {
+        format!("SenateDopDownload-{}.zip",self.election_number)
+    }
+
+
+    fn read_raw_data2013(&self,state:&str) -> anyhow::Result<ElectionData> {
+        let mut metadata = self.read_raw_metadata(state)?;
+        let filename = format!("SenateUseOfGvtByGroupDownload-{}.csv",self.election_number);
+        let preferences_zip_file = self.find_raw_data_file(&filename)?;
+        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
+        metadata.source[0].files.push(filename);
+        let ticket_votes = read_ticket_votes2013(&metadata,&preferences_zip_file,state,&self.year)?;
+        let filename = format!("SenateStateBtlDownload-{}-{}.zip",self.election_number,state);
+        let preferences_zip_file = self.find_raw_data_file(&filename)?;
+        println!("Parsing {}",&preferences_zip_file.to_string_lossy());
+        metadata.source[0].files.push(filename);
+        let (btl,informal) = read_btl_votes2013(&metadata, &preferences_zip_file, 1)?; // The 2013 formality rules are quite complex. I am assuming the AEC has applied them already to all with a 1 vote. This is a dubious assumption as there are some without a 1 vote. However since we don't get all the informal votes, it is hard to check formality properly.
+        Ok(ElectionData{ metadata, atl:ticket_votes, atl_types: vec![], atl_transfer_values: vec![], btl, btl_types: vec![], btl_transfer_values: vec![], informal })
+    }
+
 }
 
 
@@ -243,13 +351,14 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
         #[serde(rename = "Status")] status : String, // blank, Elected, Excluded
         #[serde(rename = "Changed")] changed : String, // True or blank.
         #[serde(rename = "Order Elected")] order_elected : usize,
-        #[serde(rename = "Comment")] _comment: Option<String>,
+        #[serde(rename = "Comment")] comment: Option<String>,
     }
     let lookup_names : HashMap<String,CandidateIndex> = metadata.get_candidate_name_lookup();
     let mut res = OfficialDistributionOfPreferencesTranscript::default();
     let mut last_count : usize = 0;
     let mut order_elected : HashMap<CandidateIndex,usize> = Default::default(); // value is order elected, which is not necessarily as encountered.
     let mut excluded_last : Vec<CandidateIndex> = vec![]; // transcript marks them as excluded the round before they are excluded in.
+    let mut papers_came_from_counts : Option<Vec<CountIndex>> = None;
     for result in reader.deserialize() {
         let record : Record = result?;
         if last_count==0 {
@@ -263,6 +372,7 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
             last_count=record.count;
             res.finished_count();
             res.count().excluded.extend(excluded_last.drain(..));
+            res.count().papers_came_from_counts = papers_came_from_counts.take();
         }
         if record.transfer_value!=0.0 { res.count().transfer_value = Some(record.transfer_value) }
         if record.surname=="Exhausted" {
@@ -296,6 +406,14 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
                 }
             }
         }
+        if papers_came_from_counts.is_none() {
+            if let Some(comment) = &record.comment {
+                papers_came_from_counts = OfficialDOPForOneCount::extract_counts_from_comment(comment,"Preferences received at count(s) ",".")?;
+                if papers_came_from_counts.is_none() {
+                    papers_came_from_counts = OfficialDOPForOneCount::extract_counts_from_comment(comment,"papers are involved from count number(s) ",".")?;
+                }
+            }
+        }
     }
     Ok(res)
 }
@@ -316,7 +434,7 @@ fn read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(builder: 
             if candidate_id!="0" {
                 let position_in_ticket = record[3].parse::<usize>()?; // 0, 1, .. 0 means a dummy id for the group ticket.
                 if builder.parties.len()==0 || &builder.parties[builder.parties.len()-1].group_id != group_id {
-                    builder.parties.push(GroupBuilder{name:record[5].to_string(), abbreviation:None, group_id:group_id.to_string(),ticket_id:if position_in_ticket==0 {Some(candidate_id.to_string())} else {None}, tickets: vec![] });
+                    builder.parties.push(GroupBuilder{name:record[5].to_string(), abbreviation:None, group_id:group_id.to_string(),ticket_id:if position_in_ticket==0 {Some(candidate_id.to_string())} else {None}, tickets: vec![]});
                 }
                 if position_in_ticket!=0 { // real candidate.
                     // self.candidate_by_id.insert(candidate_id.to_string(),CandidateIndex(self.candidates.len()));
@@ -333,19 +451,45 @@ fn read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(builder: 
     Ok(())
 }
 
+/// This reads the file format available before the election.
+/// This is the format used in 2022.
+/// A similar format was used in 2016 and 2019
+fn read_candidate_list_file_available_before_election2022(builder: &mut CandidateAndGroupInformationBuilder,path:&Path,state:&str) -> anyhow::Result<()> {
+    let mut rdr = csv::Reader::from_path(path)?;
+    for result in rdr.records() {
+        let record = result?;
+        if state==&record[0] { // right state
+            let group_id = &record[1]; // something like A, B, or UG
+            let position_in_ticket = record[2].parse::<usize>()?; // 1,2.,,,
+            if builder.parties.len()==0 || &builder.parties[builder.parties.len()-1].group_id != group_id {
+                builder.parties.push(GroupBuilder{name:record[5].to_string(), abbreviation:None, group_id:group_id.to_string(),ticket_id:None, tickets: vec![]});
+            }
+            builder.candidates.push(Candidate{
+                name: record[3].to_string()+", "+&record[4],
+                party: Some(PartyIndex(builder.parties.len()-1)),
+                position: Some(position_in_ticket),
+                ec_id: None,
+            });
+        }
+    }
+    Ok(())
+}
+
 
 
 struct ParsedRawVoteIterator<'a> {
     electorate_column : usize,
     collection_column : usize,
     preferences_column : Option<usize>,
+    num_atl_plus_num_btl_hint : usize,
     // reader : Reader<ZipFile<'a>>,
     records : StringRecordsIntoIter<ZipFile<'a>>
 }
 
 
 impl<'a> ParsedRawVoteIterator<'a> {
-    fn new(zipfile : &'a mut ZipArchive<File>) -> anyhow::Result<Self> {
+    /// the num_atl_plus_num_btl_hint is used for initial capacity of the vector - it only matters for performance, and if it is a few over that is fine,
+    fn new(zipfile : &'a mut ZipArchive<File>,num_atl_plus_num_btl_hint:usize) -> anyhow::Result<Self> {
         let zip_contents = zipfile.by_index(0)?;
         let mut reader = csv::ReaderBuilder::new().flexible(true).from_reader(zip_contents);
         let headings = reader.headers()?;
@@ -357,6 +501,7 @@ impl<'a> ParsedRawVoteIterator<'a> {
             electorate_column,
             collection_column,
             preferences_column,
+            num_atl_plus_num_btl_hint,
             records,
         })
     }
@@ -385,7 +530,7 @@ impl <'a> Iterator for ParsedRawVoteIterator<'a> {
         match self.records.next() {
             Some(Ok(record)) => {
                 if record[0].starts_with("---") { return self.next(); } // skip dummy heading "underlines" if there.
-                let mut markings : Vec<RawBallotMarking> = Vec::with_capacity(100); // TODO num_atl+num_btl
+                let mut markings : Vec<RawBallotMarking> = Vec::with_capacity(self.num_atl_plus_num_btl_hint);
                 match self.preferences_column {
                     Some(preferences_column) => { // preferences are all in 1 column, comma separated
                         for s in record[preferences_column].split(',') {
