@@ -16,6 +16,7 @@ use std::fmt::{Debug, Display, Formatter};
 use crate::preference_distribution::TransferValueMethod;
 use crate::signed_version::SignedVersion;
 use std::str::FromStr;
+use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
 use crate::tie_resolution::TieResolutionExplicitDecision;
 
 
@@ -68,6 +69,24 @@ impl <X:Default+PartialEq+Clone+Display+FromStr> PerCandidate<X> {
     }
 }
 
+
+impl <Tally:PartialEq+Clone+Display+FromStr+CanConvertToF64PossiblyLossily> PerCandidate<Tally> {
+    /// Like equals, but for potentially different tally types
+    pub fn same<Tally2:PartialEq+Clone+Display+FromStr+CanConvertToF64PossiblyLossily>(&self,other:&PerCandidate<Tally2>) -> bool {
+        if self.candidate.len()!=other.candidate.len() { return false; }
+        for i in 0..self.candidate.len() {
+            if self.candidate[i].convert_to_f64()!=other.candidate[i].convert_to_f64() { return false; }
+        }
+        if self.exhausted.convert_to_f64()!=other.exhausted.convert_to_f64() { return false; }
+        if self.rounding.convert_f64(|t|t.convert_to_f64())!=other.rounding.convert_f64(|t|t.convert_to_f64()) { return false; }
+        match (self.set_aside.as_ref(),other.set_aside.as_ref()) {
+            (None, None) => true,
+            (Some(_), None) => false,
+            (None,Some(_)) => false,
+            (Some(a),Some(b)) => a.convert_to_f64()==b.convert_to_f64(),
+        }
+    }
+}
 #[derive(thiserror::Error, Debug)]
 #[error("Not an integer")]
 pub struct NotInteger {}
@@ -157,7 +176,7 @@ impl From<PerCandidate<usize>> for PerCandidate<f64> {
     }
 }
 /// Record the status of the count at the end of the count.
-#[derive(Clone,Serialize,Deserialize,PartialEq)]
+#[derive(Clone,Serialize,Deserialize,PartialEq,Debug)]
 pub struct EndCountStatus<Tally:PartialEq+Clone+Display+FromStr> {
     /// tallies for each candidate
     pub tallies : PerCandidate<Tally>,
@@ -167,7 +186,14 @@ pub struct EndCountStatus<Tally:PartialEq+Clone+Display+FromStr> {
     pub atl_papers : Option<PerCandidate<BallotPaperCount>>,
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+impl <Tally:PartialEq+Clone+Display+FromStr+CanConvertToF64PossiblyLossily> EndCountStatus<Tally> {
+    /// Like equals, but for potentially different tally types
+    pub fn same<Tally2:PartialEq+Clone+Display+FromStr+CanConvertToF64PossiblyLossily>(&self,other:&EndCountStatus<Tally2>) -> bool {
+        self.papers==other.papers && self.atl_papers==other.atl_papers && self.tallies.same(&other.tallies)
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Debug)]
 pub enum ReasonForCount {
     FirstPreferenceCount,
     ExcessDistribution(CandidateIndex),
@@ -189,7 +215,7 @@ impl ReasonForCount {
     }
 }
 
-#[derive(Copy, Clone,Serialize,Deserialize,Eq, PartialEq)]
+#[derive(Copy, Clone,Serialize,Deserialize,Eq, PartialEq,Debug)]
 pub enum ElectionReason {
     ReachedQuota,
     HighestOfLastTwoStanding,
@@ -197,13 +223,13 @@ pub enum ElectionReason {
     OverwhelmingTally,
 }
 
-#[derive(Copy, Clone,Serialize,Deserialize,Eq, PartialEq)]
+#[derive(Copy, Clone,Serialize,Deserialize,Eq, PartialEq,Debug)]
 pub struct CandidateElected {
     pub who : CandidateIndex,
     pub why : ElectionReason,
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Debug)]
 pub struct PortionOfReasonBeingDoneThisCount {
     pub transfer_value : Option<TransferValue>,
     pub when_tv_created: Option<CountIndex>,
@@ -211,7 +237,7 @@ pub struct PortionOfReasonBeingDoneThisCount {
 }
 
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Debug)]
 pub struct TransferValueCreation<Tally> {
     pub surplus : Tally,
     pub votes : Tally,
@@ -247,7 +273,7 @@ impl Display for DecisionMadeByEC {
 
 
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Debug)]
 pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
     /// The action that is being done in said count
     pub reason : ReasonForCount,
@@ -286,7 +312,7 @@ impl <Tally:Display+Debug> Display for QuotaInfo<Tally> {
     }
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Debug)]
 pub struct Transcript<Tally:PartialEq+Clone+Display+FromStr+Debug> {
     /// The rules that were used to compute this transcript.
     pub rules : String,
@@ -304,7 +330,7 @@ impl <Tally:PartialEq+Clone+Display+FromStr+Debug> Transcript<Tally> {
     }
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Debug)]
 pub struct TranscriptWithMetadata<Tally:PartialEq+Clone+Display+FromStr+Debug> {
     pub metadata : ElectionMetadata,
     pub transcript : Transcript<Tally>,

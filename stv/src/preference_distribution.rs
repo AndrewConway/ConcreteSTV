@@ -55,7 +55,7 @@ pub enum WhenToDoElectCandidateClauseChecking {
     AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapersOrQuotaButOnlyIfContinuingCandidatesEqualsUnfilledVacanciesAndNotAfterSurplusIfMoreSurplusesAvailable,
 }
 
-#[derive(Copy,Clone,Serialize,Deserialize)]
+#[derive(Copy,Clone,Serialize,Deserialize,Debug)]
 pub enum TransferValueMethod {
     SurplusOverBallots, // Used by Federal
     SurplusOverContinuingBallots,
