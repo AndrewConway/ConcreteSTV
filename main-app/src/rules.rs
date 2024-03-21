@@ -21,6 +21,7 @@ use serde::{Serialize,Deserialize};
 use margin::record_changes::ElectionChanges;
 use nsw::{NSWECLocalGov2021, NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation, SimpleIRVAnyDifferenceBreaksTies};
 use nsw::nsw_random_rules::{NSWECRandomLC2015, NSWECRandomLC2019, NSWECRandomLGE2012, NSWECRandomLGE2016, NSWECRandomLGE2017};
+use stv::compare_transcripts::{compare_transcripts, DifferenceBetweenTranscripts};
 use stv::extract_votes_in_pile::ExtractionRequest;
 use stv::random_util::Randomness;
 use vic::Vic2018LegislativeCouncil;
@@ -211,7 +212,7 @@ pub enum PossibleChanges {
 
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize,Debug,Clone)]
 #[serde(untagged)]
 pub enum PossibleTranscripts {
     Integers(TranscriptWithMetadata<usize>),
@@ -223,6 +224,15 @@ impl PossibleTranscripts {
         match self {
             PossibleTranscripts::Integers(t) => {&t.transcript.elected}
             PossibleTranscripts::SixDigitDecimals(t) => {&t.transcript.elected}
+        }
+    }
+
+    pub fn compare_transcripts(&self, other:&PossibleTranscripts) -> DifferenceBetweenTranscripts {
+        match (self,other) {
+            (PossibleTranscripts::Integers(t1), PossibleTranscripts::Integers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::Integers(t1), PossibleTranscripts::SixDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::SixDigitDecimals(t1), PossibleTranscripts::Integers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::SixDigitDecimals(t1), PossibleTranscripts::SixDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
         }
     }
 }

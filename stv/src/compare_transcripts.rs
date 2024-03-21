@@ -14,6 +14,7 @@ use std::cmp::min;
 use serde::{Serialize,Deserialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
+use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
 
 /// The result of comparing two transcripts, in order of most
 /// serious to least serious. The most serious is reported.
@@ -85,7 +86,7 @@ impl DeltasInCandidateLists {
 }
 
 
-pub fn compare_transcripts<Tally:PartialEq+Clone+Display+FromStr+Debug>(transcript1:&Transcript<Tally>,transcript2:&Transcript<Tally>) -> DifferenceBetweenTranscripts {
+pub fn compare_transcripts<Tally1:PartialEq+Clone+Display+FromStr+Debug+CanConvertToF64PossiblyLossily,Tally2:PartialEq+Clone+Display+FromStr+Debug+CanConvertToF64PossiblyLossily>(transcript1:&Transcript<Tally1>,transcript2:&Transcript<Tally2>) -> DifferenceBetweenTranscripts {
     // first compare who was elected.
     if transcript1.elected!=transcript2.elected { // High priority!
         let dcl = DifferentCandidateLists{list1:transcript1.elected.clone(),list2:transcript2.elected.clone()};
@@ -95,7 +96,7 @@ pub fn compare_transcripts<Tally:PartialEq+Clone+Display+FromStr+Debug>(transcri
         for count_index in 0..min(transcript1.counts.len(),transcript2.counts.len()) {
             let count1 = &transcript1.counts[count_index];
             let count2 = &transcript2.counts[count_index];
-            if count1.elected!=count2.elected || count1.not_continuing!=count2.not_continuing || count1.status!=count2.status { return DifferenceBetweenTranscripts::DifferentValues(CountIndex(count_index))}
+            if count1.elected!=count2.elected || count1.not_continuing!=count2.not_continuing || !count1.status.same(&count2.status) { return DifferenceBetweenTranscripts::DifferentValues(CountIndex(count_index))}
         }
         if transcript1.counts.len()==transcript2.counts.len() { DifferenceBetweenTranscripts::Same } else { DifferenceBetweenTranscripts::DifferentNumberOfCounts }
     }

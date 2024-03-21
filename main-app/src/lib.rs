@@ -26,6 +26,7 @@ use crate::rules::Rules;
 
 pub mod rules;
 pub mod ec_data_source;
+pub mod compare_different_rules;
 
 
 /// Utility that is helpful for parsing tie resolution description string in clap a Vec<Vec<CandidateIndex>>.
