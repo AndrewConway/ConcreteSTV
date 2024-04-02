@@ -119,4 +119,7 @@ impl RulesComparisonGroups {
         }
         Ok(res)
     }
+
+    pub fn has_different_winners(&self) -> bool { self.groups.len()>1 }
+    pub fn has_different_orders(&self) -> bool { self.groups.iter().any(|g|g.subgroups.len()>1) }
 }
