@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -19,7 +19,7 @@ use act::{ACTPre2020, ACT2020, ACT2021};
 use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 use serde::{Serialize,Deserialize};
 use margin::record_changes::ElectionChanges;
-use nsw::{NSWECLocalGov2021, NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation, SimpleIRVAnyDifferenceBreaksTies};
+use nsw::{NSWECLocalGov2021, NSWECLocalGov2021Literal, NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation, SimpleIRVAnyDifferenceBreaksTies};
 use nsw::nsw_random_rules::{NSWECRandomLC2015, NSWECRandomLC2019, NSWECRandomLGE2012, NSWECRandomLGE2016, NSWECRandomLGE2017};
 use stv::compare_transcripts::{compare_transcripts, DifferenceBetweenTranscripts};
 use stv::extract_votes_in_pile::ExtractionRequest;
@@ -41,6 +41,7 @@ pub enum Rules {
     ACT2021,
     NSWLocalGov2021,
     NSWECLocalGov2021,
+    NSWECLocalGov2021Literal,
     NSWECRandomLGE2012,
     NSWECRandomLGE2016,
     NSWECRandomLGE2017,
@@ -68,6 +69,7 @@ impl FromStr for Rules {
             "ACT2021" => Ok(Rules::ACT2021),
             "NSWLocalGov2021" => Ok(Rules::NSWLocalGov2021),
             "NSWECLocalGov2021" => Ok(Rules::NSWECLocalGov2021),
+            "NSWECLocalGov2021Literal" => Ok(Rules::NSWECLocalGov2021Literal),
             "NSWECRandomLGE2012" => Ok(Rules::NSWECRandomLGE2012),
             "NSWECRandomLGE2016" => Ok(Rules::NSWECRandomLGE2016),
             "NSWECRandomLC2015" => Ok(Rules::NSWECRandomLC2015),
@@ -94,6 +96,7 @@ impl Display for Rules {
             Rules::ACT2021 => "ACT2021",
             Rules::NSWLocalGov2021 => "NSWLocalGov2021",
             Rules::NSWECLocalGov2021 => "NSWECLocalGov2021",
+            Rules::NSWECLocalGov2021Literal => "NSWECLocalGov2021Literal",
             Rules::NSWECRandomLGE2012 => "NSWECRandomLGE2012",
             Rules::NSWECRandomLGE2016 => "NSWECRandomLGE2016",
             Rules::NSWECRandomLGE2017 => "NSWECRandomLGE2017",
@@ -124,6 +127,10 @@ impl Rules {
             Rules::ACTPre2020 => distribute_preferences_with_extractors::<ACTPre2020>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors),
             Rules::NSWLocalGov2021 => distribute_preferences_with_extractors::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors),
             Rules::NSWECLocalGov2021 => distribute_preferences_with_extractors::<NSWECLocalGov2021>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors),
+            Rules::NSWECLocalGov2021Literal => {
+                let transcript = distribute_preferences_with_extractors::<NSWECLocalGov2021Literal>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors);
+                return PossibleTranscripts::SignedIntegers(TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript })
+            },
             Rules::NSWECRandomLGE2012 => distribute_preferences_with_extractors::<NSWECRandomLGE2012>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors),
             Rules::NSWECRandomLGE2016 => distribute_preferences_with_extractors::<NSWECRandomLGE2016>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors),
             Rules::NSWECRandomLGE2017 => distribute_preferences_with_extractors::<NSWECRandomLGE2017>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors),
@@ -157,6 +164,7 @@ impl Rules {
             Rules::ACT2021 => PossibleChanges::SixDigitDecimals(options.find_changes::<ACT2021>(data,verbose)?),
             Rules::NSWLocalGov2021 => PossibleChanges::Integers(options.find_changes::<NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation>(data,verbose)?),
             Rules::NSWECLocalGov2021 => PossibleChanges::Integers(options.find_changes::<NSWECLocalGov2021>(data,verbose)?),
+            Rules::NSWECLocalGov2021Literal => PossibleChanges::SignedIntegers(options.find_changes::<NSWECLocalGov2021Literal>(data,verbose)?),
             Rules::Vic2018 => PossibleChanges::Integers(options.find_changes::<Vic2018LegislativeCouncil>(data,verbose)?),
             Rules::WA2008 => PossibleChanges::Integers(options.find_changes::<WALegislativeCouncil>(data,verbose)?),
             Rules::IRV => PossibleChanges::Integers(options.find_changes::<SimpleIRVAnyDifferenceBreaksTies>(data,verbose)?),
@@ -207,6 +215,7 @@ impl RulesDetails {
 #[serde(untagged)]
 pub enum PossibleChanges {
     Integers(ElectionChanges<usize>),
+    SignedIntegers(ElectionChanges<isize>),
     SixDigitDecimals(ElectionChanges<FixedPrecisionDecimal<6>>),
 }
 
@@ -216,6 +225,7 @@ pub enum PossibleChanges {
 #[serde(untagged)]
 pub enum PossibleTranscripts {
     Integers(TranscriptWithMetadata<usize>),
+    SignedIntegers(TranscriptWithMetadata<isize>),
     SixDigitDecimals(TranscriptWithMetadata<FixedPrecisionDecimal<6>>),
 }
 
@@ -223,6 +233,7 @@ impl PossibleTranscripts {
     pub fn elected(&self) -> &Vec<CandidateIndex> {
         match self {
             PossibleTranscripts::Integers(t) => {&t.transcript.elected}
+            PossibleTranscripts::SignedIntegers(t) => {&t.transcript.elected}
             PossibleTranscripts::SixDigitDecimals(t) => {&t.transcript.elected}
         }
     }
@@ -230,8 +241,13 @@ impl PossibleTranscripts {
     pub fn compare_transcripts(&self, other:&PossibleTranscripts) -> DifferenceBetweenTranscripts {
         match (self,other) {
             (PossibleTranscripts::Integers(t1), PossibleTranscripts::Integers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::Integers(t1), PossibleTranscripts::SignedIntegers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
             (PossibleTranscripts::Integers(t1), PossibleTranscripts::SixDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::SignedIntegers(t1), PossibleTranscripts::Integers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::SignedIntegers(t1), PossibleTranscripts::SignedIntegers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::SignedIntegers(t1), PossibleTranscripts::SixDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
             (PossibleTranscripts::SixDigitDecimals(t1), PossibleTranscripts::Integers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::SixDigitDecimals(t1), PossibleTranscripts::SignedIntegers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
             (PossibleTranscripts::SixDigitDecimals(t1), PossibleTranscripts::SixDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
         }
     }

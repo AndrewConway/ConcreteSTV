@@ -268,8 +268,21 @@ I am not at all claiming that other interpretations are untenable. There is not 
 `the exhausted votes are to be excluded at the value that the votes were transferred to the candidate.`
 
 This is ambiguous, and could change who gets elected.
-I believe the NSWEC uses the same interpretation, although I have not checked quite as carefully as in
-other cases.
+
+I believe the NSWEC uses the same interpretation. Some evidence for this comes from the 2021 Armidale Regional
+distribution of preferences, count 26, where Steven Mephan has a surplus distributed. In this case the surplus
+is asserted to be 68, and the surplus fraction is asserted to be 0.0530666700792744≈68/1281.406952771. 
+The denominator is clearly not an integer, indicating that rounding down is not done at
+least for one component. This component can only plausibly be the value of the excluded votes, and indeed if one
+does the round down one gets 68/1285 ≈0.0529183, whereas if one does not one gets
+131699001168277130972280/2481764937794977541189273 ≈0.0530667 consistent with the NSWEC supplied value.
+
+This brings up the issue of what to do about negative transfer values. As this situation did not
+crop up in the last election, I cannot say what the NSWEC would do in this situation... either obey
+the legislation literally (producing negative transfer values which were surely not intended) or disobey
+the text and do what the writers of the legislation presumably would want if they had thought more clearly 
+about it. As this is a rather significant unresolved issue, I have made two versions, one using the literal
+legislation and one avoiding negative surplus fractions (and thus transfer values).
 
 ### When to apply clause 11 Election without reaching quota
 

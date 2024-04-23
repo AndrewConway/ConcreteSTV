@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -9,7 +9,7 @@
 //! Unlike IRV, there are many ambiguities in the conceptual description of STV, so parameterized
 
 
-use num::{BigInt, ToPrimitive, Zero};
+use num::{BigInt, Signed, ToPrimitive, Zero};
 pub use num::BigRational as BigRational;
 use crate::election_data::{ElectionData, VoteValueSpecification};
 use crate::ballot_pile::{VotesWithMultipleTransferValues, HowSplitByCountNumber, PartiallyDistributedVote, BallotPaperCount, DistributedVotes, VotesWithSameTransferValue};
@@ -122,10 +122,13 @@ pub trait RoundUpToUsize {
 impl RoundUpToUsize for usize {
     fn ceil(&self) -> usize { *self }
 }
+impl RoundUpToUsize for isize {
+    fn ceil(&self) -> usize { self.to_usize().unwrap_or(0) } // not ideal but we shouldn't expect negative vote tallies to behave sensibly. Used in margin computation and surplus distribution so should not be a problem unless its use grows.
+}
 
 pub trait PreferenceDistributionRules {
     /// The type for the number of votes. Usually an integer.
-    type Tally : Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Debug+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>+RoundUpToUsize+Div<usize,Output=Self::Tally>+CanConvertToF64PossiblyLossily;
+    type Tally : Clone+AddAssign+SubAssign+From<BallotPaperCount>+Display+PartialEq+Serialize+FromStr+Debug+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>+RoundUpToUsize/*+Div<usize,Output=Self::Tally>*/+CanConvertToF64PossiblyLossily;
     type SplitByNumber : HowSplitByCountNumber;
 
     /// Whether or not the system has a quota. False for IRV.
@@ -200,6 +203,12 @@ pub trait PreferenceDistributionRules {
     /// Instead of doing exact computations using transfer values, use f32 approximate floating point computations. Needed to emulate an NSWEC bug.
     /// Only currently implemented for the NSWEC randomized algorithm.
     fn use_f32_arithmetic_when_applying_transfer_values_instead_of_exact() -> bool { false }
+
+    /// If a surplus distribution transfer is computed by a "surplus fraction" times the original transfer value,
+    /// and the "surplus fraction" is computed by surplus/(votes-exhausted votes), and the votes is rounded down,
+    /// and the exhausted votes isn't, then the denominator could be negative. The NSW LGE legislation seems to
+    /// allow this. Set this to be false if you want to allow this behaviour, which then causes all sorts of terrible problems.
+    fn prohibit_negative_surplus_fraction() -> bool { true }
 
     /// Change the votes otherwise being classified as exhausted. Changes will go into the lost due to rounding tally.
     fn munge_exhausted_votes(exhausted:Self::Tally,_is_exclusion:bool) -> Self::Tally { exhausted }
@@ -356,7 +365,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn compute_quota(&mut self,total_first_preferences:Rules::Tally) {
         if Rules::has_quota() {
             let total_first_preferences = BallotPaperCount(Rules::convert_tally_to_rational(total_first_preferences.clone()).to_integer().to_usize().unwrap()); // usually trivial and valid, unless there are papers with TV other than 1, in which case rounded down.
-            self.quota = Rules::Tally::from(total_first_preferences.0/(1+self.candidates_to_be_elected.0)+1);
+            self.quota = Rules::Tally::from(BallotPaperCount(total_first_preferences.0/(1+self.candidates_to_be_elected.0)+1));
             self.transcript.quota = Some(QuotaInfo{
                 papers: total_first_preferences,
                 vacancies: self.candidates_to_be_elected,
@@ -364,7 +373,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             });
             if self.print_progress_to_stdout { println!("Quota = {}", self.quota); }
         } else {
-            self.quota = total_first_preferences+Rules::Tally::from(1000); // effectively infinity.
+            self.quota = total_first_preferences+Rules::Tally::from(BallotPaperCount(1000)); // effectively infinity.
         }
     }
 
@@ -541,7 +550,15 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 
     pub fn number_continuing_candidates(&self) -> NumberOfCandidates { NumberOfCandidates(self.continuing_candidates.len() )}
-    pub fn remaining_to_elect(&self) -> NumberOfCandidates { self.candidates_to_be_elected-NumberOfCandidates(self.elected_candidates.len()) }
+    pub fn remaining_to_elect(&self) -> NumberOfCandidates {
+        let elected = NumberOfCandidates(self.elected_candidates.len());
+        if self.candidates_to_be_elected>=elected {
+            self.candidates_to_be_elected-elected
+        } else { // This can "legitimately" happen with NSWECLocalGov2021Literal rules!
+            eprintln!("Elected more candidates ({}) than there were vacancies ({}).",elected,self.candidates_to_be_elected);
+            NumberOfCandidates(0)
+        }
+    }
 
     /// federal rule 17
     /// > (17) In respect of the last vacancy for which two continuing candidates
@@ -598,7 +615,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 others+=self.tally(candidate);
             }
             others+=self.total_undistributed_surplus_votes();
-            if self.print_progress_to_stdout { println!("remaining seats {} corresponding candidate tally {} others {}", self.remaining_to_elect(), possibly_overwhelming_tally, others); }
+            // if self.print_progress_to_stdout { println!("remaining seats {} corresponding candidate tally {} others {}", self.remaining_to_elect(), possibly_overwhelming_tally, others); }
             if possibly_overwhelming_tally>others {
                 let candidates_to_elect : Vec<CandidateIndex> = self.continuing_candidates_sorted_by_tally.iter().rev().take(self.remaining_to_elect().0).cloned().collect();
                 for c in candidates_to_elect {
@@ -864,7 +881,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let original_worth_ratio = Rules::convert_tally_to_rational(surplus.clone())/Rules::convert_tally_to_rational(votes.clone());
         let surplus_rational = Rules::convert_tally_to_rational(surplus.clone());
         //println!("TV based on surplus {} = {}-{} divided by {} = {}-{}",surplus_rational,votes,self.quota,general_tv_denom,votes,total_value_of_exhausted_votes);
-        let general_tv = if general_tv_denom<=surplus_rational { TransferValue::one() } else { TransferValue(surplus_rational/general_tv_denom) };
+        let general_tv = if general_tv_denom<=surplus_rational && (Rules::prohibit_negative_surplus_fraction() || !general_tv_denom.is_negative()) { TransferValue::one() } else { TransferValue(surplus_rational/general_tv_denom) };
         //println!("quota {} exhausted {} special factor excluded {:?} TV {}",self.quota,total_value_of_exhausted_votes,special_factor_excluded,general_tv);
         let mut current_remaining_tally_for_candidate_being_distributed : BigRational = Rules::convert_tally_to_rational(votes.clone());
         let mut togo = partially_distributed.len();
@@ -943,12 +960,12 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 if chosen.num_ballots.0>0 {
                     let worth = chosen.num_ballots;
                     total_transferred +=worth;
-                    self.tallys[candidate_index]+=worth.0.into();
-                    self.papers[candidate_index].add(&chosen, TransferValue::one(), self.current_count, None, worth.0.into());
+                    self.tallys[candidate_index]+=worth.into();
+                    self.papers[candidate_index].add(&chosen, TransferValue::one(), self.current_count, None, worth.into());
                 }
                 if unchosen.num_ballots.0>0 { // the ones not chosen are returned to the original owner so that s/he keeps a quota of ballot papers.
                     let worth = unchosen.num_ballots;
-                    self.papers[candidate_being_distributed.0].add(&unchosen, TransferValue::one(), self.current_count, None, worth.0.into());
+                    self.papers[candidate_being_distributed.0].add(&unchosen, TransferValue::one(), self.current_count, None, worth.into());
                 }
             }
         }
@@ -958,10 +975,10 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let exhausted_that_are_set_aside_for_quota = distributed.exhausted-exhausted_that_would_be_distributed_if_they_could_be;
         // println!("surplus={} total_transferred={}",surplus,total_transferred);
         let (exhausted_retained_for_quota,exhausted_set_aside) = distributed.exhausted_votes.set_aside_arbitrarily(exhausted_that_would_be_distributed_if_they_could_be);
-        self.papers[candidate_being_distributed.0].add(&exhausted_retained_for_quota, TransferValue::one(), self.current_count, None, exhausted_retained_for_quota.num_ballots.0.into());
+        self.papers[candidate_being_distributed.0].add(&exhausted_retained_for_quota, TransferValue::one(), self.current_count, None, exhausted_retained_for_quota.num_ballots.into());
         assert_eq!(exhausted_retained_for_quota.num_ballots,exhausted_that_are_set_aside_for_quota);
         self.exhausted += exhausted_that_would_be_distributed_if_they_could_be;
-        self.tally_exhausted += exhausted_that_would_be_distributed_if_they_could_be.0.into();
+        self.tally_exhausted += exhausted_that_would_be_distributed_if_they_could_be.into();
         self.exhausted_atl += exhausted_set_aside.num_atl_ballots;
         self.in_this_count.set_aside_for_quota = Some(PerCandidate {
             candidate: set_aside_by_candidate,

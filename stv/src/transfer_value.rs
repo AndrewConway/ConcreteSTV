@@ -52,6 +52,10 @@ impl TransferValue {
         let exact = self.mul(papers);
         round_rational_down_to_usize(exact)
     }
+    pub fn mul_rounding_down_isize(&self,papers:BallotPaperCount) -> isize {
+        let exact = self.mul(papers);
+        round_rational_down_to_isize(exact)
+    }
     pub fn mul_rounding_down_and_remainder(&self,papers:BallotPaperCount) -> (usize,BigRational) {
         let exact = self.mul(papers);
         let rounded_down_to_integer = round_rational_down_to_usize(exact.clone());
@@ -84,9 +88,18 @@ pub fn round_rational_down_to_usize(rational:BigRational) -> usize {
     let rounded_down = rational.numer().clone()/rational.denom().clone();
     rounded_down.to_usize().unwrap()
 }
-pub fn convert_usize_to_rational(tally:usize) -> BigRational {
+
+/// Round a rational number down to an isize.
+pub fn round_rational_down_to_isize(rational:BigRational) -> isize {
+    let rounded_down = rational.numer().clone()/rational.denom().clone();
+    rounded_down.to_isize().unwrap()
+}
+/// converts usize (or anything that can be converted to BigInt via From trait) into a BigRational.
+pub fn convert_usize_to_rational<T>(tally:T) -> BigRational
+where BigInt : From<T> {
     BigRational::new(BigInt::from(tally),BigInt::one())
 }
+
 
 impl Display for TransferValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -26,13 +26,22 @@ use std::fmt::{Debug, Display};
 use std::iter::Sum;
 use std::str::FromStr;
 use crate::random_util::Randomness;
-use crate::verify_official_transcript::OracleFromOfficialDOP;
 
 /// A number representing a count of pieces of paper.
 /// This is distinct from votes which may be fractional in the presence of weights.
 #[derive(Copy,Clone,Eq, PartialEq,Serialize,Deserialize,Ord, PartialOrd)]
 pub struct BallotPaperCount(pub usize);
 
+impl From<BallotPaperCount> for usize {
+    fn from(value: BallotPaperCount) -> Self {
+        value.0
+    }
+}
+impl From<BallotPaperCount> for isize {
+    fn from(value: BallotPaperCount) -> Self {
+        value.0 as isize // not ideal as overflow is possible if you are running on a 32 bit machine with over 2 billion ballots and you (insanely) want support for negative transfer values. But the overflow is not your biggest problem then.
+    }
+}
 impl AddAssign for BallotPaperCount {
     fn add_assign(&mut self, rhs: Self) { self.0+=rhs.0; }
 }
@@ -50,11 +59,11 @@ impl Add for BallotPaperCount {
     fn add(self, rhs: Self) -> Self::Output { BallotPaperCount(self.0+rhs.0) }
 }
 // type alias really, don't want long display
-impl fmt::Display for BallotPaperCount {
+impl Display for BallotPaperCount {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.0) }
 }
 // type alias really, don't want long display
-impl fmt::Debug for BallotPaperCount {
+impl Debug for BallotPaperCount {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.0) }
 }
 impl Zero for BallotPaperCount {
@@ -304,10 +313,12 @@ impl <'a> DistributedVotes<'a> {
         }
         DistributedVotes{by_candidate, exhausted_votes, exhausted,exhausted_atl}
     }
+/*
+    use crate::verify_official_transcript::OracleFromOfficialDOP;
 
     /// distribute votes ignoring the preferences totally, using an oracle that tells you how many votes to put where.
     /// Used to check the DoPs of jurisdictions that publish DoPs, but not actual votes.
-    pub fn distribute_by_oracle_recording_prefs_to_get_here(votes:&Vec<PartiallyDistributedVote<'a>>,continuing_candidates:&HashSet<CandidateIndex>,num_candidates:usize,oracle_by_candidate:&mut [usize],_oracle:&mut OracleFromOfficialDOP,oracle_arena : &'a typed_arena::Arena::<CandidateIndex>) -> Self {
+    pub fn distribute_by_oracle_recording_prefs_to_get_here(votes:&Vec<PartiallyDistributedVote<'a>>,continuing_candidates:&HashSet<CandidateIndex>,num_candidates:usize,oracle_by_candidate:&mut [usize],_oracle:&mut OracleFromOfficialDOP,oracle_arena : &'a typed_arena::Arena<CandidateIndex>) -> Self {
         assert_eq!(num_candidates+1,oracle_by_candidate.len()); // extra one is exhausted.
         let mut new_votes = vec![];
         let mut upto_candidate : usize=0;
@@ -339,6 +350,8 @@ impl <'a> DistributedVotes<'a> {
         // TODO still need to deal with the case of more ballot papers needed. But this function will probably never be used.
         DistributedVotes::distribute(&new_votes,continuing_candidates,num_candidates)
     }
+
+ */
     /// distribute votes ignoring the preferences totally, using an oracle that tells you how many votes to put where.
     /// Used to check the DoPs of jurisdictions that publish DoPs, but not actual votes.
     /// oracle_by_candidate is only used for the first num_candidates values - the number of exhausted votes is ignored. Any votes not assigned to candidates are considered exhausted.

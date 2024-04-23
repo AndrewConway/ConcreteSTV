@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -14,6 +14,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use std::str::FromStr;
+use crate::ballot_pile::BallotPaperCount;
 use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
 use crate::preference_distribution::RoundUpToUsize;
 
@@ -69,10 +70,10 @@ impl <const DIGITS:usize> SubAssign for FixedPrecisionDecimal<DIGITS> {
     }
 }
 
-impl <const DIGITS:usize> From<usize> for FixedPrecisionDecimal<DIGITS> {
-    fn from(v: usize) -> Self {
-        if v as u64>Self::MAX { panic!("Can only represent integers up to {}, and {} was too big.",Self::MAX,v)}
-        FixedPrecisionDecimal{scaled_value:v as u64*Self::SCALE}
+impl <const DIGITS:usize> From<BallotPaperCount> for FixedPrecisionDecimal<DIGITS> {
+    fn from(v: BallotPaperCount) -> Self {
+        if v.0 as u64>Self::MAX { panic!("Can only represent integers up to {}, and {} was too big.",Self::MAX,v)}
+        FixedPrecisionDecimal{scaled_value:v.0 as u64*Self::SCALE}
     }
 }
 
@@ -175,17 +176,18 @@ impl <const DIGITS:usize> Div<usize> for FixedPrecisionDecimal<DIGITS> {
 mod tests {
     use crate::fixed_precision_decimal::FixedPrecisionDecimal;
     use num::Zero;
+    use crate::ballot_pile::BallotPaperCount;
 
     #[test]
     fn test_six_digit_decimal() {
         type SixDigitDecimal = FixedPrecisionDecimal<6>;
         assert!(SixDigitDecimal::zero().is_zero());
 
-        let mut d_42 : SixDigitDecimal = (42 as usize).into();
+        let mut d_42 : SixDigitDecimal = BallotPaperCount(42).into();
         assert_eq!("42",format!("{}",d_42));
         d_42+=SixDigitDecimal::zero();
         assert_eq!("42",format!("{}",d_42));
-        let d_1 : SixDigitDecimal = (1 as usize).into();
+        let d_1 : SixDigitDecimal = BallotPaperCount(1).into();
         assert_eq!("43",format!("{}",d_42+d_1));
         assert_eq!("41",format!("{}",d_42-d_1));
         let sum : SixDigitDecimal = [d_42,d_1].iter().sum();
