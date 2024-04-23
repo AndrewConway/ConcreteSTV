@@ -1,4 +1,4 @@
-// Copyright 2021 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -41,8 +41,12 @@ impl <Tally:Signed+Clone+PartialEq> SignedVersion<Tally> {
 
 impl <Tally:ToString> Display for SignedVersion<Tally> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.negative { write!(f,"-")? }
-        write!(f,"{}",self.value.to_string())
+        let v = self.value.to_string();
+        if self.negative {
+            if v.starts_with('-') {write!(f,"{}",&v[1..])} else {write!(f,"-{}",v)}
+        } else {
+            write!(f,"{}",v)
+        }
     }
 }
 

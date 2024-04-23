@@ -202,6 +202,9 @@ pub trait CanConvertToF64PossiblyLossily {
 impl CanConvertToF64PossiblyLossily for usize {
     fn convert_to_f64(&self) -> f64 { *self as f64 }
 }
+impl CanConvertToF64PossiblyLossily for isize {
+    fn convert_to_f64(&self) -> f64 { *self as f64 }
+}
 
 impl OfficialDOPForOneCount {
     // given a string containing a comma separated list of 1 based counts, starting with start_count_list_string and ending in suffix,

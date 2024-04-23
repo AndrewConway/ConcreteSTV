@@ -1,4 +1,4 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -12,6 +12,7 @@
 
 
 use num_traits::Zero;
+use stv::ballot_pile::BallotPaperCount;
 use stv::compare_transcripts::{DeltasInCandidateLists};
 use stv::election_data::ElectionData;
 use stv::preference_distribution::{PreferenceDistributionRules, RoundUpToUsize};
@@ -71,12 +72,12 @@ pub fn optimise_work<R:PreferenceDistributionRules>(vote_changes:&VoteChanges<R:
                     let current_tally = opt_vote_changes.changes[i].vote_value.ceil();
                     let try_value = |new_count:usize| {
                         if verbose { println!("Trying change to {}",new_count); }
-                        simple_test::<R>(&opt_vote_changes.change_single_value(i,new_count),election_data,retroscope,options)
+                        simple_test::<R>(&opt_vote_changes.change_single_value(i,BallotPaperCount(new_count)),election_data,retroscope,options)
                     };
                     if let Some(search_res) = binary_search(try_value,0,current_tally) {
                         if search_res.n<current_tally { // had an improvement!
                             if verbose { println!("Improved change from {} to {}",current_tally,search_res.n); }
-                            opt_vote_changes.changes[i].vote_value=search_res.n.into();
+                            opt_vote_changes.changes[i].vote_value=BallotPaperCount(search_res.n).into();
                             if vote_changes.changes.len()>1 { had_change=true; }
                             if best_so_far.changes.n>=search_res.changes.n { // almost always the case if votes are reduced
                                 best_so_far = FoundChange{ vote_changes:opt_vote_changes.clone(), deltas:search_res.deltas,changes:search_res.changes };

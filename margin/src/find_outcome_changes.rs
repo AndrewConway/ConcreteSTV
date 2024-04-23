@@ -1,12 +1,14 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
+use stv::preference_distribution::RoundUpToUsize;
 use num_traits::Zero;
 use stv::ballot_metadata::{CandidateIndex};
+use stv::ballot_pile::BallotPaperCount;
 use stv::distribution_of_preferences_transcript::{CountIndex, ReasonForCount, SingleCount};
 use stv::election_data::ElectionData;
 use stv::preference_distribution::PreferenceDistributionRules;
@@ -138,7 +140,7 @@ fn compute_vote_addition<Rules:PreferenceDistributionRules>(to_candidate: Candid
     let vote_difference = count.status.tallies.candidate[next_largest.0].clone() - count.status.tallies.candidate[to_candidate.0].clone();
     if verbose { println!("Vote difference: {}", vote_difference); }
     return VoteChange {
-        vote_value: vote_difference+Rules::Tally::from(1), // could probably be improved to minimum increment above self.
+        vote_value: vote_difference+Rules::Tally::from(BallotPaperCount(1)), // could probably be improved to minimum increment above self.
         from: None,
         to: Some(to_candidate)
     }
@@ -151,7 +153,7 @@ fn compute_vote_change<Rules:PreferenceDistributionRules>(to_candidate: Candidat
 
     if verbose { println!("Tally for from candidate {} is {}, for to candidate {} is {}",from_candidate,tally_from_candidate,to_candidate,tally_to_candidate); }
     let vote_difference = tally_from_candidate  - tally_to_candidate;
-    let votes_to_change = vote_difference / 2 + Rules::Tally::from(1); // Want diff of 11 to produce 6, a diff of 12 to produce 7.
+    let votes_to_change = Rules::Tally::from(BallotPaperCount(vote_difference.ceil() / 2 + 1)); // Want diff of 11 to produce 6, a diff of 12 to produce 7.
     return VoteChange {
         vote_value: votes_to_change,
         from: Some(from_candidate),
@@ -175,15 +177,15 @@ fn compute_vote_change_leveling<Rules:PreferenceDistributionRules>(index_of_targ
     let max_can_take_from_target : Rules::Tally = target_chooser.votes_available_total::<Rules>();
     let base_level = if may_take_votes_from_target { // level that the target is aimed at.
         let mut sub_targets_to_raise = 0;
-        let mut sum_of_target_plus_subtargets_plus_one = current_target_tally.clone()+Rules::Tally::from(1);
+        let mut sum_of_target_plus_subtargets_plus_one = current_target_tally.clone()+Rules::Tally::from(BallotPaperCount(1));
         let mut currently_being_considered_level = current_target_tally.clone();
         while sub_targets_to_raise < index_of_target_in_sorted_list {
             let subtarget_tally = count.status.tallies.candidate[sorted_continuing_candidates[sub_targets_to_raise].0].clone();
             if currently_being_considered_level<subtarget_tally { break; } // the currently considered level is sufficient.
             sum_of_target_plus_subtargets_plus_one+=subtarget_tally;
             sub_targets_to_raise+=1;
-            let consider_level = sum_of_target_plus_subtargets_plus_one.clone()/(sub_targets_to_raise+1); // still need to subtract 1, but may be < 1 which would cause underflow.
-            let consider_level = if consider_level<=Rules::Tally::from(1) { Rules::Tally::zero() } else { consider_level-Rules::Tally::from(1)};
+            let consider_level : <Rules as PreferenceDistributionRules>::Tally= BallotPaperCount(sum_of_target_plus_subtargets_plus_one.ceil()/(sub_targets_to_raise+1)).into(); // still need to subtract 1, but may be < 1 which would cause underflow.
+            let consider_level = if consider_level<=Rules::Tally::from(BallotPaperCount(1)) { Rules::Tally::zero() } else { consider_level-Rules::Tally::from(BallotPaperCount(1))};
             currently_being_considered_level = consider_level.max(current_target_tally.clone()-max_can_take_from_target.clone())
         }
         currently_being_considered_level
@@ -204,7 +206,7 @@ fn compute_vote_change_leveling<Rules:PreferenceDistributionRules>(index_of_targ
         source.available_to_take_from_sources.push(retroscope.get_chooser(secondary_target,election_data,options));
     }
     let fudge_factor = 1;
-    let margin_above_base = Rules::Tally::from(1+fudge_factor); // want to go to above base tally. Go 2 higher instead of 1 just to allow for wierd things with rounding. 1 fudge factor.
+    let margin_above_base = Rules::Tally::from(BallotPaperCount(1+fudge_factor)); // want to go to above base tally. Go 2 higher instead of 1 just to allow for wierd things with rounding. 1 fudge factor.
     for atl_ok in [false,true] {
         for &c in sorted_continuing_candidates {
             if c!=target && atl_ok == can_use_atl(c) { // do those not in a party first as they can't take ATL votes

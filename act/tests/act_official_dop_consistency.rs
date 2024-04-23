@@ -1,4 +1,4 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -11,6 +11,7 @@ use std::str::FromStr;
 use std::vec;
 use act::{ACT2020, ACT2021, ACTPre2020};
 use act::parse::ACTDataSource;
+use stv::ballot_pile::BallotPaperCount;
 use stv::distribution_of_preferences_transcript::CountIndex;
 use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 use stv::official_dop_transcript::{DifferenceBetweenOfficialDoPAndComputed, DifferenceBetweenOfficialDoPAndComputedOnParticularCount, ECTally, test_official_dop_without_actual_votes};
@@ -91,10 +92,10 @@ fn test_Brindabella2020() {
     assert_eq!(test::<ACT2020>("2020.0","Brindabella").unwrap(),Ok(None));
     // In 2020, Elections ACT considered first preference votes with transfer value 1 to have a different TV than other sources of transfer value 1, and so distributed then on a separate count, reducing the number of votes processed on count 21 (CountIndex 20). See section 3 of our report "Errors in the ACT’s electronic counting code" in the reports folder.
     // This could be manifested in a variety of errors - the particular one here comes from the oracle not knowing where to assign votes when using an inappropriate distribution of preferences.
-    let expected_error = Err(DifferentOnCount(CountIndex(20), None, DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalExhausted(ECTally::from(2862.),FixedPrecisionDecimal::<6>::from(2943))));
+    let expected_error = Err(DifferentOnCount(CountIndex(20), None, DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalExhausted(ECTally::from(2862.),FixedPrecisionDecimal::<6>::from(BallotPaperCount(2943)))));
     assert_eq!(test::<ACT2021>("2020.0","Brindabella").unwrap(),expected_error);
     // converse of previous error.
-    let expected_error = Err(DifferentOnCount(CountIndex(20), None, DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalExhausted(ECTally::from(2898.),FixedPrecisionDecimal::<6>::from(2817))));
+    let expected_error = Err(DifferentOnCount(CountIndex(20), None, DifferenceBetweenOfficialDoPAndComputedOnParticularCount::TallyTotalExhausted(ECTally::from(2898.),FixedPrecisionDecimal::<6>::from(BallotPaperCount(2817)))));
     assert_eq!(test::<ACT2020>("2020","Brindabella").unwrap(),expected_error);
     assert_eq!(test::<ACT2021>("2020","Brindabella").unwrap(),Ok(None));
 }

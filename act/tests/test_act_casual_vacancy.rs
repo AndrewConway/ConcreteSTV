@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -77,7 +77,7 @@ mod tests {
             assert_eq!(BallotPaperCount(papers1),transcript.transcript.counts[0].status.papers.candidate[candidate.0]);
             assert_eq!(BallotPaperCount(papers1+papers2),transcript.transcript.counts[1].status.papers.candidate[candidate.0]);
             assert_eq!(papers1.to_string(),transcript.transcript.counts[0].status.tallies.candidate[candidate.0].to_string());
-            let expected_votes_at_count_2 = FixedPrecisionDecimal::<6>::from(papers1)+FixedPrecisionDecimal::<6>::from_str(votes2).unwrap();
+            let expected_votes_at_count_2 = FixedPrecisionDecimal::<6>::from(BallotPaperCount(papers1))+FixedPrecisionDecimal::<6>::from_str(votes2).unwrap();
             assert_eq!(expected_votes_at_count_2,transcript.transcript.counts[1].status.tallies.candidate[candidate.0]);
         };
         check("HELMORE, Olivia",118,0,"0");
@@ -111,7 +111,7 @@ mod tests {
             assert_eq!(BallotPaperCount(papers1),transcript.transcript.counts[0].status.papers.candidate[candidate.0]);
             assert_eq!(BallotPaperCount(papers1+papers2),transcript.transcript.counts[1].status.papers.candidate[candidate.0]);
             assert_eq!(papers1.to_string(),transcript.transcript.counts[0].status.tallies.candidate[candidate.0].to_string());
-            let expected_votes_at_count_2 = FixedPrecisionDecimal::<6>::from(papers1)+FixedPrecisionDecimal::<6>::from_str(votes2).unwrap();
+            let expected_votes_at_count_2 = FixedPrecisionDecimal::<6>::from(BallotPaperCount(papers1))+FixedPrecisionDecimal::<6>::from_str(votes2).unwrap();
             assert_eq!(expected_votes_at_count_2,transcript.transcript.counts[1].status.tallies.candidate[candidate.0]);
         };
         check("SINGH, Amardeep",952,2110,"2060.453889");
@@ -140,7 +140,7 @@ mod tests {
             assert_eq!(BallotPaperCount(papers1),transcript.transcript.counts[0].status.papers.candidate[candidate.0]);
             assert_eq!(BallotPaperCount(papers1+papers2),transcript.transcript.counts[1].status.papers.candidate[candidate.0]);
             assert_eq!(papers1.to_string(),transcript.transcript.counts[0].status.tallies.candidate[candidate.0].to_string());
-            let expected_votes_at_count_2 = FixedPrecisionDecimal::<6>::from(papers1)+FixedPrecisionDecimal::<6>::from_str(votes2).unwrap();
+            let expected_votes_at_count_2 = FixedPrecisionDecimal::<6>::from(BallotPaperCount(papers1))+FixedPrecisionDecimal::<6>::from_str(votes2).unwrap();
             assert_eq!(expected_votes_at_count_2,transcript.transcript.counts[1].status.tallies.candidate[candidate.0]);
         };
         check("WERNER-GIBBINGS, Taimus",2078,14,"10.736842");

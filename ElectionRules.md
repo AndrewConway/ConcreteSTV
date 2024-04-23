@@ -125,10 +125,17 @@ made an [interpretation](nsw/NSWLocalCouncilLegislation2021Commentary.md) of it,
 that my interpretation precludes just as valid other interpretations which are likely to result
 in different candidates being elected. After writing my interpretation, 
 the NSWEC published the transcript of distribution of preferences, from which I was able
-to work out my interpretation of their interpretation, which is now also in the above link
+to work out my interpretation of their interpretation, which is now also in the above link.
+
+Note that rule (7)(4)(a), `... The surplus fraction is equal to the resulting fraction or (if the fraction exceeds 1) to 1,`
+is unambiguous but is not reasonable, as the _resulting fraction_ may be negative, which causes all sorts of problems.
+This situation did not happen to come up in the 2021 election, so I cannot say whether the NSWEC chose to
+obey the literal legislation or to set the surplus fraction to 1 if the resulting fraction were negative.
+For this reason I have make rules that cover both cases.
 
 - **NSWLocalGov2021** My interpretation, for what it is worth
-- **NSWECLocalGov2021** My interpretation of the rules used by the NSWEC for the 2021 NSW local government elections.
+- **NSWECLocalGov2021** My interpretation of the rules used by the NSWEC for the 2021 NSW local government elections, assuming they didn't take (7)(4)(a) literally
+- **NSWECLocalGov2021Literal** My interpretation of the rules used by the NSWEC for the 2021 NSW local government elections, assuming they did take (7)(4)(a) literally. This can result in candidates getting negative tallies or more candidates than there are vacancies going over quota.
 
 ## NSW Legislative council
 

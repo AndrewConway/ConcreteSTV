@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -19,10 +19,12 @@ pub mod nsw_random_rules;
 pub mod run_election_multiple_times;
 
 use std::cmp::Ordering;
+use std::fmt::{Debug, Display};
+use std::str::FromStr;
 use stv::preference_distribution::{BigRational, CountNamingMethod, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber, FullySplitByCountNumber, HowSplitByCountNumber};
 use stv::distribution_of_preferences_transcript::{CountIndex, Transcript};
-use stv::transfer_value::{convert_usize_to_rational, round_rational_down_to_usize, TransferValue};
+use stv::transfer_value::{convert_usize_to_rational, round_rational_down_to_isize, round_rational_down_to_usize, TransferValue};
 use stv::tie_resolution::MethodOfTieResolution;
 
 /// My guess at what the legislation means. See my comments below
@@ -220,6 +222,7 @@ impl PreferenceDistributionRules for NSWECLocalGov2021 {
     /// replaced by a "First Preferences" 10389 row (which is used in the dop counting legislation
     /// but is not listed in the `dopfulldetails.xls` file.
     fn should_exhausted_votes_count_for_quota_computation() -> bool { false }
+
 }
 
 // helper functions to reproduce idiosyncratic NSWEC 2021 ordering.
@@ -250,12 +253,67 @@ impl NSWECLocalGov2021 {
         }
     }
 
-    fn sort_counts_by_name_as_dotted_number_sequences_numerically_first_3_fields_lexicographically_afterwards(transcript_so_far : &Transcript<usize>,count1:CountIndex,count2:CountIndex) -> Ordering {
+    fn sort_counts_by_name_as_dotted_number_sequences_numerically_first_3_fields_lexicographically_afterwards<Tally:PartialEq+Clone+Display+FromStr+Debug>(transcript_so_far : &Transcript<Tally>,count1:CountIndex,count2:CountIndex) -> Ordering {
         let name1 = transcript_so_far.count(count1).count_name.as_ref().unwrap();
         let name2 = transcript_so_far.count(count2).count_name.as_ref().unwrap();
         Self::sort_names_as_dotted_number_sequences_numerically_first_3_fields_lexicographically_afterwards(name1,name2,1) // use 1 already done as the current count will be prefixed to this.
     }
 }
+
+/// Like NSWECLocalGov2021, except take rule 7(4)(a) literally and allow negative surplus fractions.
+/// This leads to negative transfer values, and general incoherence. The situation didn't happen to
+/// arise in 2021 and so I cannot say whether the NSWEC would have taken 7(4)(a) literally or not.
+///
+/// I have given the NSWEC the benefit of the doubt and assumed they did something sane by giving this
+/// a more complex name.
+///
+/// Note that most things are the same as NSWECLocalGov2021 except the tally is now signed and
+/// prohibit_negative_surplus_fraction() is set.
+pub struct NSWECLocalGov2021Literal {
+}
+
+impl PreferenceDistributionRules for NSWECLocalGov2021Literal {
+    fn prohibit_negative_surplus_fraction() -> bool { false }
+    type Tally = isize;
+    type SplitByNumber = FullySplitByCountNumber;
+
+    fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::No }
+    fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverContinuingBallots }
+
+    fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { convert_usize_to_rational(tally)  }
+    fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { round_rational_down_to_isize(rational)  }
+
+    fn make_transfer_value(surplus: isize, ballots: BallotPaperCount) -> TransferValue { // NA
+        TransferValue::from_surplus(surplus as usize,ballots) // surplus can't actually get negative even if tallies can be negative.
+    }
+
+    fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> isize {
+        transfer_value.mul_rounding_down_isize(ballots)
+    }
+
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::ScaleTransferValues }
+    fn sort_exclusions_by_transfer_value() -> bool { false }
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished }
+    fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished }
+    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished }
+    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished }
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { false }
+    fn check_elected_if_in_middle_of_exclusion() -> bool { false }
+    fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
+    fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
+    fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfExclusionNotOngoing }
+    fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfExclusionNotOngoing}
+    fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
+
+    fn name() -> String { "NSWECLocalGov2021Literal".to_string() }
+    fn how_to_name_counts() -> CountNamingMethod { CountNamingMethod::BasedOnSourceName }
+    fn sort_subcounts_by_count() -> Option<Box<dyn FnMut(&Transcript<Self::Tally>,<<Self as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,<<Self as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide) -> Ordering>> {
+        Some(Box::new(NSWECLocalGov2021::sort_counts_by_name_as_dotted_number_sequences_numerically_first_3_fields_lexicographically_afterwards))
+    }
+    fn should_exhausted_votes_count_for_quota_computation() -> bool { false }
+}
+
 
 
 /// A simple IRV computation.

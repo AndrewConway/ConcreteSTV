@@ -92,7 +92,7 @@ impl <'a,Rules:PreferenceDistributionRules> VerifyOfficialDopTranscript<'a,Rules
             (vote_source.candidate.iter().sum::<f64>() + (if Rules::should_exhausted_votes_count_for_quota_computation() { vote_source.exhausted } else {0.0})) as usize
         };
         let candidates_to_be_elected = metadata.vacancies.ok_or_else(||IssueWithOfficialDOPTranscript::MetadataMissingVacancies)?;
-        let quota = Rules::Tally::from(first_preference_votes/(1+candidates_to_be_elected.0)+1);
+        let quota = Rules::Tally::from(BallotPaperCount(first_preference_votes/(1+candidates_to_be_elected.0)+1));
         if let Some(official_quota) = &official.quota  {
             if official_quota.quota!=quota.convert_to_f64() || official_quota.vacancies!=candidates_to_be_elected || official_quota.papers.0 as f64!=first_preference_votes as f64 {
                 return Err(IssueWithOfficialDOPTranscript::QuotaWrong(official_quota.clone(),QuotaInfo{

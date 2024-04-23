@@ -51,7 +51,7 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **NSWECRandomLGE2016** Buggy rules used by the NSWEC in the 2016 NSW Local Government elections.
 - **NSWECRandomLGE2017** Rules used by the NSWEC in the 2017 NSW Local Government elections.
 - **NSWLocalGov2021** My dubious interpretation of the new, very ambiguous, legislation for NSW local government elections introduced before the 2021 elections. 
-- **NSWECLocalGov2021** Rules used by the NSWEC in the 2021 local government elections. This differs in many respects from my interpretation of the very ambiguous legislation. See [my thoughts](nsw/NSWLocalCouncilLegislation2021Commentary.md) for details.
+- **NSWECLocalGov2021** or **NSWECLocalGov2021Literal** Possible rules used by the NSWEC in the 2021 local government elections. This differs in many respects from my interpretation of the very ambiguous legislation. See [my thoughts](nsw/NSWLocalCouncilLegislation2021Commentary.md) for details.
 - **NSWECRandomLC2015** Possibly buggy rules used by the NSWEC in the 2015 Legislative Council elections.
 - **NSWECRandomLC2019** Rules used by the NSWEC in the 2019 and 2023 Legislative Council elections.
 - **Vic2018** My interpretation of the Victorian Legislative Council rules. The 2018 refers to a contradiction in the legislation fixed in 2018, but the rules were plausible if not literal before then.

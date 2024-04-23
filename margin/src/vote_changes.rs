@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Andrew Conway.
+// Copyright 2022-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -74,7 +74,7 @@ impl <Tally:Clone+RoundUpToUsize> VoteChanges<Tally> {
     }
 }
 
-impl <Tally:Clone+AddAssign+SubAssign+From<usize>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Tally>+Zero+Hash+Sum<Tally>+RoundUpToUsize> VoteChanges<Tally> {
+impl <Tally:Clone+AddAssign+SubAssign+From<BallotPaperCount>+Display+PartialEq+Serialize+FromStr+Ord+Sub<Output=Tally>+Zero+Hash+Sum<Tally>+RoundUpToUsize> VoteChanges<Tally> {
     pub fn make_concrete<R:PreferenceDistributionRules<Tally=Tally>>(&self,retroscope:&Retroscope,election_data:&ElectionData,options:&ChooseVotesOptions) -> Option<BallotChanges<Tally>> {
         let mut builder = BallotChangesBuilder{ map: HashMap::new() };
         let mut choosers : HashMap<CandidateIndex,ChooseVotes> = HashMap::new();
