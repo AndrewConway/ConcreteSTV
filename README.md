@@ -131,8 +131,10 @@ cargo build --release
 
 This will create several binary programs in the `target/release` directory.
 
-If you get an error like `failed to run custom build command for ``openssl-sys v0.9.72`` `, then install the package `libssl-dev` on Ubuntu,
-possibly `openssl-dev` on some other linux distributions.
+If you get an error complaining about not being able to find `CC`, install the package `gcc` and possibly `g++` on most Linux distributions.
+If you get an error like `could not link with -lssl` or `failed to run custom build command for ``openssl-sys v0.9.72`` `, 
+then install the package `libssl-dev` on Ubuntu,
+possibly `openssl-dev` on some other Linux distributions.
 
 ## To get real election data (parse_ec_data)
 

@@ -39,7 +39,7 @@ mod tests {
         let cloned_extracted_data = extracted_data.clone();
         let what_to_do_with_it = WhatToDoWithExtractedVotes::CallFunction(Arc::new(Mutex::new(move |e:ElectionData|{cloned_extracted_data.set(e).unwrap();})));
         let extractors = vec![ExtractionRequest{ what_to_extract, what_to_do_with_it  }];
-        let transcript = distribute_preferences_with_extractors::<Rules>(&data, loader.candidates_to_be_elected(electorate), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote,&extractors);
+        let transcript = distribute_preferences_with_extractors::<Rules>(&data, loader.candidates_to_be_elected(electorate), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote,&extractors,false);
         let mut excluded_in_recount: HashSet<CandidateIndex> = HashSet::default();
         for &c in &transcript.elected {
             excluded_in_recount.insert(c);
@@ -56,7 +56,7 @@ mod tests {
         serde_json::to_writer_pretty(file,&extracted_data)?;
         extracted_data.print_summary();
         // TODO make correct rules that handle quota correctly - recompute at each round.
-        let transcript = distribute_preferences_with_extractors::<Rules>(&extracted_data, extracted_data.metadata.vacancies.unwrap(), &excluded_in_recount, &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote,&[]);
+        let transcript = distribute_preferences_with_extractors::<Rules>(&extracted_data, extracted_data.metadata.vacancies.unwrap(), &excluded_in_recount, &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote,&[],false);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript };
         let file = File::create(format!("test_transcripts/extract/Casual Vacancy {} Transcript {} {}.json",ex_mla,electorate,transcript.metadata.name.year))?;
         serde_json::to_writer_pretty(file,&transcript)?;

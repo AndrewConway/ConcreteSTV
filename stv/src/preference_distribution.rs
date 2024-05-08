@@ -31,6 +31,7 @@ use crate::extract_votes_in_pile::{ExtractionRequest, WhatToExtract};
 use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
 use crate::random_util::Randomness;
 use crate::signed_version::SignedVersion;
+use crate::simple_list_of_votes::ListOfVotes;
 use crate::verify_official_transcript::OracleFromOfficialDOP;
 
 
@@ -261,11 +262,15 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     print_progress_to_stdout : bool, // if true, then print tallys etc to stdout.
     oracle : Option<OracleFromOfficialDOP<'a>>,
     extractors : &'a [ExtractionRequest],
+    include_list_of_votes_in_transcript : bool,
+    exhausted_list_of_votes : ListOfVotes,
+    set_aside_list_of_votes : ListOfVotes,
+    last_written_list_of_votes_by_candidate : Vec<ListOfVotes>,
 }
 
 impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 {
-    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<(TransferValue,Vec<PartiallyDistributedVote<'a>>)>,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC,print_progress_to_stdout : bool,oracle : Option<OracleFromOfficialDOP<'a>>,randomness:&'a mut Randomness,extractors:&'a [ExtractionRequest]) -> Self {
+    pub fn new(data : &'a ElectionData,original_votes:&'a Vec<(TransferValue,Vec<PartiallyDistributedVote<'a>>)>,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:&'a TieResolutionsMadeByEC,print_progress_to_stdout : bool,oracle : Option<OracleFromOfficialDOP<'a>>,randomness:&'a mut Randomness,extractors:&'a [ExtractionRequest],include_list_of_votes_in_transcript:bool) -> Self {
         let num_candidates = data.metadata.candidates.len();
         let tallys = vec![Rules::Tally::zero();num_candidates];
         let mut papers = vec![];
@@ -300,7 +305,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             pending_surplus_distribution : VecDeque::default(),
             elected_candidates : vec![],
             candidate_elected_at_count: vec![None;num_candidates],
-            randomness: randomness,
+            randomness,
             in_this_count : PendingTranscript {
                 elected: vec![],
                 not_continuing: vec![],
@@ -317,6 +322,10 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             print_progress_to_stdout,
             oracle,
             extractors,
+            include_list_of_votes_in_transcript,
+            exhausted_list_of_votes: Default::default(),
+            set_aside_list_of_votes: Default::default(),
+            last_written_list_of_votes_by_candidate: vec![ListOfVotes::default();num_candidates],
         }
     }
 
@@ -726,6 +735,21 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                     rounding:  Zero::zero(),
                     set_aside: None
                 }),
+                list_of_votes: if self.include_list_of_votes_in_transcript {
+                    let mut candidate = vec![];
+                    for (papers,already_written) in self.papers.iter().zip(self.last_written_list_of_votes_by_candidate.iter_mut()) {
+                        let all_votes : ListOfVotes = papers.into();
+                        let delta = all_votes.sub(already_written);
+                        *already_written=all_votes;
+                        candidate.push(delta);
+                    }
+                    Some(PerCandidate {
+                        candidate,
+                        exhausted: self.exhausted_list_of_votes.clone(),
+                        rounding: SignedVersion { negative: false, value: ListOfVotes::default() },
+                        set_aside: Some(self.set_aside_list_of_votes.clone()),
+                    })
+                } else {None},
             },
             count_name,
         });
@@ -1302,14 +1326,14 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     }
 }
 
-pub fn distribute_preferences_with_extractors<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool,randomness:&mut Randomness,extractors:&[ExtractionRequest]) -> Transcript<Rules::Tally> {
+pub fn distribute_preferences_with_extractors<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool,randomness:&mut Randomness,extractors:&[ExtractionRequest],include_list_of_votes_in_transcript:bool) -> Transcript<Rules::Tally> {
     let arena = typed_arena::Arena::<CandidateIndex>::new();
     let votes = data.resolve_atl_including_weights(&arena,vote_types);
-    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates,ec_resolutions,print_progress_to_stdout,None,randomness,extractors);
+    let mut work : PreferenceDistributor<'_,Rules> = PreferenceDistributor::new(data,&votes,candidates_to_be_elected,excluded_candidates,ec_resolutions,print_progress_to_stdout,None,randomness,extractors,include_list_of_votes_in_transcript);
     work.go();
     work.transcript
 }
 
 pub fn distribute_preferences<Rules:PreferenceDistributionRules>(data:&ElectionData,candidates_to_be_elected : NumberOfCandidates,excluded_candidates:&HashSet<CandidateIndex>,ec_resolutions:& TieResolutionsMadeByEC,vote_types : Option<&[String]>,print_progress_to_stdout:bool,randomness:&mut Randomness) -> Transcript<Rules::Tally> {
-    distribute_preferences_with_extractors::<Rules>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,&[])
+    distribute_preferences_with_extractors::<Rules>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,&[],false)
 }

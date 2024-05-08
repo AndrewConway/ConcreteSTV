@@ -83,7 +83,7 @@ pub enum VoteSource<'a> {
 }
 
 /// Below the line vote.
-#[derive(Clone,Debug,Serialize,Deserialize)]
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 pub struct BTL {
     /// Candidate ids, in preference order
     pub candidates : Vec<CandidateIndex>,

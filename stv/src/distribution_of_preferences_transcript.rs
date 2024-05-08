@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -17,6 +17,7 @@ use crate::preference_distribution::TransferValueMethod;
 use crate::signed_version::SignedVersion;
 use std::str::FromStr;
 use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
+use crate::simple_list_of_votes::ListOfVotes;
 use crate::tie_resolution::TieResolutionExplicitDecision;
 
 
@@ -31,6 +32,7 @@ impl Display for CountIndex {
     }
 }
 
+
 /// A value that is primarily per candidate, but may also go to some other source.
 /// Generally, this is used for preserved properties such that the sum over all candidates and other destinations is always the same.
 /// For instance, ballots, which start out all assigned to candidates, are shifted around between people, but some will get exhausted.
@@ -43,7 +45,7 @@ pub struct PerCandidate<X:PartialEq+Clone+Display+FromStr> {
     pub exhausted : X,
     /// something goes to rounding if it can't go to a specific candidate as fractions are not allowed.
     pub rounding : SignedVersion<X>,
-    /// something gets set aside if some feature of the the rules means it doesn't go to a particular candidate. None if not applicable.
+    /// something gets set aside if some feature of the rules means it doesn't go to a particular candidate. None if not applicable.
     pub set_aside : Option<X>,
 }
 
@@ -184,6 +186,9 @@ pub struct EndCountStatus<Tally:PartialEq+Clone+Display+FromStr> {
     pub papers : PerCandidate<BallotPaperCount>,
     /// the number of above pieces of paper that are ATL.
     pub atl_papers : Option<PerCandidate<BallotPaperCount>>,
+    /// usually not present list of all votes' positions.
+    #[serde(default,skip_serializing_if = "Option::is_none")]
+    pub list_of_votes: Option<PerCandidate<ListOfVotes>>,
 }
 
 impl <Tally:PartialEq+Clone+Display+FromStr+CanConvertToF64PossiblyLossily> EndCountStatus<Tally> {

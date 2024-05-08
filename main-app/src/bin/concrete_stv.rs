@@ -53,7 +53,13 @@ struct Opts {
     /// what_to_do_with_it can currently only be file:file_name where file_name is the name of a .stv
     /// file that you want to store the extracted votes in.
     #[clap(long)]
-    extract : Vec<ExtractionRequest>
+    extract : Vec<ExtractionRequest>,
+
+    /// You can list all the votes that are in a candidate's pile at every count for every candidate
+    /// in the output transcript. This will usually make a very big file and be very slow! Default is to
+    /// not do this, flag makes it be done.
+    #[clap(long)]
+    include_list_of_votes_in_transcript:bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -62,7 +68,7 @@ fn main() -> anyhow::Result<()> {
     let votes = opt.input_options.get_data(&opt.votes,opt.verbose)?;
     let transcript_file = opt.input_options.result_file_name(&opt.votes,opt.transcript.as_ref(),".transcript",&opt.rules);
     let mut randomness : Randomness = opt.seed.into();
-    let transcript = opt.rules.count_simple(&votes,opt.verbose,&mut randomness,&opt.extract)?;
+    let transcript = opt.rules.count_simple(&votes,opt.verbose,&mut randomness,&opt.extract,opt.include_list_of_votes_in_transcript)?;
 
     if let Some(parent) = transcript_file.parent() { std::fs::create_dir_all(parent)? }
     serde_json::to_writer(File::create(&transcript_file)?,&transcript)?;

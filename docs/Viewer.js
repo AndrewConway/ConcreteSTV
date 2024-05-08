@@ -53,27 +53,31 @@ function Render() {
     // general purpose clearing up.
     const render_div = document.getElementById("RenderThingToView");
     removeAllChildElements(render_div);
+    const show_heading_and_comments = document.getElementById("ShowHeadingAndComments").checked;
     const heading = document.getElementById("MainHeading");
     heading.innerHTML="";
     if (!document_to_show) return;
     const metadata = document_to_show.metadata || document_to_show.original.metadata;
-    if (metadata&&metadata.name) { // compute the name
+    if (show_heading_and_comments&&metadata&&metadata.name) { // compute the name
         const name = metadata.name;
         const heading_text = name.year.toString()+" "+name.name+" : "+name.electorate+(name.modifications?(" "+name.modifications.join(" ; ")):"");
         heading.innerText=heading_text;
     }
-    if (metadata&&metadata.name&&metadata.name.comment) {
+    if (show_heading_and_comments&&metadata&&metadata.name&&metadata.name.comment) {
         add(render_div,"div","comment").innerText=metadata.name.comment;
     }
     // work out what to show.
     document.getElementById("TranscriptOnly").className="hidden";
     document.getElementById("ChangeOnly").className="hidden";
     document.getElementById("NothingChosen").className="hidden";
+    document.getElementById("ShowRawBallotsIncludingLabel").className="hidden";
     if (document_to_show.transcript) {
         document.getElementById("TranscriptOnly").className="";
         const has_set_aside = document_to_show.transcript.counts.some(a=>a.set_aside_for_quota);
         document.getElementById("ShowSetAside").className=has_set_aside?"":"hidden";
         document.getElementById("ShowSetAsideLabel").className=has_set_aside?"":"hidden";
+        const has_raw_votes = document_to_show.transcript.counts.some(a=>a.status && a.status.list_of_votes);
+        document.getElementById("ShowRawBallotsIncludingLabel").className=has_raw_votes?"":"hidden";
         RenderTranscript(document_to_show,render_div);
     } else if (document_to_show.original && document_to_show.changes) {
         document.getElementById("ChangeOnly").className="";
@@ -153,11 +157,19 @@ function RenderChanges(vote_changes_document,render_div) {
         }
     }
 }
+
+
 /** Display a distribution of preferences transcript */
 function RenderTranscript(full_transcript,render_div) {
-    let heading_orientation = document.getElementById("heading-orientation").value;
-    let show_papers = document.getElementById("ShowPapers").checked;
-    let show_set_aside = document.getElementById("ShowSetAside").checked;
+    const heading_orientation = document.getElementById("heading-orientation").value;
+    const show_papers = document.getElementById("ShowPapers").checked;
+    const show_raw_ballots = document.getElementById("ShowRawBallots").checked;
+    const show_set_aside = document.getElementById("ShowSetAside").checked;
+    const show_list_of_winning_candidates = document.getElementById("ShowListOfWinningCandidates").checked;
+    const show_ec_decisions = document.getElementById("ShowECDecisions").checked;
+    const show_candidate_numbers_in_decisions = document.getElementById("ShowCandidateNumbersInDecisions").checked;
+    const show_from_count = document.getElementById("ShowFromCount").checked;
+
     const metadata = full_transcript.metadata;
     const transcript = full_transcript.transcript;
     const rounding_ever_used = transcript.counts.some(c=>c.status.papers.rounding || c.status.tallies.rounding);
@@ -167,8 +179,8 @@ function RenderTranscript(full_transcript,render_div) {
         above_table.innerText="Quota : "+transcript.quota.quota+" Votes with first preference : "+transcript.quota.papers+" Vacancies : "+transcript.quota.vacancies;
     }
     const table = add(render_div,"table");
-    const elected_list = add(render_div,"div","WinningCandidatesList");
-    add(elected_list,"h4").innerText="Winning Candidates";
+    const elected_list = show_list_of_winning_candidates?add(render_div,"div","WinningCandidatesList"):null;
+    if (show_list_of_winning_candidates) add(elected_list,"h4").innerText="Winning Candidates";
     const FirstCandidate = new Set(); // First candidate in a party
     const LastCandidate = new Set(); // Last candidate in a party
     let people_before_parties = heading_orientation==="slanted";
@@ -216,14 +228,29 @@ function RenderTranscript(full_transcript,render_div) {
     }
     add(people_row,"th").innerText="Transfer Value";
     add(people_row,"th").innerText="Count action";
-    add(people_row,"th").innerText="EC decisions needed";
-    add(people_row,"th").innerText="From Count";
+    if (show_ec_decisions) add(people_row,"th").innerText="EC decisions needed";
+    if (show_from_count) add(people_row,"th").innerText="From Count";
     let count_number = 1;
     let elected = new Set();
     let not_continuing = new Set();
     let count_name_by_id = [];
     function format_from(from_id) { return (typeof from_id === "number")?count_name_by_id[from_id]:null; }
     function cname(id) { return metadata.candidates[id].name; }
+    /** Show a list of votes in render_element. Warning - may be big */
+    function render_list_of_votes(render_element, list_of_votes) {
+        if ((!list_of_votes) || list_of_votes.length===0) return
+        const div = add(render_element,"div","ListOfVotes");
+        let last_tv = "1";
+        for (const votes_with_tv of list_of_votes) {
+            if (votes_with_tv.tv!==last_tv) {
+                add(div,"div","TVspec").innerText="TV : "+votes_with_tv.tv;
+                last_tv=votes_with_tv.tv;
+            }
+            for (const vote of votes_with_tv.votes) {
+                add(div,"div","preflist").innerText=""+vote.n+"×"+vote.candidates.map(cname).join(",");
+            }
+        }
+    }
     let last_count = null;
     for (const count of transcript.counts) {
         const deltarow = last_count?add(table,"tr","delta"):null;
@@ -237,26 +264,26 @@ function RenderTranscript(full_transcript,render_div) {
         count_name_by_id.push(count_desc);
         for (const e of count.elected) {
             elected.add(e.who);
-            add(elected_list,"div","WinningCandidate").innerText=""+(elected.size)+". "+metadata.candidates[e.who].name;
+            if (show_list_of_winning_candidates) add(elected_list,"div","WinningCandidate").innerText=""+(elected.size)+". "+metadata.candidates[e.who].name;
         }
         for (const nc of count.not_continuing) not_continuing.add(nc);
         for (let i=0;i<metadata.candidates.length;i++) {
             const status = elected.has(i)?"Elected":not_continuing.has(i)?"Eliminated":"Continuing"
-            const delta_td = deltarow?add(deltarow,"td",status):null;
+            const delta_td = deltarow?add(deltarow,"td",status+" Delta"):null;
             if (delta_td) delta_td.innerText=delta(count.status.tallies.candidate[i],last_count.status.tallies.candidate[i]);
-            const td = add(row,"td",status);
+            const td = add(row,"td",status+" Cumulative");
             if (show_papers) {
                 if (deltarow) {
-                    add(deltarow,"td",status+" BallotPapers").innerText=delta(count.status.papers.candidate[i],last_count.status.papers.candidate[i]);
+                    add(deltarow,"td",status+" BallotPapers Delta").innerText=delta(count.status.papers.candidate[i],last_count.status.papers.candidate[i]);
                 }
-                const papers = add(row,"td",status+" BallotPapers");
+                const papers = add(row,"td",status+" BallotPapers Cumulative");
                 papers.innerText=zero_is_blank(count.status.papers.candidate[i]);
             }
             if (show_set_aside) {
                 if (deltarow) {
-                    add(deltarow,"td",status+" SetAside").innerText=count.set_aside_for_quota?zero_is_blank(count.set_aside_for_quota.candidate[i]):"";
+                    add(deltarow,"td",status+" SetAside Delta").innerText=count.set_aside_for_quota?zero_is_blank(count.set_aside_for_quota.candidate[i]):"";
                 }
-                const papers = add(row,"td",status);
+                const papers = add(row,"td",status+" SetAside Cumulative");
             }
             let tally = count.status.tallies.candidate[i];
             let text = zero_is_blank(tally);
@@ -272,22 +299,25 @@ function RenderTranscript(full_transcript,render_div) {
                     addStart(delta_td||td,"span").innerText="👎";
                 }
             }
+            if (show_raw_ballots && count.status.list_of_votes) {
+                render_list_of_votes(delta_td || addStart(td,"div"),count.status.list_of_votes.candidate[i]);
+            }
         }
         if (exhausted_ever_used) {
-            if (deltarow) add(deltarow,"td","Continuing").innerText=delta(count.status.tallies.exhausted,last_count.status.tallies.exhausted);
-            add(row,"td","Continuing").innerText=zero_is_blank(count.status.tallies.exhausted);
+            if (deltarow) add(deltarow,"td","Continuing Delta").innerText=delta(count.status.tallies.exhausted,last_count.status.tallies.exhausted);
+            add(row,"td","Continuing Cumulative").innerText=zero_is_blank(count.status.tallies.exhausted);
             if (show_papers) {
-                if (deltarow) add(deltarow,"td","Continuing BallotPapers").innerText=delta(count.status.papers.exhausted,last_count.status.papers.exhausted);
-                add(row,"td","Continuing BallotPapers").innerText=zero_is_blank(count.status.papers.exhausted);
+                if (deltarow) add(deltarow,"td","Continuing BallotPapers Delta").innerText=delta(count.status.papers.exhausted,last_count.status.papers.exhausted);
+                add(row,"td","Continuing BallotPapers Cumulative").innerText=zero_is_blank(count.status.papers.exhausted);
             }
             if (show_set_aside) {
-                if (deltarow) add(deltarow,"td","Continuing SetAside").innerText=count.set_aside_for_quota?zero_is_blank(count.set_aside_for_quota.exhausted):"";
-                add(row,"td","Continuing");
+                if (deltarow) add(deltarow,"td","Continuing SetAside Delta").innerText=count.set_aside_for_quota?zero_is_blank(count.set_aside_for_quota.exhausted):"";
+                add(row,"td","Continuing Cumulative");
             }
         }
         if (rounding_ever_used) {
-            if (deltarow) add(deltarow,"td","Continuing").innerText=delta(count.status.tallies.rounding,last_count.status.tallies.rounding);
-            add(row,"td","Continuing").innerText=zero_is_blank(count.status.tallies.rounding);
+            if (deltarow) add(deltarow,"td","Continuing Delta").innerText=delta(count.status.tallies.rounding,last_count.status.tallies.rounding);
+            add(row,"td","Continuing Cumulative").innerText=zero_is_blank(count.status.tallies.rounding);
         }
         const tv_td = fullSpanTD("TransferValue");
         tv_td.innerText=format_transfer_value(count.created_transfer_value&&count.created_transfer_value.transfer_value || count.portion.transfer_value,count.created_transfer_value?null:format_from(count.portion.when_tv_created));
@@ -300,7 +330,7 @@ function RenderTranscript(full_transcript,render_div) {
         }
         fullSpanTD("CountAction").innerText=count.reason==="FirstPreferenceCount"?"First Preference Count":count.reason.hasOwnProperty("ExcessDistribution")?"Surplus distribution for "+cname(count.reason.ExcessDistribution):"Exclusion of "+count.reason.Elimination.map(cname).join(" & "); // TODO prettify
         function candidate_index_array_to_string(candidate_list) {
-            return candidate_list.map(candidate=>metadata.candidates[candidate].name+" ("+candidate+")").join(",");
+            return candidate_list.map(candidate=>metadata.candidates[candidate].name+(show_candidate_numbers_in_decisions?" ("+candidate+")":"")).join(",");
         }
         function text_description_of_decision(a) {
             if (a.affected) return candidate_index_array_to_string(a.affected); // deprecated old style, left for compatibility with old transcripts.
@@ -308,8 +338,8 @@ function RenderTranscript(full_transcript,render_div) {
                 return a.increasing_favour.map(candidate_index_array_to_string).join(" < ");
             }
         }
-        fullSpanTD("ECDecisions").innerText=count.decisions.map(text_description_of_decision).join(" and ");
-        fullSpanTD("FromCount").innerText=count.portion.papers_came_from_counts.map(format_from).join(", ");
+        if (show_ec_decisions) fullSpanTD("ECDecisions").innerText=count.decisions.map(text_description_of_decision).join(" and ");
+        if (show_from_count) fullSpanTD("FromCount").innerText=count.portion.papers_came_from_counts.map(format_from).join(", ");
         count_number+=1;
         last_count=count;
     }
@@ -366,7 +396,13 @@ function MainViewerOnLoadFunction() {
         document.getElementById("ChooseTranscript").onchange = ChooseTranscript;
     }
     document.getElementById("ShowPapers").onchange = Render;
+    document.getElementById("ShowRawBallots").onchange = Render;
     document.getElementById("ShowSetAside").onchange = Render;
+    document.getElementById("ShowHeadingAndComments").onchange = Render;
+    document.getElementById("ShowListOfWinningCandidates").onchange = Render;
+    document.getElementById("ShowECDecisions").onchange = Render;
+    document.getElementById("ShowCandidateNumbersInDecisions").onchange = Render;
+    document.getElementById("ShowFromCount").onchange = Render;
     document.getElementById("heading-orientation").onchange = Render;
     // function got_std(data) { document_to_show=data; Render(); }
     // getWebJSON("../transcript.json",data=>{full_transcript=data; Render();},null);

@@ -26,6 +26,7 @@ use std::fmt::{Debug, Display};
 use std::iter::Sum;
 use std::str::FromStr;
 use crate::random_util::Randomness;
+use crate::simple_list_of_votes::{ListOfVotes, Vote, VotesWithGivenTransferValue};
 
 /// A number representing a count of pieces of paper.
 /// This is distinct from votes which may be fractional in the presence of weights.
@@ -433,6 +434,23 @@ pub struct VotesWithMultipleTransferValues<'a,S:HowSplitByCountNumber,Tally> {
 impl <'a,S:HowSplitByCountNumber,Tally> Default for VotesWithMultipleTransferValues<'a,S,Tally> {
     fn default() -> Self {
         VotesWithMultipleTransferValues{ last_parcel: None, by_provenance: HashMap::default() }
+    }
+}
+
+impl <'a,S:HowSplitByCountNumber,Tally:AddAssign+Zero+Clone+Display+FromStr+PartialEq+Debug+Sub<Output=Tally>> Into<ListOfVotes> for &VotesWithMultipleTransferValues<'a,S,Tally> {
+    /// Copies all the ballots, adding all with same transfer value together. Sort highest to lowest.
+    fn into(self) -> ListOfVotes {
+        let mut tvs : HashMap<TransferValue,Vec<Vote>> = HashMap::new();
+        for ((_,tv),(_,votes)) in &self.by_provenance {
+            let place_to_put = tvs.entry(tv.clone()).or_insert_with(||vec![]);
+            for v in &votes.votes {
+                place_to_put.push(Vote{n:v.n.0 as isize,candidates:v.prefs.to_vec()})
+            }
+        }
+        let mut tvs : Vec<VotesWithGivenTransferValue> = tvs.into_iter().map(|(tv,votes)|VotesWithGivenTransferValue{tv,votes}).collect();
+        tvs.sort_unstable_by(|a,b| b.tv.cmp(&a.tv)); // sort highest to lowest.
+        ListOfVotes{ tvs }
+
     }
 }
 
