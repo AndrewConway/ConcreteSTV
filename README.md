@@ -205,7 +205,8 @@ Note that you can pass --help as an option to either of these programs for detai
 
 The `docs` folder of this project contains a web based viewer for transcript files.
 Open `docs/Viewer.html` in a web browser. Alternatively this is hosted on github at
-[https://andrewconway.github.io/ConcreteSTV/Viewer.html](https://andrewconway.github.io/ConcreteSTV/Viewer.html)
+[https://andrewconway.github.io/ConcreteSTV/Viewer.html](https://andrewconway.github.io/ConcreteSTV/Viewer.html). A [detailed description
+of a very simple example is here](examples/SimpleExample.md).
 
 In the upper left corner, there will be a *Browse* button. Use it to select the `TAS2019_AEC2019.transcript`
 file from before.

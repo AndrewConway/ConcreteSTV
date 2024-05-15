@@ -171,6 +171,14 @@ div.ListOfVotes {
     font-weight: normal;
 }
 
+.ExcludedSymbol {
+    font-size: larger;
+    color: red;
+}
+span.ElectedSymbol {
+    font-size: larger;
+    color: green;
+}
 @media print
 {
     .NoPrint {

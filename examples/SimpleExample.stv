@@ -1,0 +1,28 @@
+{
+  "metadata":{
+    "name":{"year":"1901","authority":"NA","name":"Simple Example","electorate":"Examplia","comment": "This is an example of a simple election with three parties, 240 voters, three vacancies and so a quota of 61."},
+    "candidates":[
+      {"name":"C1","party": 0, "position": 1 },
+      {"name":"C2","party": 0, "position": 2 },
+      {"name":"A1","party": 1, "position": 1 },
+      {"name":"A2","party": 1, "position": 2 },
+      {"name":"P1","party": 2, "position": 1 }
+    ],
+    "parties" : [
+      {"column_id":"A","atl_allowed": true,"name": "Clockwise Coalition","candidates": [0,1]},
+      {"column_id":"B","atl_allowed": true,"name": "Anticlockwise Alliance","candidates": [2,3]},
+      {"column_id":"C","atl_allowed": true,"name": "Clockphobics","candidates": [4]}
+    ],
+    "vacancies" : 3
+  },
+  "atl":[
+    {"parties":[0,1],"n":110},
+    {"parties":[1,2,0],"n":100},
+    {"parties":[2,1],"n":10},
+    {"parties":[2],"n":10}
+  ],
+  "btl":[
+    {"candidates":[2,4,3],"n":10}
+  ],
+  "informal":0
+}

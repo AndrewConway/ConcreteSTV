@@ -290,13 +290,17 @@ function RenderTranscript(full_transcript,render_div) {
             td.innerText=text;
             if (elected.has(i)) { // see if elected this round
                 for (const e of count.elected) if (e.who===i) {
-                    let happy = addStart(td,"span");
-                    happy.innerText="👑";
-                    happy.title = e.why; // TODO make prettier.
+                    let happy = addStart(td,"span","ElectedSymbol "+e.why);
+                    happy.innerText="✓"; // was "👑" but too hard to read.
+                    if (e.why==="ReachedQuota") happy.title = "Reached Quota";
+                    else if (e.why==="HighestOfLastTwoStanding") happy.title = "Highest of last two continuing candidates";
+                    else if (e.why==="AllRemainingMustBeElected") happy.title = "Remaining candidates = Remaining vacancies";
+                    else if (e.why==="OverwhelmingTally") happy.title = "Overwhelming Tally";
+                    else happy.title = e.why;
                 }
             } else { // see if eliminated this round
                 if (count.not_continuing.includes(i)) {
-                    addStart(delta_td||td,"span").innerText="👎";
+                    addStart(delta_td||td,"span","ExcludedSymbol").innerText="✕"; // was "👎" but too hard to read;
                 }
             }
             if (show_raw_ballots && count.status.list_of_votes) {
