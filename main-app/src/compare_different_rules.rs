@@ -93,7 +93,7 @@ impl RulesComparisonGroups {
     pub fn create(data:&ElectionData,rules:&[Rules]) -> anyhow::Result<Self> {
         let mut res = RulesComparisonGroups { metadata: data.metadata.clone(), groups: vec![] };
         for rule in rules {
-            let transcript = rule.count_simple(data,false,&mut Randomness::ReverseDonkeyVote,&[])?;
+            let transcript = rule.count_simple(data,false,&mut Randomness::ReverseDonkeyVote,&[],false)?;
             let winners = transcript.elected();
             let mut ordered_winners = winners.clone();
             ordered_winners.sort_by_key(|c|c.0);

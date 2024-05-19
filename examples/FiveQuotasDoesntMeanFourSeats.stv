@@ -1,6 +1,6 @@
 {
   "metadata":{
-    "name":{"year":"NA","authority":"NA","name":"Federal Senate","electorate":"NA","comment": "This is an artificial dataset to demonstrate an example of a party with five candidates who gets over five quotas worth of above the line votes, but still doesn't get four seats due to the way transfer values are computed for the federal senate. The issue is that a whole lot of low transfer value votes from B candidates get distributed to candidate A3 before candidate A2 is distributed, because B candidates are elected in an earlier round than A2 (Section 273 subsection 23, Commonwealth Electoral Act 1918). These votes then get distributed from A3 to C candidates with a higher transfer value than they arrived at A3 with, depriving A4 of the votes one would expect A4 to get."},
+    "name":{"year":"","authority":"NA","name":"Federal Senate","electorate":"Example of a party with 5 ATL quotas only getting 3 seats","comment": "This is an artificial dataset to demonstrate an example of a party with five candidates who gets over five quotas worth of above the line votes, but still doesn't get four seats due to the way transfer values are computed for the federal senate. The issue is that a whole lot of low transfer value votes from B candidates get distributed to candidate A3 before candidate A2 is distributed, because B candidates are elected in an earlier round than A2 (Section 273 subsection 23, Commonwealth Electoral Act 1918). These votes then get distributed from A3 to C candidates with a higher transfer value than they arrived at A3 with, depriving A4 of the votes one would expect A4 to get."},
     "candidates":[
       {"name":"A1","party": 0, "position": 1 },
       {"name":"A2","party": 0, "position": 2 },
@@ -17,9 +17,9 @@
       {"name":"C2","party": 2, "position": 2 }
     ],
     "parties" : [
-      {"column_id":"A","atl_allowed": true,"name": "A","candidates": [0,1,2,3,4]},
-      {"column_id":"B","atl_allowed": true,"name": "B","candidates": [5,6,7,8,9,10]},
-      {"column_id":"C","atl_allowed": true,"name": "C","candidates": [11,12]}
+      {"column_id":"A","atl_allowed": true,"name": "Party A","candidates": [0,1,2,3,4]},
+      {"column_id":"B","atl_allowed": true,"name": "Party B","candidates": [5,6,7,8,9,10]},
+      {"column_id":"C","atl_allowed": true,"name": "Party C","candidates": [11,12]}
     ],
     "vacancies" : 11
   },

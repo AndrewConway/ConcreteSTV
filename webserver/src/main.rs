@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Andrew Conway.
+// Copyright 2022-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -133,7 +133,7 @@ async fn recount(election : web::Path<FoundElection>,query:Json<RecountQuery>) -
     async fn recount_uncached(election : &web::Path<FoundElection>,query:&RecountQuery) -> Result<PossibleTranscripts,String> {
         let vote_types : Option<&[String]> = if let Some(vt) = &query.vote_types { Some(vt) } else { None };
         let mut randomness : Randomness = query.seed.into();
-        Ok(query.rules.count(&election.data().await?,query.candidates_to_be_elected,&query.excluded.iter().cloned().collect(),&query.tie_resolutions,vote_types,false,&mut randomness,&[]))
+        Ok(query.rules.count(&election.data().await?,query.candidates_to_be_elected,&query.excluded.iter().cloned().collect(),&query.tie_resolutions,vote_types,false,&mut randomness,&[],false))
     }
     cache_json("recount",&(election.spec.clone(),query.clone()),||recount_uncached(&election,&query)).await
 }

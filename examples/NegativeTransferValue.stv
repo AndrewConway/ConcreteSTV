@@ -1,0 +1,25 @@
+{
+  "metadata":{
+    "name":{"year":"NA","authority":"NA","name":"NSW LGE","electorate":"Example","comment": "This is an artificial dataset to demonstrate the effect of the NSW LGE legislation 7(4)(a) which can cause negative transfer values if taken literally. Quota is 1000. Candidate A gets 800 first preference votes, and 1 more ballot paper with TV 0.2 when W1 gets surplus distributed (rounded down to 0). Then comes another ballot paper with TV 0.2 when L1 gets excluded (also rounded down to 0). Then L2 gets excluded, giving A 300 TV 1 votes, taking A over quota with 1100 votes. Of those 1100 votes, all are exhausted other than one of the TV 0.2 votes. This means 1100.2 are exhausted. This means the denominator of 7(4)(a) is 1100-1100.2, or -0.2. This means the surplus fraction is negative if 7(4)(a) is taken literally. I cannot say what the NSWEC would do in this situation."},
+    "candidates":[
+      {"name":"A"},
+      {"name":"W1"},
+      {"name":"L1"},
+      {"name":"L2"},
+      {"name":"F1"},
+      {"name":"F2"}
+    ],
+    "vacancies" : 3
+  },
+  "atl":[],
+  "btl":[
+    {"candidates":[0],"n":800},
+    {"candidates":[1,0],"n":1},
+    {"candidates":[1,2],"n":1248},
+    {"candidates":[1,2,0,5],"n":1},
+    {"candidates":[3,0],"n":300},
+    {"candidates":[4],"n":823},
+    {"candidates":[5],"n":823}
+  ],
+  "informal":0
+}

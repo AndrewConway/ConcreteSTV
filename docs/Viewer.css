@@ -52,7 +52,7 @@ td.CandidateNameSlanted.LastCandidate > div > div {
 
 
 td.PartyName {
-    text-align: right;
+    text-align: center;
     border-left: 1px solid grey;
     border-right: 1px solid grey;
 }
@@ -86,7 +86,7 @@ td.TransferValue, td.CountAction, td.ECDecisions,td.FromCount {
 
 td.Continuing,td.Elected,td.Eliminated {
     text-align: right;
-    padding : 0 2px 0 0;
+    padding : 0 2px 0 2px;
 }
 td.BallotPapers {
     color: grey;
@@ -154,4 +154,34 @@ div#TranscriptOnly {
 }
 .hidden, div.hidden#TranscriptOnly {
     display: none;
+}
+
+.Cumulative {
+    font-weight: bold;
+    vertical-align: bottom;
+}
+.Delta {
+    vertical-align: top;
+}
+div.ListOfVotes {
+    border-radius: 4px;
+    border: 1px solid black;
+    padding: 1px;
+    font-size: x-small;
+    font-weight: normal;
+}
+
+.ExcludedSymbol {
+    font-size: larger;
+    color: red;
+}
+span.ElectedSymbol {
+    font-size: larger;
+    color: green;
+}
+@media print
+{
+    .NoPrint {
+        display: none !important;
+    }
 }

@@ -10,9 +10,9 @@
       {"name":"C","party": 2, "position": 1 }
     ],
     "parties" : [
-      {"column_id":"A","atl_allowed": true,"name": "A","candidates": [0,1,2,3]},
-      {"column_id":"B","atl_allowed": true,"name": "B","candidates": [4]},
-      {"column_id":"C","atl_allowed": true,"name": "C","candidates": [5]}
+      {"column_id":"A","atl_allowed": true,"name": "Party A","candidates": [0,1,2,3]},
+      {"column_id":"B","atl_allowed": true,"name": "Party B","candidates": [4]},
+      {"column_id":"C","atl_allowed": true,"name": "Party C","candidates": [5]}
     ],
     "vacancies" : 5
   },
