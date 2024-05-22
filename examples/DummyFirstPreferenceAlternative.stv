@@ -1,0 +1,32 @@
+{
+  "metadata":{
+    "name":{"year":"1901","authority":"NA","name":"Dummy first preference","electorate":"Examplia","comment": "This is an alternate voting scenario from DummyFirstPreference.stv where the one voter does not list a dummy first preference, resulting in their vote being rounded down to 0 causing candidate `P' to win instead of `O'. See similar DummyFirstPreference.stv for the alternate situation."},
+    "candidates":[
+      {"name":"C1","party": 0, "position": 1 },
+      {"name":"C2","party": 0, "position": 2 },
+      {"name":"A1","party": 1, "position": 1 },
+      {"name":"A2","party": 1, "position": 2 },
+      {"name":"P","party": 2, "position": 1 },
+      {"name":"O","party": 3, "position": 1 },
+      {"name":"E","party": 4, "position": 1 }
+    ],
+    "parties" : [
+      {"column_id":"A","atl_allowed": true,"name": "Clockwise Coalition","candidates": [0,1]},
+      {"column_id":"B","atl_allowed": true,"name": "Anticlockwise Alliance","candidates": [2,3]},
+      {"column_id":"C","atl_allowed": true,"name": "Clockphobics","candidates": [4]},
+      {"column_id":"D","atl_allowed": true,"name": "Only Clocks","candidates": [5]},
+      {"column_id":"E","atl_allowed": true,"name": "Gratuitous Evil","candidates": [6]}
+    ],
+    "vacancies" : 3
+  },
+  "atl":[
+    {"parties":[0,1],"n":110},
+    {"parties":[1,2],"n":120},
+    {"parties":[2],"n":74},
+    {"parties":[3],"n":93},
+    {"parties":[0,3],"n":1}
+  ],
+  "btl":[
+  ],
+  "informal":0
+}
