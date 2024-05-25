@@ -1,0 +1,21 @@
+{
+  "metadata":{
+    "name":{"year":"1901","authority":"NA","name":"Win by giving away votes","electorate":"Examplia","comment": "Alternative to WinByGivingAwayAlternative.stv. Candidate C has persuaded two voters who previously just voted for C to instead vote for A then B. This wins C the election."},
+    "candidates":[
+      {"name":"A" },
+      {"name":"B" },
+      {"name":"C" }
+    ],
+    "parties" : [
+    ],
+    "vacancies" : 1
+  },
+  "atl":[
+  ],
+  "btl":[
+    {"candidates":[0,1],"n":12},
+    {"candidates":[1],"n":11},
+    {"candidates":[2],"n":13}
+  ],
+  "informal":0
+}
