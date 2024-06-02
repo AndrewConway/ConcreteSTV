@@ -56,21 +56,21 @@ pub fn try_parse_candidate_list(s:&str) -> anyhow::Result<TieResolutionAtom> {
 #[clap(next_help_heading="Options for which ballots to consider changing")]
 pub struct ChangeOptions {
     /// Should be followed by true, false, or both (separated by commas)
-    /// Whether above the line votes should be allowed. Default true.
-    /// If both true and false are specified, changes will be searched for both with an without above the line votes (slower).
+    /// Whether above the line votes should be allowed to be changed. Default true.
+    /// If both true and false are specified, changes will be searched for both with and without above the line votes (slower).
     #[clap(long, value_delimiter=',',default_value="true")]
     allow_atl : Vec<bool>,
 
     /// Should be followed by true, false, or both (separated by commas)
     /// Whether changes to the first preferences votes should be allowed. Default true.
-    /// If both true and false are specified, changes will be searched for both with an without first preference modifications (slower).
+    /// If both true and false are specified, changes will be searched for both with and without first preference modifications (slower).
     #[clap(long, value_delimiter=',',default_value="true")]
     allow_first : Vec<bool>,
 
     /// Should be followed by true, false, or both (separated by commas)
-    /// Whether changes to ballots that are in principle verifiable. Default true.
+    /// Whether changes to ballots that are in principle verifiable should be allowed. Default true.
     /// This option only makes sense if the `--unverifiable` flag is also used.
-    /// If both true and false are specified, changes will be searched for both with an without this restriction (slower).
+    /// If both true and false are specified, changes will be searched for both with and without this restriction (slower).
     #[clap(long, value_delimiter=',',default_value="true")]
     allow_verifiable : Vec<bool>,
 
@@ -94,7 +94,7 @@ impl ChangeOptions {
                 }
             }
         }
-        let mut res = res.ok_or_else(||anyhow!("No votes allowed to be modifed"))?;
+        let mut res = res.ok_or_else(||anyhow!("No votes allowed to be modified"))?;
         res.sort();
         Ok(res)
     }
