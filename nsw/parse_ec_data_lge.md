@@ -11,7 +11,7 @@ the NSW Electroral Commission has a quite permissive license. Kudos to them for 
 Use the `parse_ec_data` program to convert their files to ConcreteSTV's .stv format, with the `NSWLG2021`
 data source. Note that in the examples below I am leaving off the path to the command `parse_ec_data`.
 
-E.g. to parse the *City of Albury*'s data, run the command
+E.g. to parse the *City of Albury*'s data from the NSW 2021 local government election, run the command
 ```bash
 parse_ec_data --out Albury.stv NSWLG2021 "City of Albury"
 ```
@@ -51,3 +51,15 @@ parse_ec_data --out Albury.stv --tie 43,27 NSWLG2021 "City of Albury"
 ## Problems
 
 You may need `openoffice` installed on your system to read some NSW data. This is used to help decode some of the files in .xlsx format.
+
+## Alternatives
+
+You can also download many already converted files from [the online version of ConcreteSTV](https://vote.andrewconway.org/)
+either from a web browser or (looking at copyright messages in the web browser first, which in this case
+is : Derived from data © State of New South Wales through the NSW Electoral Commission. Licensed under Creative Commons Attribution 4.0 License) 
+then on the command line:
+
+```text
+wget -O Albury.stv https://vote.andrewconway.org/NSW%20Local%20Government/2021/City%20of%20Albury/data.stv
+```
+

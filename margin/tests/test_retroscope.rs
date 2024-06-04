@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -132,11 +132,11 @@ fn test_retroscope() {
     assert_eq!(true,retroscope.is_highest_continuing_member_party_ticket(CandidateIndex(3),&vote_data.metadata)); // top of ticket
     assert_eq!(false,retroscope.is_highest_continuing_member_party_ticket(CandidateIndex(4),&vote_data.metadata)); // not on a ticket
     // Test ChooseVotes
-    let mut chooser1 = retroscope.get_chooser(CandidateIndex(1),&vote_data,&ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default() });
+    let mut chooser1 = retroscope.get_chooser(CandidateIndex(1),&vote_data,&ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default(), allow_additions: false, allow_from: None, allow_to: None });
     assert!(chooser1.get_votes::<FederalRulesPre2021>(1000, true).is_none());
-    let mut chooser1 = retroscope.get_chooser(CandidateIndex(1),&vote_data,&ChooseVotesOptions{ allow_atl: false, allow_first_pref: false, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default() });
+    let mut chooser1 = retroscope.get_chooser(CandidateIndex(1),&vote_data,&ChooseVotesOptions{ allow_atl: false, allow_first_pref: false, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default(), allow_additions: false, allow_from: None, allow_to: None });
     assert!(chooser1.get_votes::<FederalRulesPre2021>(1, true).is_none());
-    let mut chooser1 = retroscope.get_chooser(CandidateIndex(1),&vote_data,&ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default() });
+    let mut chooser1 = retroscope.get_chooser(CandidateIndex(1),&vote_data,&ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default(), allow_additions: false, allow_from: None, allow_to: None });
     assert_eq!(10,chooser1.votes_available_btl::<FederalRulesPre2021>());
     assert_eq!(53,chooser1.votes_available_total::<FederalRulesPre2021>());
     let found1 = chooser1.get_votes::<FederalRulesPre2021>(4, true).unwrap(); // there are 10 BTL TV 1, and 100 ATL TV 79/180
@@ -172,10 +172,10 @@ fn test_retroscope() {
     assert!(chooser1.get_votes::<FederalRulesPre2021>(30, true).is_none());
 
     let attempted_changes = VoteChanges{ changes: vec![VoteChange{ vote_value: 30, from: Some(CandidateIndex(1)), to: Some(CandidateIndex(4)) }] };
-    let concrete = attempted_changes.make_concrete::<FederalRulesPre2021>(&retroscope, &vote_data, &ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default() });
+    let concrete = attempted_changes.make_concrete::<FederalRulesPre2021>(&retroscope, &vote_data, &ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default(), allow_additions: false, allow_from: None, allow_to: None });
     assert!(concrete.is_none());
     let attempted_changes = VoteChanges{ changes: vec![VoteChange{ vote_value: 30, from: Some(CandidateIndex(1)), to: Some(CandidateIndex(3)) }] };
-    let concrete = attempted_changes.make_concrete::<FederalRulesPre2021>(&retroscope, &vote_data, &ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default() }).unwrap();
+    let concrete = attempted_changes.make_concrete::<FederalRulesPre2021>(&retroscope, &vote_data, &ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default(), allow_additions: false, allow_from: None, allow_to: None }).unwrap();
     assert_eq!(2,concrete.changes.len());
     assert_eq!(BallotPaperCount(10),concrete.changes[0].n);
     assert_eq!(10,concrete.changes[0].tally);
@@ -196,7 +196,7 @@ fn test_retroscope() {
 
     // consider changing the outcome of the election at this point. Candidate 1 has 53 votes, 3 has 86, 4 has 23. Normally 4 would be excluded, giving 1 vote to candidate 1, and then candidate 3 gets elected 86 to 54. This could be changed by moving 17 votes from candidate 3 to candidate 1.
     let vote_changes = VoteChanges{ changes: vec![VoteChange{ vote_value: 20, from: Some(CandidateIndex(3)), to: Some(CandidateIndex(1)) }] };
-    match simple_test::<FederalRulesPre2021>(&vote_changes, &vote_data, &retroscope, &ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default() }) {
+    match simple_test::<FederalRulesPre2021>(&vote_changes, &vote_data, &retroscope, &ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default(), allow_additions: false, allow_from: None, allow_to: None }) {
         ChangeResult::NoChange => panic!("No change!"),
         ChangeResult::NotEnoughVotesAvailable => panic!("Not enough votes available!"),
         ChangeResult::Change(deltas,ballot_changes) => {
@@ -206,7 +206,7 @@ fn test_retroscope() {
         }
     }
 
-    let optimize_result = optimise::<FederalRulesPre2021>(&vote_changes, &vote_data, &retroscope, &ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default() }, true).unwrap();
+    let optimize_result = optimise::<FederalRulesPre2021>(&vote_changes, &vote_data, &retroscope, &ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable: Default::default(), allow_additions: false, allow_from: None, allow_to: None }, true).unwrap();
     assert_eq!(optimize_result.deltas.list2only,vec![CandidateIndex(3)]);
     assert_eq!(optimize_result.deltas.list1only,vec![CandidateIndex(1)]);
     assert_eq!(optimize_result.changes.n,BallotPaperCount(17)); // optimized it down to 17.

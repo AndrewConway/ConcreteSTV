@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -49,7 +49,7 @@ fn main() -> anyhow::Result <()> {
         let out = File::create(format!("nsw2021stv/{}.stv", electorate))?;
         serde_json::to_writer(out,&data)?;
 
-        let mut results = find_outcome_changes::<NSWECLocalGov2021>(&data,&options1,true);
+        let mut results = find_outcome_changes::<NSWECLocalGov2021>(&data,&options1,true,None);
         results.merge_reevaluating::<NSWECLocalGov2021>(&old_changes,&data,&ballot_types_considered_unverifiable,true); // add in old data to make sure we don't do worse!
         //let results2 = find_outcome_changes::<NSWECLocalGov2021>(&data,&options2);
         //results.merge(results2);

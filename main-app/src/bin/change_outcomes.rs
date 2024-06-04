@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -25,7 +25,10 @@ use stv::random_util::Randomness;
 ///
 /// This will not reliably work with ticket elections (e.g. Federal 2013 and earlier) if ATL modifications are allowed.
 ///
-/// As randomness could cause changes, random seeds are not allowed, and reverse donkey vote is used to resolve ties.
+/// As randomness could cause changes, random seeds are not allowed for resolving ties.
+/// Reverse donkey vote is used to resolve ties if not otherwise specified.
+///
+/// Running multiple times can produce different results as different choices of votes are tried.
 struct Opts {
     /// The counting rules to use.
     /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021, Vic2018, WA2008

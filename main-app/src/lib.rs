@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -17,7 +17,9 @@ use anyhow::anyhow;
 use margin::choose_votes::ChooseVotesOptions;
 use margin::find_outcome_changes::find_outcome_changes;
 use margin::record_changes::ElectionChanges;
+use margin::vote_changes::{VoteChange, VoteChanges};
 use stv::ballot_metadata::{CandidateIndex, NumberOfCandidates};
+use stv::ballot_pile::BallotPaperCount;
 use stv::distribution_of_preferences_transcript::CountIndex;
 use stv::election_data::ElectionData;
 use stv::preference_distribution::PreferenceDistributionRules;
@@ -78,18 +80,40 @@ pub struct ChangeOptions {
     /// The string (or strings separated by commas) following this are election specific, and correspond to types specified by the electoral commission.
     #[clap(long, value_delimiter=',')]
     unverifiable : Vec<String>,
+
+    /// Don't allow additional ballots. Setting this will make it faster.
+    #[clap(long)]
+    disallow_additions : bool,
+
+    /// Give a list of candidate indices (starting at zero) such that votes cannot be taken away from any other candidates.
+    /// Default allows everyone.
+    #[clap(long, value_delimiter=',')]
+    allow_from : Option<Vec<CandidateIndex>>,
+
+    /// Give a list of candidate indices (starting at zero) that votes can be given to.
+    /// Default allows everyone.
+    #[clap(long, value_delimiter=',')]
+    allow_to : Option<Vec<CandidateIndex>>,
+
+    /// Instead of looking for anything it can find, just try the given manipulation. Takes a list of vote changes
+    /// separated by commas. Each manipulation should look like "56:4→2" which means take 56 votes from candidate index 4
+    /// (the fifth candidate) and give to candidate 2. Candidate indices may be left out, meaning add or delete ballots.
+    /// A "-" symbol may be used instead of "→".
+    #[clap(long, value_delimiter=',')]
+    just_try : Option<Vec<VoteChange<u64>>>,
 }
 
 
 impl ChangeOptions {
     fn find_changes<Rules:PreferenceDistributionRules>(&self,data:&ElectionData,verbose:bool) -> anyhow::Result<ElectionChanges<Rules::Tally>> {
+        let just_try = self.just_try.as_ref().map(|v|VoteChanges{changes:v.iter().map(|c|VoteChange{vote_value:Rules::Tally::from(BallotPaperCount(c.vote_value as usize)),from:c.from,to:c.to}).collect()});
         let ballot_types_considered_unverifiable = self.unverifiable.iter().cloned().collect::<HashSet<_>>();
         let mut res : Option<ElectionChanges<Rules::Tally>> = None;
         for &allow_atl in  &self.allow_atl {
             for &allow_first_pref in &self.allow_first {
                 for &allow_verifiable in &self.allow_verifiable {
-                    let options = ChooseVotesOptions{allow_atl,allow_first_pref,allow_verifiable,ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone()};
-                    let results = find_outcome_changes::<Rules>(&data,&options,verbose);
+                    let options = ChooseVotesOptions{allow_atl,allow_first_pref,allow_verifiable,ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone(), allow_additions: !self.disallow_additions, allow_from: self.allow_from.as_ref().map(|v|v.iter().copied().collect()), allow_to: self.allow_to.as_ref().map(|v|v.iter().copied().collect()) };
+                    let results = find_outcome_changes::<Rules>(&data,&options,verbose,just_try.as_ref());
                     if res.is_none() { res=Some(results)} else { res.as_mut().unwrap().merge(results,false) }
                 }
             }

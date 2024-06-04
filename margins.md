@@ -32,7 +32,7 @@ Suppose we generated the `Albury.stv` file as described [here](nsw/parse_ec_data
 we wished to see what modifications could be produced using only iVote votes. This could be computed
 using the command:
 ```bash
-change_outcomes --unverifiable iVote --allow-verifiable false --verbose NSWECLocalGov2021 Albury.stv 
+change_outcomes --unverifiable iVote --allow-verifiable false --allow-first true,false --verbose NSWECLocalGov2021 Albury.stv 
 ```
 This will probably take several seconds to a minute to run. Remove the `--verbose` flag to not print out diagnostic messages.
 
@@ -54,9 +54,11 @@ a table like
 
 Note that there is some randomness in the searching algorithm, 
 and different runs will sometimes produce slightly different results.
+The current version is more powerful than the version when the screenshot above was taken and will
+find some more variations in addition to the ones described here.
 
 This means that there were 3 interesting changes found. The first affected 18 ballots. Its effect was for
-the formerly elected candidate THURLEY David to lose a set and HAMILTON Ross to gain a set. This involved
+the formerly elected candidate THURLEY David to lose a set and HAMILTON Ross to gain a seat. This involved
 changing some votes, at least one of which was above the line, but no first preferences were changed. 
 The details section lists what the changes
 were. In this case there were 18 ballots (worth 18 votes, with transfer value 1 at roughly the time
