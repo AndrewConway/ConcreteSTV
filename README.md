@@ -367,8 +367,13 @@ extent.
 * The federal/legislation folder contains legislation taken from the Federal Register of Legislation
   and is covered by a [Creative Commons Attribution 4.0 International (the CC BY 4.0 licence)](http://creativecommons.org/licenses/by/4.0/).
   See the [copyright notice](federal/legislation/Copyright.md) for details.
+* The example file `examples/Federal Senate 2013 VIC_AEC2013.full.vchange` is based
+  on data from the votes in the 2013 federal senate election, Victoria from the website of the
+  [Australian Electoral Commission (AEC)](https://www.aec.gov.au/).
+  Derived from data [© Commonwealth of Australia 2017](https://www.aec.gov.au/footer/Copyright.htm).
+  Licensed under [Creative Commons Attribution 4.0 International Licence](https://creativecommons.org/licenses/by/4.0).
 
-Kudos to the State of New South Wales and the Federal Register of Legislation for the use of such a license. 
+Kudos to the State of New South Wales, the Federal Register of Legislation, and the Commonwealth of Australia for the use of such a license. 
 
 This should not be taken as an endorsement of ConcreteSTV by any organisation listed here.
 
