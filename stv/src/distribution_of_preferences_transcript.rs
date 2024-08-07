@@ -143,7 +143,7 @@ impl PerCandidate<usize> {
     pub fn sum(&self) -> usize {
         let mut res = self.exhausted;
         for s in &self.candidate { res+=*s; }
-        for s in &self.set_aside { res+=*s; }
+        if let Some(s) = self.set_aside { res+=s; }
         if self.rounding.negative { res-=self.rounding.value } else { res+=self.rounding.value }
         res
     }
