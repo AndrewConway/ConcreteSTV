@@ -68,6 +68,11 @@ function redrawTranscript() {
     if (currently_showing_transcript) {
         const results = document.getElementById("RenderThingToView");
         removeAllChildElements(results);
+        const has_set_aside = currently_showing_transcript.transcript.counts.some(a=>a.set_aside_for_quota);
+        document.getElementById("ShowSetAside").className=has_set_aside?"":"hidden";
+        document.getElementById("ShowSetAsideLabel").className=has_set_aside?"":"hidden";
+        const has_raw_votes = currently_showing_transcript.transcript.counts.some(a=>a.status && a.status.list_of_votes);
+        document.getElementById("ShowRawBallotsIncludingLabel").className=has_raw_votes?"":"hidden";
         RenderTranscript(currently_showing_transcript,results);
     }
 }
@@ -253,5 +258,13 @@ window.onload = function () {
     addHeaderAndFooter();
     getWebJSONResult("metadata.json",process_good_metadata);
     document.getElementById("ShowPapers").onchange = redrawTranscript;
+    document.getElementById("ShowRawBallots").onchange = redrawTranscript;
+    document.getElementById("ShowSetAside").onchange = redrawTranscript;
+    document.getElementById("ShowHeadingAndComments").onchange = redrawTranscript;
+    document.getElementById("ShowListOfWinningCandidates").onchange = redrawTranscript;
+    document.getElementById("ShowECDecisions").onchange = redrawTranscript;
+    document.getElementById("ShowCandidateNumbersInDecisions").onchange = redrawTranscript;
+    document.getElementById("ShowFromCount").onchange = redrawTranscript;
     document.getElementById("heading-orientation").onchange = redrawTranscript;
+
 }
