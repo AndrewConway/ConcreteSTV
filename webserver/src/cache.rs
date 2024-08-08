@@ -54,7 +54,14 @@ pub async fn cache_async<F,R,A,Fut,E>(name:&str,args:&A,f:F) -> Result<R,String>
 
     match cacache::read(CACHE_DIR,&key).await {
         Ok(bytes) => {
-            let deserialized : R = serde_json::from_slice(&bytes).map_err(|e|{println!("{}",String::from_utf8_lossy(&bytes)); format!("Internal error - could not deserialize cached value ({})",e)})?;
+            let deserialized : R = serde_json::from_slice(&bytes).map_err(|e|{
+                println!("Internal Error {}. Failed to deserialize {}",e,String::from_utf8_lossy(&bytes));
+                // let try2 : Result<TranscriptWithMetadata<isize>,_> = serde_json::from_slice(&bytes);
+                // if let Err(err) = try2 {
+                //     println!("try2 error : {}",err);
+                // }
+                format!("Internal error - could not deserialize cached value ({})",e)
+            })?;
             Ok(deserialized)
         }
         Err(_) => {

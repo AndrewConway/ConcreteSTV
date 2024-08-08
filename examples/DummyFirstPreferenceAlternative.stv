@@ -1,6 +1,6 @@
 {
   "metadata":{
-    "name":{"year":"1901","authority":"NA","name":"Dummy first preference","electorate":"Examplia","comment": "This is an alternate voting scenario from DummyFirstPreference.stv where the one voter does not list a dummy first preference, resulting in their vote being rounded down to 0 causing candidate `P' to win instead of `O'. See similar DummyFirstPreference.stv for the alternate situation."},
+    "name":{"year":"Generic Examples","authority":"Made up","name":"Dummy first preference","electorate":"DummyFirstPreferenceAlternative","comment": "This is an alternate voting scenario from DummyFirstPreference.stv where the one voter does not list a dummy first preference, resulting in their vote being rounded down to 0 causing candidate `P' to win instead of `O'. See similar DummyFirstPreference.stv for the alternate situation."},
     "candidates":[
       {"name":"C1","party": 0, "position": 1 },
       {"name":"C2","party": 0, "position": 2 },

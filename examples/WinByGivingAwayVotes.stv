@@ -1,6 +1,6 @@
 {
   "metadata":{
-    "name":{"year":"1901","authority":"NA","name":"Win by giving away votes","electorate":"Examplia","comment": "This is a dummy situation where candidate B currently wins, but candidate C could win by persuading some people who voted for C to instead vote for A then B. See WinByGivingAwayVotesAlternative.stv"},
+    "name":{"year":"Generic Examples","authority":"Made up","name":"Win by giving away votes","electorate":"WinByGivingAwayVotes","comment": "This is a dummy situation where candidate B currently wins, but candidate C could win by persuading some people who voted for C to instead vote for A then B. See WinByGivingAwayVotesAlternative.stv"},
     "candidates":[
       {"name":"A" },
       {"name":"B" },

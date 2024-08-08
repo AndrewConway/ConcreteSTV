@@ -1,6 +1,6 @@
 {
   "metadata":{
-    "name":{"year":"NA","authority":"NA","name":"NSW LGE","electorate":"Example","comment": "This is an artificial dataset to demonstrate the effect of the NSW LGE legislation 7(4)(a) which can cause transfer values greater than one and too many candidates going over quota if taken literally. Quota is 1000. During W2's surplus distribution, there is a negative surplus fraction due to rounding. Two votes with TV -100 go to W3, who later goes over quota with surplus fraction -110 due to the negative votes received. The two votes with prior TV -100 go one each to candidates F1 and F2 with TV 11000, putting both over quota and electing too many candidates. I cannot say what the NSWEC would do in this situation."},
+    "name":{"year":"NSW LGE Examples","authority":"Made up","name":"NSW LGE","electorate":"TransferValueOverOne","comment": "This is an artificial dataset to demonstrate the effect of the NSW LGE legislation 7(4)(a) which can cause transfer values greater than one and too many candidates going over quota if taken literally. Quota is 1000. During W2's surplus distribution, there is a negative surplus fraction due to rounding. Two votes with TV -100 go to W3, who later goes over quota with surplus fraction -110 due to the negative votes received. The two votes with prior TV -100 go one each to candidates F1 and F2 with TV 11000, putting both over quota and electing too many candidates. I cannot say what the NSWEC would do in this situation."},
     "candidates":[
       {"name":"W1"},
       {"name":"W2"},

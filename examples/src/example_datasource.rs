@@ -25,10 +25,12 @@ impl ElectionDataSource for ExampleDataSource {
     fn name(&self) -> Cow<'static, str> { "Interesting made up elections".into() }
     fn ec_name(&self) -> Cow<'static, str> { "Made up by Andrew Conway".into() }
     fn ec_url(&self) -> Cow<'static, str> { "https://vote.andrewconway.org/".into() }
-    fn years(&self) -> Vec<String> { vec!["Federal Examples".to_string()] }
+    fn years(&self) -> Vec<String> { vec!["Federal Examples".to_string(),"NSW LGE Examples".to_string(),"Generic Examples".to_string()] }
     fn get_loader_for_year(&self,year: &str,_finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
         match year {
             "Federal Examples" => Ok(Box::new(ExampleDataLoader::<FederalExamples>{ phantom_data: Default::default() })),
+            "NSW LGE Examples" => Ok(Box::new(ExampleDataLoader::<NSWLGEExamples>{ phantom_data: Default::default() })),
+            "Generic Examples" => Ok(Box::new(ExampleDataLoader::<GenericExamples>{ phantom_data: Default::default() })),
             _ => Err(anyhow!("Not a valid example category")),
         }
 
@@ -59,11 +61,7 @@ impl SimpleExampleFromText for FederalExamples {
 
     fn rules(electorate: &str) -> AssociatedRules {
         AssociatedRules {
-            rules_used: match electorate {
-                "2015" => Some("NSWECRandomLC2015".into()),
-                "2019" | "2023" => Some("NSWECRandomLC2019".into()),
-                _ => None,
-            },
+            rules_used: None,
             rules_recommended: Some("FederalPost2021".into()),
             comment: match electorate {
                 "MultipleExclusionOrdering" => Some("This produces different candidates elected with AEC2013, AEC2016 (due to missing bulk exclusion) and AEC2019 (due to missing bulk exclusion and the distribution of preferences for the last candidate excluded). After the legislation changes in 2021, it produces different candidates elected if counted by computer (FederalPost2021) or manually (FederalPost2021Manual) due to the different handling of bulk exclusion. The difference is due to a subtle issue in the conditions for bulk exclusion in the federal legislation".into()),
@@ -80,6 +78,78 @@ impl SimpleExampleFromText for FederalExamples {
         }
     }
 }
+
+/// Examples relevant particularly to the New South Wales local government elections
+pub struct NSWLGEExamples {}
+
+impl SimpleExampleFromText for crate::example_datasource::NSWLGEExamples {
+    fn all_electorates() -> Vec<String> {
+        vec!["NegativeTransferValueCausingElectionOnNegativeTally".to_string(),"TransferValueOverOne".to_string()]
+    }
+
+    fn get_raw_data_as_string(electorate: &str) -> anyhow::Result<&'static str> {
+        match electorate {
+            "NegativeTransferValueCausingElectionOnNegativeTally" => Ok(include_str!("../NegativeTransferValueCausingElectionOnNegativeTally.stv")),
+            "TransferValueOverOne" => Ok(include_str!("../TransferValueOverOne.stv")),
+            _ => Err(anyhow!("No such Federal example {}",electorate))
+        }
+    }
+
+    fn rules(electorate: &str) -> AssociatedRules {
+        AssociatedRules {
+            rules_used: None,
+            rules_recommended: Some("NSWECLocalGov2021Literal".into()),
+            comment: match electorate {
+                "NegativeTransferValueCausingElectionOnNegativeTally" => Some("This produces negative transfer values with the NSWECLocalGov2021Literal ruleset, due to a idiosyncratic formula in the legislation. As a result one of the elected candidates is elected on a negative number of votes.".into()),
+                "TransferValueOverOne" => Some("The product of two uses of the idiosyncratic formula for transfer values results in a transfer value over one, resulting in too many candidates going over quota and getting elected when using the NSWECLocalGov2021Literal ruleset.".into()),
+                _ => None,
+            },
+            reports:  match electorate { // TODO add report when done
+                "NegativeTransferValueCausingElectionOnNegativeTally" | "TransferValueOverOne" => vec![],
+                _ => vec![],
+            },
+        }
+    }
+}
+
+
+/// Examples relevant not particular to any STV variant
+pub struct GenericExamples {}
+
+impl SimpleExampleFromText for crate::example_datasource::GenericExamples {
+    fn all_electorates() -> Vec<String> {
+        vec!["DummyFirstPreference".to_string(),"DummyFirstPreferenceAlternative".to_string(),"WinByGivingAwayVotes".to_string(),"WinByGivingAwayVotesAlternative".to_string()]
+    }
+
+    fn get_raw_data_as_string(electorate: &str) -> anyhow::Result<&'static str> {
+        match electorate {
+            "DummyFirstPreference" => Ok(include_str!("../DummyFirstPreference.stv")),
+            "DummyFirstPreferenceAlternative" => Ok(include_str!("../DummyFirstPreferenceAlternative.stv")),
+            "WinByGivingAwayVotes" => Ok(include_str!("../WinByGivingAwayVotes.stv")),
+            "WinByGivingAwayVotesAlternative" => Ok(include_str!("../WinByGivingAwayVotesAlternative.stv")),
+            _ => Err(anyhow!("No such Federal example {}",electorate))
+        }
+    }
+
+    fn rules(electorate: &str) -> AssociatedRules {
+        AssociatedRules {
+            rules_used: None,
+            rules_recommended: Some("FederalPost2021".into()),
+            comment: match electorate {
+                "DummyFirstPreference" => Some("This is an example of tactical voting, where a voter adds an undesired candidate E as first preference before C1,C2,O to increase the power of the vote in some situations. Applicable to most rulesets. See DummyFirstPreferenceAlternative".into()),
+                "DummyFirstPreferenceAlternative" => Some("This is like DummyFirstPreference except the tactical voter here expresses their true preferences C1,C2,O, resulting in hated P winning instead of O.".into()),
+                "WinByGivingAwayVotes" => Some("Candidate C loses in this election, but would win by persuading some people who voted for C to instead vote for other candidates. See WinByGivingAwayVotesAlternative. Applicable to most rulesets.".into()),
+                "WinByGivingAwayVotesAlternative" => Some("Like WinByGivingAwayVotes except candidate C wins a seat after persuading two voters who previously just voted for C to instead vote for A then B.".into()),
+                _ => None,
+            },
+            reports:  match electorate { // TODO add report when done
+                "DummyFirstPreference" | "DummyFirstPreferenceAlternative" | "WinByGivingAwayVotes" | "WinByGivingAwayVotesAlternative" => vec![],
+                _ => vec![],
+            },
+        }
+    }
+}
+
 
 
 pub trait SimpleExampleFromText {
