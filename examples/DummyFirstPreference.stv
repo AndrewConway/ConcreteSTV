@@ -1,6 +1,6 @@
 {
   "metadata":{
-    "name":{"year":"Generic Examples","authority":"Made up","name":"Dummy first preference","electorate":"DummyFirstPreference","comment": "This is an example of how adding a sure to lose party as a first preference by one voter increases the power of their vote, making candidate `O' win rather than `P' who would have won. See similar DummyFirstPreferenceAlternative.stv for the alternate situation."},
+    "name":{"year":"Generic","authority":"Made up","name":"Dummy first preference","electorate":"DummyFirstPreference","comment": "This is an example of how adding a sure to lose party as a first preference by one voter increases the power of their vote, making candidate `O' win rather than `P' who would have won. See similar DummyFirstPreferenceAlternative.stv for the alternate situation."},
     "candidates":[
       {"name":"C1","party": 0, "position": 1 },
       {"name":"C2","party": 0, "position": 2 },

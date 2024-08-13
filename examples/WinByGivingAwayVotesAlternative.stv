@@ -1,6 +1,6 @@
 {
   "metadata":{
-    "name":{"year":"Generic Examples","authority":"Made up","name":"Win by giving away votes","electorate":"WinByGivingAwayVotesAlternative","comment": "Alternative to WinByGivingAwayAlternative.stv. Candidate C has persuaded two voters who previously just voted for C to instead vote for A then B. This wins C the election."},
+    "name":{"year":"Generic","authority":"Made up","name":"Win by giving away votes","electorate":"WinByGivingAwayVotesAlternative","comment": "Alternative to WinByGivingAwayAlternative.stv. Candidate C has persuaded two voters who previously just voted for C to instead vote for A then B. This wins C the election."},
     "candidates":[
       {"name":"A" },
       {"name":"B" },

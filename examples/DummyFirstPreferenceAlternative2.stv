@@ -1,6 +1,6 @@
 {
   "metadata":{
-    "name":{"year":"Generic","authority":"Made up","name":"Dummy first preference","electorate":"DummyFirstPreferenceAlternative","comment": "This is an alternate voting scenario from DummyFirstPreference.stv where the one voter does not list a dummy first preference, resulting in their vote being rounded down to 0 causing candidate `P' to win instead of `O'. See similar DummyFirstPreference.stv for the alternate situation."},
+    "name":{"year":"Generic","authority":"Made up","name":"Dummy first preference","electorate":"DummyFirstPreferenceAlternative2","comment": "This is an alternate voting scenario from DummyFirstPreference.stv where the two voters do not list a dummy first preference, resulting in their vote being rounded down to 0 causing candidate `P' to win instead of `O'. See similar DummyFirstPreference2.stv for the alternate situation. Like DummyFirstPreference, but 2 voters instead of 1 doesn't rely on tie resolution by countback."},
     "candidates":[
       {"name":"C1","party": 0, "position": 1 },
       {"name":"C2","party": 0, "position": 2 },
@@ -24,7 +24,7 @@
     {"parties":[1,2],"n":120},
     {"parties":[2],"n":74},
     {"parties":[3],"n":93},
-    {"parties":[0,3],"n":1}
+    {"parties":[0,3],"n":2}
   ],
   "btl":[
   ],
