@@ -812,6 +812,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let votes : Rules::Tally = self.tally(candidate_to_distribute);
         let surplus: Rules::Tally  = votes.clone()-self.quota.clone();
         self.tallys[candidate_to_distribute.0]=self.quota.clone();
+        // the code below is not production but is to find the oddity of a transfer value being increased.
+        // let original_provinances = self.papers[candidate_to_distribute.0].get_all_provenance_keys();
         let (_tally_here,ballots,provenance) = match Rules::use_last_parcel_for_surplus_distribution() {
             LastParcelUse::No => self.papers[candidate_to_distribute.0].extract_all_ballots_ignoring_transfer_value(),
             LastParcelUse::LiterallyLast => self.papers[candidate_to_distribute.0].extract_last_parcel(),
@@ -829,6 +831,14 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let continuing_ballots = ballots_considered-distributed.exhausted;
         let tv_denom = if Rules::transfer_value_method().denom_is_just_continuing() {continuing_ballots} else {ballots.num_ballots};
         let mut transfer_value : TransferValue = if tv_denom.is_zero() { TransferValue::one() } else {Rules::make_transfer_value(surplus.clone(),tv_denom)};
+        // the code below is not production but is to find the oddity of a transfer value being increased.
+        //for (_,original_tv) in original_provinances {
+        //    if original_tv.lt(&transfer_value) {
+        //        println!("Found case count {} of tv {} less than {} election {}",self.current_count,original_tv,transfer_value,self.data.metadata.name.human_readable_name());
+        //        panic!("Found oddity")
+        //    }
+        //}
+        //
         let mut original_worth : Rules::Tally = surplus.clone();
         if Rules::transfer_value_method().limit_to_incoming_transfer_value() {
             let old_tv = provenance.transfer_value.clone().expect("If you are going to limit to an incoming transfer value, there must be a unique one.");
