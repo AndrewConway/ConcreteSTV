@@ -124,7 +124,7 @@ their results, although some errors are discoverable (see our reports).
 ## To compile
 
 ConcreteSTV is written in [Rust](https://www.rust-lang.org/). Install Rust (latest stable version
-recommended), then run, in this directory,
+recommended), then run, in this directory (the directory containing the file README.md you are currently reading),
 ```bash
 cargo build --release
 ```
@@ -139,7 +139,8 @@ possibly `openssl-dev` on some other Linux distributions.
 ## To get real election data (parse_ec_data)
 
 Before we can count an election, we need the votes to count. ConcreteSTV uses a format 
-with extension `.stv` to store votes and some metadata about the election.
+with extension `.stv` to store votes and some metadata about the election. Before
+counting the votes, one needs to get the data into this .stv format.
 
 Some electoral commissions publish
 a list of votes that are used as the basis of their counts. Let's choose the federal 2019 election, state Tasmania.
@@ -181,6 +182,9 @@ Currently parse_ec_data can accept (as first argument) the following elections:
 * ACT Legislative assembly : ACT2008, ACT2012, ACT2016, ACT2020 [ElectionsACT](https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections)
 * NSW Local Government : NSWLG2021 [NSW Election Commission](https://www.elections.nsw.gov.au/) See [docs](nsw/parse_ec_data_lge.md) for specific instructions.
 * Victoria : VIC2014, VIC2018, VIC2022 if you have the privilege of having the data.
+
+If you have data in some other format (such as .soi, .soc, or .blt) you can convert it to
+the .stv format using the `preflib_to_stv` or `blt_to_stv` programs described later.
 
 ## To count (concrete_stv)
 
