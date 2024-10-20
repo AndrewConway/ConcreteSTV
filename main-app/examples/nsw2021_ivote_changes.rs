@@ -27,7 +27,7 @@ fn main() -> anyhow::Result <()> {
     let mut summary = File::create("changes/summary.csv")?;
     let ballot_types_considered_unverifiable = ["iVote"];
     let ballot_types_considered_unverifiable : HashSet<String> = ballot_types_considered_unverifiable.iter().map(|s|s.to_string()).collect();
-    let options1 = ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: false, ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone() };
+    let options1 = ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: false, ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone(), allow_additions: false, allow_from: None, allow_to: None };
     // let options2 = ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone() };
     writeln!(summary,"Electorate,Votes,Min Addition,Min Manipulation,Old Min Add,Old Min Manipulation")?;
     for electorate in &electorates {
