@@ -16,7 +16,7 @@ use anyhow::{anyhow, Context};
 use scraper::{ElementRef, Html, Selector};
 use stv::ballot_paper::PreferencesComingOutOfOrderHelper;
 use stv::parse_util::{file_to_string, file_to_string_windows_1252, FileFinder, KnowsAboutRawMarkings, MissingAlternateNamedFiles, MissingFile, RawDataSource, read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions};
-use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionExplicitDecisionInCount, TieResolutionsMadeByEC};
+use stv::tie_resolution::{TieResolutionAtom, TieResolutionExplicitDecision, TieResolutionExplicitDecisionInCount, TieResolutionsMadeByEC, TieResolutionUsage};
 use serde::{Serialize,Deserialize};
 use url::Url;
 use stv::ballot_pile::BallotPaperCount;
@@ -29,6 +29,9 @@ use crate::{NSWECLocalGov2021, SimpleIRVAnyDifferenceBreaksTies};
 use crate::parse_lc::read_official_dop_transcript_html_index_page_then_one_html_page_per_count;
 
 
+pub fn get_nsw_lge_data_loader_2024(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
+    NSWLGEDataLoader::new(finder,"2024","https://vtr.elections.nsw.gov.au/LG2401/results","/LG2401")
+}
 pub fn get_nsw_lge_data_loader_2021(finder:&FileFinder) -> anyhow::Result<NSWLGEDataLoader> {
     NSWLGEDataLoader::new(finder,"2021","https://pastvtr.elections.nsw.gov.au/LG2101/results","/LG2101")
 }
@@ -47,9 +50,10 @@ impl ElectionDataSource for NSWLGEDataSource {
     fn name(&self) -> Cow<'static, str> { "NSW Local Government".into() }
     fn ec_name(&self) -> Cow<'static, str> { "NSW Electoral Commission".into() }
     fn ec_url(&self) -> Cow<'static, str> { "https://www.elections.nsw.gov.au/".into() }
-    fn years(&self) -> Vec<String> { vec!["2012".to_string(),"2016".to_string(),"2017".to_string(),"2021".to_string()] }
+    fn years(&self) -> Vec<String> { vec!["2012".to_string(),"2016".to_string(),"2017".to_string(),"2021".to_string(),"2024".to_string()] }
     fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
         match year {
+            "2024" => Ok(Box::new(get_nsw_lge_data_loader_2024(finder)?)),
             "2021" => Ok(Box::new(get_nsw_lge_data_loader_2021(finder)?)),
             "2017" => Ok(Box::new(get_nsw_lge_data_loader_2017(finder)?)),
             "2016" => Ok(Box::new(get_nsw_lge_data_loader_2016(finder)?)),
@@ -121,6 +125,7 @@ impl RawDataSource for NSWLGEDataLoader {
             "2012" | "2016" | "2017" => self.read_raw_data(electorate), // too hard to get ec resolutions from the probabilistic years.
             _ => {
                 if electorate.ends_with("Mayoral") { read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<SimpleIRVAnyDifferenceBreaksTies,Self>(self, electorate) }
+                else if self.year=="2024" && electorate=="Balranald" { self.read_raw_data(electorate) } // TODO remove if NSWEC puts up a valid DoP file for Balrand
                 else { read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<NSWECLocalGov2021,Self>(self,electorate) }
             }
         }
@@ -140,8 +145,20 @@ impl RawDataSource for NSWLGEDataLoader {
         }
     }
 
-    fn rules(&self, electorate: &str) -> AssociatedRules {
+    fn rules(&self, electorate: &str) -> AssociatedRules { // TODO add 2024
         match self.year.as_str() {
+            "2024" if electorate.ends_with("Mayoral") => AssociatedRules {
+                rules_used: Some("IRV".into()),
+                rules_recommended: Some("IRV".into()),
+                comment: Some("This is not actually a STV election, having only one candidate. It is an IRV election. The legislation is ambiguous about tie resolution. The NSWEC transcripts frequently continue far beyond when the mayor is elected; this is harmless if bizarre and confusing and I do not bother emulating this bug.".into()),
+                reports: vec![],
+            },
+            "2024" => AssociatedRules {
+                rules_used: Some("NSWECLocalGov2021".into()),
+                rules_recommended: None,
+                comment: Some("The legislation is very ambiguous. My interpretation of the rules is NSWLocalGov2021 but NSWECLocalGov2021 or NSWECLocalGov2021Literal seem plausible interpretations.".into()),
+                reports: vec![],
+            },
             "2021" if electorate.ends_with("Mayoral") => AssociatedRules {
                 rules_used: Some("IRV".into()),
                 rules_recommended: Some("IRV".into()),
@@ -151,7 +168,7 @@ impl RawDataSource for NSWLGEDataLoader {
             "2021" => AssociatedRules {
                 rules_used: Some("NSWECLocalGov2021".into()),
                 rules_recommended: None,
-                comment: Some("The legislation is very ambiguous. My interpretation of the rules is NSWLocalGov2021 but NSWECLocalGov2021 seems a plausible interpretation.".into()),
+                comment: Some("The legislation is very ambiguous. My interpretation of the rules is NSWLocalGov2021 but NSWECLocalGov2021 or NSWECLocalGov2021Literal seem plausible interpretations.".into()),
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/NSWLGE2021Report.pdf".into()],
             },
             "2012" => AssociatedRules {
@@ -185,7 +202,7 @@ impl RawDataSource for NSWLGEDataLoader {
                 let dop_url = Url::parse(&self.page_url)?.join(&(contest.to_string()+"/dop_index.htm"))?;
                 read_official_dop_transcript_html_index_page_then_one_html_page_per_count(&cache,dop_url.as_str(),metadata)
             }
-            "2021" => {
+            "2021" | "2024" => {
                 if metadata.name.electorate.ends_with("Mayoral") { self.read_official_dop_transcript_mayoral(metadata) }
                 else { self.read_official_dop_transcript_councillor(metadata).context("read_official_dop_transcript_councillor") }
             }
@@ -212,7 +229,7 @@ impl NSWLGEDataLoader {
             "2017" => {
                 self.find_raw_data_file_relative(contest,"","summary.htm","summary.htm")?
             }
-            "2021" => {
+            "2021" | "2024" => {
                 self.find_raw_data_file_relative(contest,"",
                                                  if mayoral {"mayoral.html"} else {"councillor.html"},
                                                  if mayoral {"mayoral"} else {"councillor"})?
@@ -252,6 +269,12 @@ impl NSWLGEDataLoader {
                                                          if mayoral { "mayoral-fp-by-candidate.html" } else { "fp-by-grp-and-candidate-by-vote-type.html" },
                                                          if mayoral { "mayoral/report/fp-by-grp-and-candidate-by-vote-type" } else { "councillor/report/fp-by-grp-and-candidate-by-vote-type" })?
                     }
+                    "2024" => {
+                        self.find_raw_data_file_relative(contest,
+                                                         if mayoral { "mayoral" } else { "councillor" },
+                                                         if mayoral { "mayoral-fp-by-candidate.html" } else { "fp-by-grp-and-candidate-by-vote-type.html" },
+                                                         if mayoral { "mayoral/fp-by-grp-and-candidate-by-vote-type" } else { "councillor/fp-by-grp-and-candidate-by-vote-type" })?
+                    }
                     _ => { return Err(anyhow!("Invalid year")); }
                 };
                 self.parse_candidate_list(File::open(metadata_data_file)?, mayoral, electorate)?
@@ -275,6 +298,9 @@ impl NSWLGEDataLoader {
                 "2021" => {
                     Some(self.find_raw_data_file_relative(contest,"councillor/report","grp-and-candidates-result.html","councillor/report/grp-and-candidates-result")?)
                 }
+                "2024" => {
+                    Some(self.find_raw_data_file_relative(contest,"councillor","grp-and-candidates-result.html","councillor/grp-and-candidates-result")?)
+                }
                 "2012" => None, // done above
                 _ => { return Err(anyhow!("Invalid year")); }
             } {
@@ -290,6 +316,17 @@ impl NSWLGEDataLoader {
                 came_up_in: Some(CountIndex(1)),
             }))
         }
+        if electorate=="Upper Lachlan Shire" && self.year.as_str()=="2024" {
+            let favoured = vec![CandidateIndex(2)];
+            let disfavoured = vec![CandidateIndex(3)];
+            metadata.tie_resolutions.tie_resolutions.push(TieResolutionAtom::ExplicitDecision(TieResolutionExplicitDecisionInCount {
+                decision: TieResolutionExplicitDecision{
+                    increasing_favour: vec![disfavoured,favoured],
+                    usage: Some(TieResolutionUsage::OrderElected),
+                },
+                came_up_in: Some(CountIndex(0)),
+            }))
+        }
         Ok((metadata,preferences_loc))
     }
 
@@ -301,9 +338,10 @@ impl NSWLGEDataLoader {
             "2012" => {
                 parse_zip_election_file_2012(File::open(preferences_loc.unwrap())?,metadata)
             }
-            "2016" | "2017" | "2021" => {
+            "2016" | "2017" | "2021" | "2024" => {
                 let zip_name = if mayoral {"mayoral-finalpreferencedatafile.zip"} else {"finalpreferencedatafile.zip"};
-                let zip_preferences_list = self.find_raw_data_file_relative(contest,if self.year=="2021"{"download"} else {""},zip_name,&((if self.year=="2021"{"download/"} else {""}).to_string()+zip_name))?;
+                let in_download_folder =   self.year=="2021" ||  self.year=="2024";
+                let zip_preferences_list = self.find_raw_data_file_relative(contest,if in_download_folder {"download"} else {""},zip_name,&((if in_download_folder {"download/"} else {""}).to_string()+zip_name))?;
                 parse_zip_election_file(File::open(zip_preferences_list)?,metadata,reject_vote_type,mayoral)
             }
             _ => return Err(anyhow!("can't read raw data for NSW LGE year {}",&self.year)),
@@ -312,12 +350,15 @@ impl NSWLGEDataLoader {
 
     pub fn new(finder:&FileFinder,year:&'static str,page_url:&'static str,archive_location_prefix:&str) -> anyhow::Result<Self> {
 
-        let archive_location = "NSW/LGE".to_string()+year+"/pastvtr.elections.nsw.gov.au"+archive_location_prefix;
+        let uses_past = year!="2024"; // TODO this will presumably change in the near future when NSWEC changes the URLs.
+
+        let archive_location = "NSW/LGE".to_string()+year+"/"+(if uses_past {"past"} else {""})+"vtr.elections.nsw.gov.au"+archive_location_prefix;
         let contest_list = match year {
             "2012" => include_str!("NSWLGE2012_contest_list.json"),
             "2016" => include_str!("NSWLGE2016_contest_list.json"),
             "2017" => include_str!("NSWLGE2017_contest_list.json"),
             "2021" => include_str!("NSWLGE2021_contest_list.json"),
+            "2024" => include_str!("NSWLGE2024_contest_list.json"),
             _ => return Err(anyhow!("Illegal year {}",year)),
         };
         Ok(NSWLGEDataLoader {
@@ -353,7 +394,7 @@ impl NSWLGEDataLoader {
     fn parse_candidate_list(&self,file:File,mayoral:bool,electorate:&str) -> anyhow::Result<ElectionMetadata> {
         let headings_in_tbody = match self.year.as_str() {
             "2017" | "2016" => true,
-            "2021" => false,
+            "2021" | "2024" => false,
             _ => return Err(anyhow!("Illegal Year"))
         };
         parse_fp_by_grp_and_candidate_by_vote_type(file,mayoral,None,headings_in_tbody,self.name(electorate))
@@ -513,7 +554,8 @@ impl NSWLGEDataLoader {
 
     pub fn read_official_dop_transcript_mayoral(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let contest = &self.find_contest(&metadata.name.electorate)?.url;
-        let dop_file = self.find_raw_data_file_relative(contest,"mayoral/report","mayoral-dop","mayoral/report/mayoral-dop")?;
+        let relfolder = if metadata.name.year=="2024" {"mayoral"} else {"mayoral/report"};
+        let dop_file = self.find_raw_data_file_relative(contest,relfolder,"mayoral-dop",&format!("{relfolder}/mayoral-dop"))?;
         let html = Html::parse_document(&std::fs::read_to_string(dop_file)?);
         let selector_td = Selector::parse("td").unwrap();
         let mut candidates_in_order_of_exclusion : Vec<CandidateIndex> = vec![];

@@ -5,21 +5,22 @@
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
+use std::collections::HashSet;
 use std::fs::File;
 use nsw::{NSWECLocalGov2021, SimpleIRVAnyDifferenceBreaksTies};
-use nsw::parse_lge::{get_nsw_lge_data_loader_2021, NSWLGEDataLoader};
+use nsw::parse_lge::{get_nsw_lge_data_loader_2024, NSWLGEDataLoader};
 use stv::ballot_metadata::CandidateIndex;
 use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
 use stv::parse_util::{FileFinder, RawDataSource};
 use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
 use stv::random_util::Randomness;
-use stv::tie_resolution::{TieResolutionAtom, TieResolutionsMadeByEC};
+use stv::tie_resolution::TieResolutionAtom;
 
 
 fn test<Rules:PreferenceDistributionRules>(electorate:&str,loader:&NSWLGEDataLoader) {
     let data = loader.read_raw_data(electorate).unwrap();
     data.print_summary();
-    let mut tie_resolutions = TieResolutionsMadeByEC::default();
+    let mut tie_resolutions = data.metadata.tie_resolutions.clone();
     let official_transcript = loader.read_official_dop_transcript(&data.metadata).unwrap();
     loop {
         let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &data.metadata.excluded.iter().cloned().collect(), &tie_resolutions,None,false,&mut Randomness::ReverseDonkeyVote);
@@ -42,36 +43,18 @@ fn test<Rules:PreferenceDistributionRules>(electorate:&str,loader:&NSWLGEDataLoa
 fn test_ineligible() {
     let finder = FileFinder::find_ec_data_repository();
     println!("Found files at {:?}",finder.path);
-    let loader = get_nsw_lge_data_loader_2021(&finder).unwrap();
+    let loader = get_nsw_lge_data_loader_2024(&finder).unwrap();
     let data = loader.read_raw_data_checking_electorate_valid("Ballina - B Ward").unwrap();
-    assert_eq!(data.metadata.excluded,vec![CandidateIndex(2)]);
+    assert_eq!(data.metadata.excluded,vec![CandidateIndex(0)]);
 }
-/*
-#[test]
-fn test_all_council_races() {
-    let finder = FileFinder::find_ec_data_repository();
-    println!("Found files at {:?}",finder.path);
-    let loader = get_nsw_lge_data_loader_2021(&finder).unwrap();
-    println!("Made loader");
-    let electorate =&loader.all_electorates()[0];
-    assert_eq!(electorate,"City of Albury");
-    for electorate in &loader.all_electorates() {
-        if electorate.ends_with(" Mayoral") {
-            println!("Testing Electorate {}",electorate);
-            test::<SimpleIRVAnyDifferenceBreaksTies>(electorate, &loader);
-        } else {
-            println!("Testing Electorate {}",electorate);
-            test::<NSWECLocalGov2021>(electorate,&loader);
-        }
-    }
-}*/
+
 
 #[test]
-/// Test all 2021 Mayoral elections
-fn test_2021_mayoral() {
+/// Test all 2024 Mayoral elections
+fn test_2024_mayoral() {
     let finder = FileFinder::find_ec_data_repository();
     println!("Found files at {:?}",finder.path);
-    let loader = get_nsw_lge_data_loader_2021(&finder).unwrap();
+    let loader = get_nsw_lge_data_loader_2024(&finder).unwrap();
     println!("Made loader");
     let electorate =&loader.all_electorates()[0];
     assert_eq!(electorate,"City of Albury");
@@ -83,19 +66,50 @@ fn test_2021_mayoral() {
     }
 }
 #[test]
-fn test_2021_council() {
+fn test_2024_council() {
     let finder = FileFinder::find_ec_data_repository();
     println!("Found files at {:?}",finder.path);
-    let loader = get_nsw_lge_data_loader_2021(&finder).unwrap();
+    let loader = get_nsw_lge_data_loader_2024(&finder).unwrap();
     println!("Made loader");
     let electorate =&loader.all_electorates()[0];
     assert_eq!(electorate,"City of Albury");
     for electorate in &loader.all_electorates() {
         if !electorate.ends_with(" Mayoral") {
             println!("Testing Electorate {}",electorate);
-            test::<NSWECLocalGov2021>(electorate,&loader);
+            if electorate!="Balranald" { // the Balranald official DoP seems corrupt.
+                test::<NSWECLocalGov2021>(electorate,&loader);
+            }
         }
     }
+}
+
+#[allow(non_snake_case)]
+#[test]
+fn test_2024_Upper_Lachlan_Shire() { // Upper Lachlan Shire had a tie for elected candidates on round 1. The EC decision is hard coded in the parse metadata function.
+    let finder = FileFinder::find_ec_data_repository();
+    println!("Found files at {:?}",finder.path);
+    let loader = get_nsw_lge_data_loader_2024(&finder).unwrap();
+    println!("Made loader");
+    test::<NSWECLocalGov2021>("Upper Lachlan Shire",&loader);
+}
+
+#[allow(non_snake_case)]
+#[test]
+fn test_2024_Balrand() { // The DoP speadsheet on the NSWEC website for Balrand was corrupt. I looked at the HTML DoP, but it is missing the sub-counts, and seems to count all exhausted votes as "lost" rather than "exhausted" which is always blank. First encountered, 7.1
+    let finder = FileFinder::find_ec_data_repository();
+    println!("Found files at {:?}", finder.path);
+    let loader = get_nsw_lge_data_loader_2024(&finder).unwrap();
+    println!("Made loader");
+    let data = loader.read_raw_data_checking_electorate_valid("Balranald").unwrap();
+    data.print_summary();
+    let transcript = distribute_preferences::<NSWECLocalGov2021>(&data, loader.candidates_to_be_elected("Balranald"), &data.metadata.excluded.iter().cloned().collect(), &data.metadata.tie_resolutions, None, false, &mut Randomness::ReverseDonkeyVote);
+    let transcript = TranscriptWithMetadata { metadata: data.metadata.clone(), transcript };
+    std::fs::create_dir_all("test_transcripts").unwrap();
+    {
+        let file = File::create(format!("test_transcripts/NSW LG{} {}.transcript", transcript.metadata.name.year, "Balranald")).unwrap();
+        serde_json::to_writer_pretty(file, &transcript).unwrap();
+    }
+    assert_eq!(transcript.transcript.elected.iter().copied().collect::<HashSet<CandidateIndex>>(), transcript.metadata.results.unwrap().iter().copied().collect::<HashSet<CandidateIndex>>());
 }
 /*
 #[test]
