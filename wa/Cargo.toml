@@ -12,6 +12,6 @@ calamine = "0.19"
 serde = {version="1.0", features = ["derive"]}
 serde_json = "1.0"
 csv = "1.2"
-scraper = "0.16"
+scraper = "0.20"
 url = "2.3"
 regex = "1.7"
