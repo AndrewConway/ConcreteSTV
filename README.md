@@ -46,7 +46,7 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **AEC2019** Buggy rules used by AEC in 2019 and 2022 Federal Senate elections
 - **ACTPre2020** Rules used for ACT Legislative Assembly by ElectionsACT prior to 2020.
 - **ACT2020** Very buggy rules used by ElectionsACT in 2020
-- **ACT2021** Rules that should have been used by ElectionsACT in 2020 and were used for the 2021 recount.
+- **ACT2021** Rules that should have been used by ElectionsACT in 2020 and 2024 and were used for the 2021 recount and 2024 count. 
 - **NSWECRandomLGE2012** Buggy rules used by the NSWEC in the 2012 NSW Local Government elections.
 - **NSWECRandomLGE2016** Buggy rules used by the NSWEC in the 2016 NSW Local Government elections.
 - **NSWECRandomLGE2017** Rules used by the NSWEC in the 2017 NSW Local Government elections.
@@ -82,7 +82,7 @@ If my program matches their output exactly, is that evidence that the correct ca
 were elected? Only very weak evidence. For a start, I may have the same bug as the electoral
 commission. This sounds unlikely, but it actually
 happened once in prior work - at first my transcripts matched the AEC's perfectly in 2013, but later I found a bug
-in my code. More importantly, the accuracy depends on the list of the votes provided by the
+in my code - and the AEC had the same bug. More importantly, the accuracy depends on the list of the votes provided by the
 electroral commission, and there is rarely any meaningful evidence provided either to the public
 or scrutineers that these
 correspond to the physical ballots, and are not affected by hackers, malicious insiders, supply chain
@@ -179,7 +179,7 @@ if you wish.
 
 Currently parse_ec_data can accept (as first argument) the following elections:
 * Federal Senate : AEC2013, AEC2016, AEC2019 [AEC](https://results.aec.gov.au/)
-* ACT Legislative assembly : ACT2008, ACT2012, ACT2016, ACT2020 [ElectionsACT](https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections)
+* ACT Legislative assembly : ACT2008, ACT2012, ACT2016, ACT2020, ACT2024 [ElectionsACT](https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections)
 * NSW Local Government : NSWLG2021, NSWLG2021 [NSW Election Commission](https://www.elections.nsw.gov.au/) See [docs](nsw/parse_ec_data_lge.md) for specific instructions.
 * Victoria : VIC2014, VIC2018, VIC2022 if you have the privilege of having the data.
 
