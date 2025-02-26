@@ -1,4 +1,4 @@
-// Copyright 2023 Andrew Conway.
+// Copyright 2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -210,7 +210,7 @@ fn merge_whitespace_to_space(s:&str) -> String {
 /// full_dop is false for these years.
 ///
 /// For year 2008 they produced a pretty full DoP.
-fn parse_dop_excel_file(sheet:&calamine::Range<DataType>,metadata:&ElectionMetadata,full_dop:bool) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript>{
+fn parse_dop_excel_file(sheet:&calamine::Range<calamine::Data>,metadata:&ElectionMetadata,full_dop:bool) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript>{
     let string_value = |row:u32,col: u32| { sheet.get_value((row, col)).and_then(|v|v.get_string()) };
     let is_first_preference_row = |row:&usize| match string_value(*row as u32,0) {
         Some("First Preferences") | Some("1st Preferences") => true,

@@ -399,7 +399,7 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
     let mut row_index = row_index_for_names_table2+1;
     let mut paper_row_index = row_index_for_names+1;
     let quota : Option<QuotaInfo<f64>> = None;
-    fn parse_transfer_value(f:&DataType) -> Option<f64> { // TV may be a string ratio
+    fn parse_transfer_value(f:&impl DataType) -> Option<f64> { // TV may be a string ratio
         f.get_float().or_else(||{
             if let Some(s)=f.get_string() {
                 if let Ok(v) = s.parse::<f64>() { Some(v) }
@@ -413,7 +413,7 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
             } else {None}
         })
     }
-    fn parse_num_possibly_blank(f:Option<&DataType>) -> f64 {
+    fn parse_num_possibly_blank(f:Option<&impl DataType>) -> f64 {
         f.and_then(|v|v.get_float().or_else(||v.get_string().and_then(|s|s.trim().parse::<f64>().ok()))).unwrap_or(0.0)
     }
     let mut counts = vec![];

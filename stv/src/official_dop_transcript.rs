@@ -35,7 +35,7 @@ pub enum DifferenceBetweenOfficialDoPAndComputed<Tally:Display+Debug> {
     DifferentNumbersOfPapersInQuota(BallotPaperCount,BallotPaperCount),
     #[error("The quota is {0} in the official DoP quota computation and {1} in the ConcreteSTV case.")]
     DifferentQuota(ECTally,Tally),
-    #[error("There is a difference on count {} : {2}", count_name(*.0,&.1))]
+    #[error("There is a difference on count {} : {}", count_name(*.0,&.1),&.2)]
     DifferentOnCount(CountIndex,Option<String>,DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally>),
 }
 

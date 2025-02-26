@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -23,6 +23,7 @@ use stv::distribution_of_preferences_transcript::{CountIndex, PerCandidate, Quot
 use stv::download::CacheDir;
 use stv::official_dop_transcript::{OfficialDistributionOfPreferencesTranscript, OfficialDOPForOneCount};
 use crate::parse_lge::parse_zip_election_file;
+use calamine::DataType;
 
 
 // 2011 data files are at http://www.pastvtr.elections.nsw.gov.au/SGE2011/lc_prefdata.htm
