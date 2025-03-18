@@ -44,7 +44,7 @@ impl PreferenceDistributionRules for Minimal {
     }
 
     // Transfer eveything in one go
-    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
+    fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::MergeSameTransferValuesAndScale }
 
     fn sort_exclusions_by_transfer_value() -> bool { false }
 
