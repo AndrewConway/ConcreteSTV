@@ -46,7 +46,7 @@ See [ElectionRules.md](ElectionRules.md) for a detailed description of what each
 - **AEC2019** Buggy rules used by AEC in 2019 and 2022 Federal Senate elections
 - **ACTPre2020** Rules used for ACT Legislative Assembly by ElectionsACT prior to 2020.
 - **ACT2020** Very buggy rules used by ElectionsACT in 2020
-- **ACT2021** Rules that should have been used by ElectionsACT in 2020 and were used for the 2021 recount.
+- **ACT2021** Rules that should have been used by ElectionsACT in 2020 and 2024 and were used for the 2021 recount and 2024 count. 
 - **NSWECRandomLGE2012** Buggy rules used by the NSWEC in the 2012 NSW Local Government elections.
 - **NSWECRandomLGE2016** Buggy rules used by the NSWEC in the 2016 NSW Local Government elections.
 - **NSWECRandomLGE2017** Rules used by the NSWEC in the 2017 NSW Local Government elections.
@@ -82,7 +82,7 @@ If my program matches their output exactly, is that evidence that the correct ca
 were elected? Only very weak evidence. For a start, I may have the same bug as the electoral
 commission. This sounds unlikely, but it actually
 happened once in prior work - at first my transcripts matched the AEC's perfectly in 2013, but later I found a bug
-in my code. More importantly, the accuracy depends on the list of the votes provided by the
+in my code - and the AEC had the same bug. More importantly, the accuracy depends on the list of the votes provided by the
 electroral commission, and there is rarely any meaningful evidence provided either to the public
 or scrutineers that these
 correspond to the physical ballots, and are not affected by hackers, malicious insiders, supply chain
@@ -124,7 +124,7 @@ their results, although some errors are discoverable (see our reports).
 ## To compile
 
 ConcreteSTV is written in [Rust](https://www.rust-lang.org/). Install Rust (latest stable version
-recommended), then run, in this directory,
+recommended), then run, in this directory (the directory containing the file README.md you are currently reading),
 ```bash
 cargo build --release
 ```
@@ -139,7 +139,8 @@ possibly `openssl-dev` on some other Linux distributions.
 ## To get real election data (parse_ec_data)
 
 Before we can count an election, we need the votes to count. ConcreteSTV uses a format 
-with extension `.stv` to store votes and some metadata about the election.
+with extension `.stv` to store votes and some metadata about the election. Before
+counting the votes, one needs to get the data into this .stv format.
 
 Some electoral commissions publish
 a list of votes that are used as the basis of their counts. Let's choose the federal 2019 election, state Tasmania.
@@ -178,9 +179,12 @@ if you wish.
 
 Currently parse_ec_data can accept (as first argument) the following elections:
 * Federal Senate : AEC2013, AEC2016, AEC2019 [AEC](https://results.aec.gov.au/)
-* ACT Legislative assembly : ACT2008, ACT2012, ACT2016, ACT2020 [ElectionsACT](https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections)
-* NSW Local Government : NSWLG2021 [NSW Election Commission](https://www.elections.nsw.gov.au/) See [docs](nsw/parse_ec_data_lge.md) for specific instructions.
+* ACT Legislative assembly : ACT2008, ACT2012, ACT2016, ACT2020, ACT2024 [ElectionsACT](https://www.elections.act.gov.au/elections_and_voting/past_act_legislative_assembly_elections)
+* NSW Local Government : NSWLG2021, NSWLG2021 [NSW Election Commission](https://www.elections.nsw.gov.au/) See [docs](nsw/parse_ec_data_lge.md) for specific instructions.
 * Victoria : VIC2014, VIC2018, VIC2022 if you have the privilege of having the data.
+
+If you have data in some other format (such as .soi, .soc, or .blt) you can convert it to
+the .stv format using the `preflib_to_stv` or `blt_to_stv` programs described later.
 
 ## To count (concrete_stv)
 
@@ -356,7 +360,7 @@ extent.
   [New South Wales Legislation website](https://legislation.nsw.gov.au/view/whole/html/2020-10-27/sl-2005-0487#sch.5) at 3 Dec 2021. 
   For the latest information on New South Wales Government legislation please go to https://www.legislation.nsw.gov.au.
   It is licensed under a Creative Commons Attribution 4.0 International licence (CC BY 4.0).
-* nsw/src/NSWLGE2012_contest_list.json, nsw/src/NSWLGE2016_contest_list.json, nsw/src/NSWLGE2017_contest_list.json, nsw/src/NSWLGE2021_contest_list.json and nsw/examples/putative_lost_ivotes.csv. 
+* nsw/src/NSWLGE2012_contest_list.json, nsw/src/NSWLGE2016_contest_list.json, nsw/src/NSWLGE2017_contest_list.json, nsw/src/NSWLGE2021_contest_list.json, nsw/src/NSWLGE2024_contest_list.json and nsw/examples/putative_lost_ivotes.csv. 
   These lists are partially derived from data on the 
   [NSW Electoral Commission website](https://www.elections.nsw.gov.au), which
   is © State of New South Wales through the NSW Electoral Commission 

@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -25,6 +25,10 @@ use calamine::{open_workbook_auto, DataType};
 use stv::datasource_description::{AssociatedRules, Copyright, ElectionDataSource};
 use stv::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo};
 use crate::{ACT2020, ACT2021, ACTPre2020};
+
+pub fn get_act_data_loader_2024(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
+    ACTDataLoader::new(finder,"2024","https://www.elections.act.gov.au/elections/previous-assembly-elections/2024-election/ballot-paper-preference-data")
+}
 
 // Get a data loader that loads the original Distribution of Preferences.
 pub fn get_act_data_loader_2020_0(finder:&FileFinder) -> anyhow::Result<ACTDataLoader> {
@@ -60,6 +64,7 @@ impl ElectionDataSource for ACTDataSource {
             "2016" => Ok(Box::new(get_act_data_loader_2016(finder)?)),
             "2020" => Ok(Box::new(get_act_data_loader_2020(finder)?)),
             "2020.0" => Ok(Box::new(get_act_data_loader_2020_0(finder)?)),
+            "2024" => Ok(Box::new(get_act_data_loader_2024(finder)?)),
             _ => Err(anyhow!("Not a valid year")),
         }
     }
@@ -147,7 +152,7 @@ impl RawDataSource for ACTDataLoader {
     fn read_raw_data_best_quality(&self, electorate: &str) -> anyhow::Result<ElectionData> {
         match self.year.as_str() {
             "2008"|"2012"|"2016" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<ACTPre2020,Self>(self,electorate),
-            "2020" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<ACT2021,Self>(self,electorate),
+            "2020"|"2024" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<ACT2021,Self>(self,electorate),
             "2020.0" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<ACT2020,Self>(self,electorate),
             _ => Err(anyhow!("Invalid year {}",self.year)),
         }
@@ -171,7 +176,7 @@ impl RawDataSource for ACTDataLoader {
             parties,
             source: vec![DataSource{
                 url: self.page_url.clone(),
-                files: vec!["Candidates.txt".to_string(),"Electorates.txt".to_string(),"Groups.txt".to_string()],
+                files: vec![(if self.year=="2024" {"candidates.txt"} else {"Candidates.txt"}).to_string(),"Electorates.txt".to_string(),"Groups.txt".to_string()],
                 comments: None
             }],
             results: None,
@@ -206,7 +211,7 @@ impl RawDataSource for ACTDataLoader {
                 rules_recommended: Some("ACT2021".into()),
                 comment: Some("The election was initially run with buggy rules ACT2020. After we pointed out the bugs, the counts on Elections ACT website were changed in 2021 to use the correct rules ACT2021".into()),
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/2020%20Errors%20In%20ACT%20Counting.pdf".into()]
-            },
+            }, // TODO 2024
             _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
         }
     }
@@ -266,7 +271,7 @@ impl ACTDataLoader {
     }
     /// load candidates for a given ecode, and add to appropriate party.
     fn load_candidates(&self,ecode:usize,parties:&mut Vec<Party>) -> anyhow::Result<Vec<Candidate>> {
-        let path = self.find_raw_data_file("Candidates.txt")?;
+        let path = self.find_raw_data_file(if self.year=="2024" {"candidates.txt"} else {"Candidates.txt"})?;
         let mut res = vec![];
         #[derive(Deserialize)]
         struct CandidatesRecord {
@@ -323,7 +328,9 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
     let sheet1 = workbook1.worksheet_range_at(0).ok_or_else(||anyhow!("No sheets in table1"))??;
     let mut workbook2 = open_workbook_auto(&table2)?;
     let sheet2 = workbook2.worksheet_range_at(0).ok_or_else(||anyhow!("No sheets in table2"))??;
-    let row_index_for_names : u32 = if table1.file_name().unwrap().to_string_lossy().ends_with("xlsx") {2} else {1};
+    let row_index_for_names : u32 = if table1.file_name().unwrap().to_string_lossy().ends_with("xlsx") {
+        if metadata.name.year.starts_with("2024") {4} else {2}
+    } else {1};
     let mut table1_col_for_candidate = vec![u32::MAX;metadata.candidates.len()];
     let mut table2_col_for_candidate = vec![u32::MAX;metadata.candidates.len()];
     let mut table1_col_for_exhausted_papers : Option<u32> = None;
@@ -333,14 +340,20 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
     let mut table2_col_for_loss_by_fraction : Option<u32> = None;
     let mut table2_col_for_remarks : Option<u32> = None;
     let count_column : u32 = 0;
+    let mut candidate_of_name = metadata.get_candidate_name_lookup_multiple_ways();
+    if metadata.name.year=="2024" && metadata.name.electorate=="Yerrabi" { candidate_of_name.insert("SoÃ«lily CONSEN-LYNCH".to_string(),CandidateIndex(1));}// bad unicode handling in the 2024 Yerrabi DofP file.
     for col in count_column+1 .. sheet1.width() as u32 {
         if let Some(v) = sheet1.get_value((row_index_for_names,col)) {
             if let Some(s) = v.get_string() {
+                let s = if s=="SoÃ«lily CONSEN-LYNCH" { "Soelily CONSEN-LYNCH" } else {s}; // bad unicode handling in the 2024 Yerrabi table 1 xlsx file.
                 for candidate_index in 0..metadata.candidates.len() {
                     if s.contains(&metadata.candidates[candidate_index].name) || s.contains(&metadata.candidates[candidate_index].no_comma_name()){
                         table1_col_for_candidate[candidate_index]=col;
                     }
                 }
+                if s.contains("Papers Exhausted at Count") { table1_col_for_exhausted_papers=Some(col); }
+                else if s.contains("Transfer Value") { table1_col_for_transfer_value=Some(col); }
+                else if s.contains("Description of Choices Counted") { table1_col_for_description_of_choices=Some(col); }
             }
         }
         if let Some(v) = sheet1.get_value((1,col)) {
@@ -351,18 +364,23 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
             }
         }
     }
-    if table1_col_for_candidate.contains(&u32::MAX) { return Err(anyhow!("Could not find all candidates in table1"));}
+    if table1_col_for_candidate.contains(&u32::MAX) { return Err(anyhow!("Could not find all candidates in table1... missing {} of {}",table1_col_for_candidate.iter().enumerate().filter_map(|(candidate,col)|if *col==u32::MAX {Some(candidate.to_string())} else {None}).collect::<Vec<_>>().join(","),table1_col_for_candidate.len()));}
     let table1_col_for_exhausted_papers=table1_col_for_exhausted_papers.ok_or_else(||anyhow!("Could not find exhausted papers column in table 1"))?;
     let table1_col_for_transfer_value=table1_col_for_transfer_value.ok_or_else(||anyhow!("Could not find transfer value column in table 1"))?;
     let table1_col_for_description_of_choices= table1_col_for_description_of_choices.ok_or_else(||anyhow!("Could not find description of choices counted column in table 1"))?;
+    let row_index_for_names_table2 = if metadata.name.year=="2024" { 5 } else { row_index_for_names };
     for col in count_column+1 .. sheet2.width() as u32 {
-        if let Some(v) = sheet2.get_value((row_index_for_names,col)) {
+        if let Some(v) = sheet2.get_value((row_index_for_names_table2,col)) {
             if let Some(s) = v.get_string() {
+                let s = if s=="SoÃ«lily CONSEN-LYNCH" { "Soelily CONSEN-LYNCH" } else {s}; // bad unicode handling in the 2024 Yerrabi table 2 xlsx file.
                 for candidate_index in 0..metadata.candidates.len() {
                     if s.contains(&metadata.candidates[candidate_index].name) || s.contains(&metadata.candidates[candidate_index].no_comma_name()){
                         table2_col_for_candidate[candidate_index]=col;
                     }
                 }
+                if s.contains("Votes Exhausted at Count") { table2_col_for_exhausted_votes=Some(col); }
+                else if s.contains("Loss by fraction") { table2_col_for_loss_by_fraction=Some(col); }
+                else if s.contains("Remarks") { table2_col_for_remarks=Some(col); }
             }
         }
         if let Some(v) = sheet2.get_value((1,col)) {
@@ -378,7 +396,7 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
     let table2_col_for_loss_by_fraction=table2_col_for_loss_by_fraction.ok_or_else(||anyhow!("Could not find loss by fraction column in table 2"))?;
     let table2_col_for_remarks=table2_col_for_remarks.ok_or_else(||anyhow!("Could not find remarks column in table 2"))?;
     // now we understand the columns, we can actually read it.
-    let mut row_index = row_index_for_names+1;
+    let mut row_index = row_index_for_names_table2+1;
     let mut paper_row_index = row_index_for_names+1;
     let quota : Option<QuotaInfo<f64>> = None;
     fn parse_transfer_value(f:&DataType) -> Option<f64> { // TV may be a string ratio
@@ -399,16 +417,16 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
         f.and_then(|v|v.get_float().or_else(||v.get_string().and_then(|s|s.trim().parse::<f64>().ok()))).unwrap_or(0.0)
     }
     let mut counts = vec![];
-    let candidate_of_name = metadata.get_candidate_name_lookup_multiple_ways();
     let mut not_continuing : HashSet<CandidateIndex> = HashSet::default();
     loop {
-        let only_1_row = counts.is_empty() && !(metadata.name.year.starts_with("200")||metadata.name.year.starts_with("201"));
+        let only_1_row = counts.is_empty() && metadata.name.year.starts_with("2020");
         // table 1: row_index contains the delta.
         let transfer_value : Option<f64> = sheet1.get_value((row_index,table1_col_for_transfer_value)).and_then(parse_transfer_value);
         let mut elected : Vec<CandidateIndex> = vec![];
         let mut excluded : Vec<CandidateIndex> = vec![];
-        let remarks_1 = sheet2.get_value((row_index,table2_col_for_remarks)).and_then(|v|v.get_string());
-        let remarks_2 = if only_1_row {None} else {sheet2.get_value((row_index+1,table2_col_for_remarks)).and_then(|v|v.get_string())};
+        let sheet2_delta_row = row_index; // the row containing delta values on sheet2.
+        let remarks_1 = sheet2.get_value((sheet2_delta_row,table2_col_for_remarks)).and_then(|v|v.get_string());
+        let remarks_2 = if only_1_row {None} else {sheet2.get_value((sheet2_delta_row+1,table2_col_for_remarks)).and_then(|v|v.get_string())};
         for &remarks in [remarks_1,remarks_2].iter().flatten() {
             for remark in remarks.split('.') {
                 //println!("Processing remark {}",remark);
@@ -430,15 +448,15 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
         }
         let paper_total : Option<PerCandidate<usize>> = None;
         let vote_delta : Option<PerCandidate<f64>>=Some(PerCandidate{
-            candidate: table2_col_for_candidate.iter().map(|c|parse_num_possibly_blank(sheet2.get_value((row_index,*c)))).collect(),
-            exhausted: parse_num_possibly_blank(sheet2.get_value((row_index,table2_col_for_exhausted_votes))),
-            rounding: parse_num_possibly_blank(sheet2.get_value((row_index,table2_col_for_loss_by_fraction))).into(),
+            candidate: table2_col_for_candidate.iter().map(|c|parse_num_possibly_blank(sheet2.get_value((sheet2_delta_row, *c)))).collect(),
+            exhausted: parse_num_possibly_blank(sheet2.get_value((sheet2_delta_row, table2_col_for_exhausted_votes))),
+            rounding: parse_num_possibly_blank(sheet2.get_value((sheet2_delta_row, table2_col_for_loss_by_fraction))).into(),
             set_aside: None,
         });
         let vote_total : Option<PerCandidate<f64>> = if only_1_row { vote_delta.clone() } else {Some(PerCandidate{
-            candidate: table2_col_for_candidate.iter().map(|c|parse_num_possibly_blank(sheet2.get_value((row_index+1,*c)))).collect(),
-            exhausted: parse_num_possibly_blank(sheet2.get_value((row_index+1,table2_col_for_exhausted_votes))),
-            rounding: parse_num_possibly_blank(sheet2.get_value((row_index+1,table2_col_for_loss_by_fraction))).into(),
+            candidate: table2_col_for_candidate.iter().map(|c|parse_num_possibly_blank(sheet2.get_value((sheet2_delta_row +1, *c)))).collect(),
+            exhausted: parse_num_possibly_blank(sheet2.get_value((sheet2_delta_row +1, table2_col_for_exhausted_votes))),
+            rounding: parse_num_possibly_blank(sheet2.get_value((sheet2_delta_row +1, table2_col_for_loss_by_fraction))).into(),
             set_aside: None,
         })};
         let paper_delta : Option<PerCandidate<isize>>=Some(PerCandidate{
@@ -453,7 +471,7 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
                 "2008" => ( 0,"On Papers at Count ",","),
                 "2012" => ( 0,"On Papers at Count ",","),
                 "2016" => (-1,"On Papers at Count ",","),
-                "2020"|"2020.0" => { // 2020.0 is the buggy version, but some older code paths might get it other ways.
+                "2020"|"2020.0"|"2024" => { // 2020.0 is the buggy version, but some older code paths might get it other ways.
                     let buggy_version = if let Some(s) = sheet1.get_value((paper_row_index,table1_col_for_description_of_choices)).and_then(|v|v.get_string()) { // the original DOPs published had lots of bugs and a different format.
                         s.starts_with("From counts")
                     } else { false };
@@ -467,7 +485,7 @@ fn parse_excel_tables_official_dop_transcript(table1:PathBuf,table2:PathBuf,meta
                 if metadata.name.year=="2020" && metadata.name.electorate=="Kurrajong" && s=="From counts55" { papers_came_from_counts=Some(vec![CountIndex(51)])} // That year was really special. See the wayback machine to get the spreadsheet needing this.
                 if papers_came_from_counts.is_none() { return Err(anyhow!("Could not work out who which counts contributed {}",s))}
             } else {
-                return Err(anyhow!("Could not find which counts this came from"))
+                return Err(anyhow!("Could not find which counts this came from row {} column {table1_col_for_description_of_choices}",(paper_row_index as i32+row_offset) as u32))
             }
         }
         //println!("{:?}",paper_delta.as_ref().unwrap());

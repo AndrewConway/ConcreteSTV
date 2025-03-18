@@ -21,7 +21,7 @@ use stv::tie_resolution::{TieResolutionAtom, TieResolutionsMadeByEC};
 /// Produce a .stv file with actual election data from a download from an Electoral Commission.
 struct Opts {
     /// The election to load data from.
-    /// Currently accepted AEC2013, AEC2016, AEC2019, AEC2022, ACT2008, ACT2012, ACT2016, ACT2020, NSWLG2021, VIC2014, VIC2018, VIC2022,
+    /// Currently accepted AEC2013, AEC2016, AEC2019, AEC2022, ACT2008, ACT2012, ACT2016, ACT2020, NSWLG2021, NSWLG2024, VIC2014, VIC2018, VIC2022,
     election : ECDataSource,
 
     /// The electorate to load data for the given election.

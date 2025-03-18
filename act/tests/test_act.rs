@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -10,7 +10,7 @@
 
 #[cfg(test)]
 mod tests {
-    use act::parse::{get_act_data_loader_2020, get_act_data_loader_2016, ACTDataLoader, get_act_data_loader_2012, get_act_data_loader_2008};
+    use act::parse::{get_act_data_loader_2020, get_act_data_loader_2016, ACTDataLoader, get_act_data_loader_2012, get_act_data_loader_2008, get_act_data_loader_2024};
     use stv::preference_distribution::{distribute_preferences, PreferenceDistributionRules};
     use std::collections::HashSet;
     use stv::tie_resolution::TieResolutionsMadeByEC;
@@ -31,6 +31,11 @@ mod tests {
         let official_transcript = loader.read_official_dop_transcript_with_subfolder(&transcript.metadata,sub_folder)?;
         official_transcript.compare_with_transcript(&transcript.transcript);
         Ok(())
+    }
+
+    fn test2024(electorate: &str) -> anyhow::Result<()> {
+        let loader = get_act_data_loader_2024(&FileFinder::find_ec_data_repository())?;
+        test::<ACT2021>(electorate,loader,None)
     }
 
     fn test2021(electorate: &str) -> anyhow::Result<()> {
@@ -57,6 +62,22 @@ mod tests {
         let loader = get_act_data_loader_2008(&FileFinder::find_ec_data_repository())?;
         test::<ACTPre2020>(electorate,loader,None)
     }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Brindabella2024() { test2024("Brindabella").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Ginninderra2024() { test2024("Ginninderra").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Kurrajong2024() { test2024("Kurrajong").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Murrumbidgee2024() { test2024("Murrumbidgee").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_Yerrabi2024() { test2024("Yerrabi").unwrap() }
 
 
     #[test]

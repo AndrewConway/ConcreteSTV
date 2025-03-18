@@ -323,7 +323,7 @@ impl TieResolutionsMadeByEC {
         TieResolutionExplicitDecision::from_resolution(tied_candidates,granularity,usage)
     }
     fn resolve_work(&self, tied_candidates: &mut [CandidateIndex], granularity: TieResolutionGranularityNeeded,usage:TieResolutionUsage,current_count:CountIndex,randomness:&mut Randomness)  {
-        // println!("Trying to resolve {:?}",tied_candidates);
+        // println!("Trying to resolve {:?}. There are {} tie resolutions given.",tied_candidates,self.tie_resolutions.len());
         for atom in &self.tie_resolutions {
             match atom {
                 TieResolutionAtom::IncreasingFavour(decision) => {
@@ -345,7 +345,7 @@ impl TieResolutionsMadeByEC {
                     let appropriate_usage = match decision.usage {
                         None => true,
                         Some(TieResolutionUsage::Exclusion) => usage==TieResolutionUsage::Exclusion,
-                        Some(TieResolutionUsage::OrderElected) => usage==TieResolutionUsage::Exclusion || usage==TieResolutionUsage::OrderSurplusDistributed,
+                        Some(TieResolutionUsage::OrderElected) => usage==TieResolutionUsage::OrderElected || usage==TieResolutionUsage::OrderSurplusDistributed,
                         Some(TieResolutionUsage::ShortcutWinner) => usage==TieResolutionUsage::ShortcutWinner,
                         Some(TieResolutionUsage::OrderSurplusDistributed) => usage==TieResolutionUsage::OrderSurplusDistributed,
                         Some(TieResolutionUsage::RoundingUp) => usage==TieResolutionUsage::RoundingUp,
@@ -358,8 +358,10 @@ impl TieResolutionsMadeByEC {
                         TieResolutionGranularityNeeded::Total => decision.increasing_favour.iter().all(|v|v.len()==1),
                         TieResolutionGranularityNeeded::LowestSeparated(num_low) => decision.increasing_favour.len()==2 && decision.increasing_favour[0].len()==num_low
                     };
+                    // println!("Found {:?} appropriate usage : {appropriate_usage} appropriate time : {appropriate_time} appropriate division : {appropriate_division}",decision);
                     if appropriate_usage && appropriate_time && appropriate_division && decision.mentions_exactly_these_candidates(tied_candidates) { // this decision is perfect for this particular case.
                         // load tied_candidates from flattened decision.increasing_favour.
+                        // println!("Found ideal decision.");
                         let mut upto = 0;
                         for v in &decision.increasing_favour {
                             tied_candidates[upto..upto+v.len()].copy_from_slice(v);
