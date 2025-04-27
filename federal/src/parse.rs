@@ -46,6 +46,10 @@ pub fn get_federal_data_loader_2022(finder:&FileFinder) -> FederalDataLoader {
     FederalDataLoader::new(finder,"2022",false,"https://results.aec.gov.au/27966/Website/SenateDownloadsMenu-27966-Csv.htm",27966)
 }
 
+pub fn get_federal_data_loader_2025(finder:&FileFinder) -> FederalDataLoader {
+    FederalDataLoader::new(finder,"2025",false,"https://results.aec.gov.au/",0)
+}
+
 
 
 pub struct FederalDataSource {}
@@ -54,7 +58,7 @@ impl ElectionDataSource for FederalDataSource {
     fn name(&self) -> Cow<'static, str> { "Federal Senate".into() }
     fn ec_name(&self) -> Cow<'static, str> { "Australian Electoral Commission (AEC)".into() }
     fn ec_url(&self) -> Cow<'static, str> { "https://www.aec.gov.au/".into() }
-    fn years(&self) -> Vec<String> { vec!["2013".to_string(),"2014".to_string(),"2016".to_string(),"2019".to_string(),"2022".to_string()] }
+    fn years(&self) -> Vec<String> { vec!["2013".to_string(),"2014".to_string(),"2016".to_string(),"2019".to_string(),"2022".to_string(),"2025".to_string()] }
     fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
         match year {
             "2013" => Ok(Box::new(get_federal_data_loader_2013(finder))),
@@ -62,6 +66,7 @@ impl ElectionDataSource for FederalDataSource {
             "2016" => Ok(Box::new(get_federal_data_loader_2016(finder))),
             "2019" => Ok(Box::new(get_federal_data_loader_2019(finder))),
             "2022" => Ok(Box::new(get_federal_data_loader_2022(finder))),
+            "2025" => Ok(Box::new(get_federal_data_loader_2025(finder))),
             _ => Err(anyhow!("Not a valid year")),
         }
     }
@@ -232,7 +237,7 @@ impl RawDataSource for FederalDataLoader {
         }
     }
     fn can_read_raw_markings(&self) -> bool  { self.year=="2016" || self.year=="2019" || self.year=="2022" }
-    fn can_load_full_data(&self,_state:&str) -> bool { true }
+    fn can_load_full_data(&self,_state:&str) -> bool { self.year!="2025" }
 
     fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let filename = self.name_of_official_transcript_zip_file();
@@ -300,7 +305,7 @@ impl FederalDataLoader {
     }
     fn name_of_candidate_source_pre_election(&self) -> anyhow::Result<String> {
         match self.year.as_str() {
-            "2022" => Ok("senate-candidates.csv".to_string()),
+            "2022" | "2025" => Ok("senate-candidates.csv".to_string()),
             _ => Err(anyhow!("No pre election formats for year {}",self.year))
         }
     }
