@@ -54,7 +54,7 @@ function drawBallotPaper(showCandidates,createX,clickOnName) {
     return allXs;
 }
 
-const computingHTML = '<img src="/ajax-loader.gif"/> Computing...';
+const computingHTML = '<img src="/ajax-loader.gif" alt="loading..."/> Computing...';
 
 function sumArray(a) { return a.reduce((a,b)=>a+b); }
 
@@ -136,4 +136,12 @@ function checkGroupsCheckboxForMeaning(id,metadata,shouldBeCheckedIfNoGroups) {
         let label = document.querySelector("label[for='"+id+"']");
         if (label) label.className="disabled";
     }
+}
+
+function is_where_did_my_vote_go_supported(info) {
+    if (!info) return false;
+    if (!info.rules) return false;
+    let rules = info.rules.rules_used || info.rules.rules_recommended;
+    if (!rules) return false;
+    return rules==="IRV" || rules.startsWith("AEC") || rules.startsWith("Federal");
 }

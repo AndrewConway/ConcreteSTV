@@ -30,6 +30,7 @@ function process_good_info(info) {
     const simpleDiv = add(mainDiv,"div")
     if (info.simple) {
         document.getElementById("ElectionDataAvailableSection").className="";
+        document.getElementById("NeedsWhereDidMyVoteGo").className=is_where_did_my_vote_go_supported(info)?"":"hidden";
         if (!info.can_read_raw_markings) {
             document.getElementById("NeedsRawAccess1").className="hidden";
             document.getElementById("NeedsRawAccess2").className="hidden";

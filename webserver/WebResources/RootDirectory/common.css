@@ -200,3 +200,40 @@ span.MulticolumnListOfLinks {
 span.MulticolumnListOfLinks a {
     display: block;
 }
+
+/* For where did my vote go */
+
+span.number_in_ballot_box {
+    padding: 2px;
+    border: 2px solid black;
+}
+
+text.transfer_value_continuing, text.transfer_value_used {
+    dominant-baseline:middle;
+    text-align: left;
+}
+
+
+rect.transfer_value_used {
+    stroke: black;
+    fill: green;
+}
+
+rect.transfer_value_used_negative {
+    stroke: black;
+    fill: red;
+}
+
+rect.transfer_value_continuing {
+    stroke: black;
+    fill: deepskyblue;
+}
+
+rect.transfer_value_continuing_exhausted {
+    stroke: black;
+    fill: yellow;
+}
+
+td.left {
+    text-align: left;
+}

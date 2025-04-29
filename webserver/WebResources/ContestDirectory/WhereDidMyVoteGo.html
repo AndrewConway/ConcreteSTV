@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/common.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="/util.js"></script>
+    <script src="/common.js"></script>
+    <script src="/PrepareVoteCommon.js"></script>
+    <script src="/WhereDidMyVoteGo.js"></script>
+
+    <title>Where did my vote go?</title>
+</head>
+<body>
+
+<div id="MainBody">
+    <h1>Where did my vote go? PROTOTYPE</h1>
+    <details class="noprint">
+        <summary>Instructions for this page</summary>
+        <p class="noprint">This page enables one to see who your (or any other) vote ended up helping elect,
+            tracking through the preferences. You enter a vote, and the page will show how it is affected by
+            the exclusions and surplus distributions that actually happened. </p>
+        <p class="noprint">If you enter a vote which actually was one of the votes counted in the election,
+            then the following should be accurate. If you enter a vote that was not one of the votes counted,
+            this page will attempt to show what would have happened with such a vote, assuming that the vote didn't change
+            the course of the election (usually but not always a decent approximation).</p>
+        <p class="noprint">The formality requirements of a minimum number of preferences will not be enforced.</p>
+        <div class="noprint"><p><em>Usage:</em></p>
+            <ul>
+                <li>You can enter numbers by typing in the boxes adjacent to a name. Duplicated numbers will get a red background.</li>
+                <li>As a shortcut, clicking on the name (not the box) of a candidate will assign the candidate the best
+                    preference not already assigned.</li>
+                <li>Holding down the ALT key while clicking on a name of a candidate will assign the worst preference not already assigned.</li>
+                <li>If the box already contains a number when you click on a name, the current number in the box will be cleared.</li>
+                <li>If you wish to save a partially completed ballot to resume later, record the numbers in the summary
+                    section. Then next time you visit this page, copy the saved numbers into the summary field.
+                    This uses the same format as the <a href="PrepareVote.html">Prepare Vote</a> page.</li>
+                <li>Currently only below the line votes are supported.</li>
+            </ul>
+        </div>
+    </details>
+    <div id="tools"  class="noprint">
+        <p>Next liked candidate (click a name to assign): <span id="likedCandidate">???</span></p>
+        <p>Next despised candidate (alt-click a name to assign) : <span id="despisedCandidate">???</span></p>
+        <p>Candidates to go : <span id="togoCandidates">???</span> </p>
+    </div>
+    <h2 id="TitleHeading">Loading...</h2>
+    <div id="paperDiv"><img src="/ajax-loader.gif" alt="Loading"/></div>
+    <p class="noprint">Vote summary : <input name="preferences" id="preferences" autocomplete="off"/> </p>
+
+    <div id="resultsDiv"><img src="/ajax-loader.gif" alt="Loading"/></div>
+
+    <details class="noprint">
+        <summary>Privacy for this page</summary>
+        I want to preserve your <a href="/Privacy.html">privacy</a>. This is particularly important and difficult for this specific page. This web page should not
+        make any network accesses after initial loading, so you can check (using standard network
+        monitoring tools) that your preferences
+        are not being sent anywhere. So I never see what you do, other than the standard
+        things your browser sends when going to a web site.
+        But I may be lying (possibly coerced), so even better than trusting me
+        you can disconnect your computer from the internet after loading this page and
+        before entering your preferences into it.
+        This should protect you against me observing your computer.
+    </details>
+</div>
+
+</body>
+</html>
