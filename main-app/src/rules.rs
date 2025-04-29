@@ -25,6 +25,7 @@ use stv::compare_transcripts::{compare_transcripts, DifferenceBetweenTranscripts
 use stv::extract_votes_in_pile::ExtractionRequest;
 use stv::random_util::Randomness;
 use vic::Vic2018LegislativeCouncil;
+use minimal::Minimal;
 use wa::WALegislativeCouncil;
 use crate::ChangeOptions;
 
@@ -49,6 +50,7 @@ pub enum Rules {
     NSWECRandomLC2019,
     Vic2018,
     WA2008,
+    Minimal,
     IRV,
 }
 
@@ -76,6 +78,7 @@ impl FromStr for Rules {
             "NSWECRandomLC2019" => Ok(Rules::NSWECRandomLC2019),
             "Vic2018" => Ok(Rules::Vic2018),
             "WA2008" => Ok(Rules::WA2008),
+            "Minimal" => Ok(Rules::Minimal),
             "IRV" => Ok(Rules::IRV),
             _ => Err("No such rule supported")
         }
@@ -104,6 +107,7 @@ impl Display for Rules {
             Rules::NSWECRandomLC2019 => "NSWECRandomLC2019",
             Rules::Vic2018 => "Vic2018",
             Rules::WA2008 => "WA2008",
+            Rules::Minimal => "Minimal",
             Rules::IRV => "IRV",
         };
         f.write_str(s)
@@ -143,6 +147,7 @@ impl Rules {
                 let transcript = match self {
                     Rules::ACT2020 => distribute_preferences_with_extractors::<ACT2020>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
                     Rules::ACT2021 => distribute_preferences_with_extractors::<ACT2021>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
+                    Rules::Minimal => distribute_preferences_with_extractors::<Minimal>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
                     _ => panic!("Case not handled.")
                 };
                 return PossibleTranscripts::SixDigitDecimals(TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript })
@@ -167,6 +172,7 @@ impl Rules {
             Rules::NSWECLocalGov2021Literal => PossibleChanges::SignedIntegers(options.find_changes::<NSWECLocalGov2021Literal>(data,verbose)?),
             Rules::Vic2018 => PossibleChanges::Integers(options.find_changes::<Vic2018LegislativeCouncil>(data,verbose)?),
             Rules::WA2008 => PossibleChanges::Integers(options.find_changes::<WALegislativeCouncil>(data,verbose)?),
+            Rules::Minimal => PossibleChanges::SixDigitDecimals(options.find_changes::<Minimal>(data,verbose)?),
             Rules::IRV => PossibleChanges::Integers(options.find_changes::<SimpleIRVAnyDifferenceBreaksTies>(data,verbose)?),
             Rules::NSWECRandomLGE2012 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLGE2012>(data, verbose)?),
             Rules::NSWECRandomLGE2016 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLGE2016>(data, verbose)?),
@@ -206,6 +212,7 @@ impl RulesDetails {
             RulesDetails{ name: "NSWECRandomLC2019".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2019 and 2023 legislative council elections. Note that there is considerable randomness so recounting with a different random choices will probably produce different results. ".to_string() },
             RulesDetails{ name: "Vic2018".to_string(), description: "My interpretation of the rules that should have been used by the VEC since the 2018 modification to 114A(28)(c) of the Electoral Act 2002, and a plausible if not literal interpretation of the rules prior to that.".to_string() },
             RulesDetails{ name: "WA2018".to_string(), description: "My interpretation of the Western Australian Legislative Council rules consistent with the 2008 published official distribution of preferences.".to_string() },
+            RulesDetails{ name: "Minimal".to_string(), description: "Minimal rules; according to the STV Margin Paper.".to_string() },
             RulesDetails{ name: "IRV".to_string(), description: "IRV with tie resolution by count backs with any non-equality breaking ties where possible.".to_string() },
         ]
     }
