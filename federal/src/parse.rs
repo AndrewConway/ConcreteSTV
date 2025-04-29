@@ -103,7 +103,7 @@ impl RawDataSource for FederalDataLoader {
     }
 
     /// These are deduced by looking at the actual transcript of results.
-    /// I have not included anything if all decisions are handled by the fallback "earlier on the ballot paper candidates are listed in worse positions.
+    /// I have not included anything if all decisions are handled by the fallback "earlier on the ballot paper candidates are listed in worse positions".
     fn ec_decisions(&self,state:&str) -> TieResolutionsMadeByEC {
         match self.year.as_str() {
             "2013" => match state {
@@ -243,7 +243,7 @@ impl RawDataSource for FederalDataLoader {
         let filename = self.name_of_official_transcript_zip_file();
         let preferences_zip_file = self.find_raw_data_file(&filename)?;
         println!("Parsing {}",&preferences_zip_file.to_string_lossy());
-        let mut zipfile = zip::ZipArchive::new(File::open(preferences_zip_file)?)?;
+        let mut zipfile = ZipArchive::new(File::open(preferences_zip_file)?)?;
         {
             for i in 0..zipfile.len() {
                 let file = zipfile.by_index(i)?;
@@ -271,7 +271,7 @@ impl CanReadRawMarkings for FederalDataLoader {
         for i in 0..metadata.parties.len() {
             if metadata.parties[i].atl_allowed { parties_that_can_get_atls.push(PartyIndex(i)); }
         }
-        let mut zipfile = zip::ZipArchive::new(File::open(preferences_zip_file)?)?;
+        let mut zipfile = ZipArchive::new(File::open(preferences_zip_file)?)?;
         let num_atl_plus_num_btl_hint = metadata.candidates.len()+metadata.parties.len();
         for record in ParsedRawVoteIterator::new(&mut zipfile,num_atl_plus_num_btl_hint)? {
             let record=record?;
@@ -381,11 +381,11 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
         }
         if record.transfer_value!=0.0 { res.count().transfer_value = Some(record.transfer_value) }
         if record.surname=="Exhausted" {
-            res.count().paper_delta().exhausted= record.papers_transferred as isize;
+            res.count().paper_delta().exhausted= record.papers_transferred;
             res.count().vote_delta().exhausted= record.votes_transferred as f64;
             res.count().vote_total().exhausted= record.votes_total as f64;
         } else if record.surname=="Gain/Loss" {
-            res.count().paper_delta().rounding= (record.papers_transferred as isize).into();
+            res.count().paper_delta().rounding= record.papers_transferred.into();
             res.count().vote_delta().rounding= (record.votes_transferred as f64).into();
             res.count().vote_total().rounding= (record.votes_total as f64).into();
         } else {
@@ -393,7 +393,7 @@ fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata
             match lookup_names.get(&name) {
                 None => return Err(anyhow!("Could not find name {}",name)),
                 Some(&candidate) => {
-                    * candidate_elem(&mut res.count().paper_delta().candidate,candidate) = record.papers_transferred as isize;
+                    * candidate_elem(&mut res.count().paper_delta().candidate,candidate) = record.papers_transferred;
                     * candidate_elem(&mut res.count().vote_delta().candidate,candidate)= record.votes_transferred as f64;
                     * candidate_elem(&mut res.count().vote_total().candidate,candidate)= record.votes_total as f64;
                     if &record.changed=="True" {
@@ -437,7 +437,7 @@ fn read_from_senate_first_prefs_by_state_by_vote_typ_download_file2016(builder: 
             let group_id = &record[1]; // something like A, B, or UG
             let candidate_id = &record[2]; // something like 32847
             if candidate_id!="0" {
-                let position_in_ticket = record[3].parse::<usize>()?; // 0, 1, .. 0 means a dummy id for the group ticket.
+                let position_in_ticket = record[3].parse::<usize>()?; // 0, 1, ... 0 means a dummy id for the group ticket.
                 if builder.parties.len()==0 || &builder.parties[builder.parties.len()-1].group_id != group_id {
                     builder.parties.push(GroupBuilder{name:record[5].to_string(), abbreviation:None, group_id:group_id.to_string(),ticket_id:if position_in_ticket==0 {Some(candidate_id.to_string())} else {None}, tickets: vec![]});
                 }
