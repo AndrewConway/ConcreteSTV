@@ -233,6 +233,10 @@ rect.transfer_value_continuing_exhausted {
     stroke: black;
     fill: yellow;
 }
+rect.transfer_value_continuing_loses {
+    stroke: black;
+    fill: lightgrey;
+}
 
 td.left {
     text-align: left;

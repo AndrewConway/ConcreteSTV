@@ -31,7 +31,7 @@ function checkAllNumbers(adjustSummary) {
     }
     document.getElementById("likedCandidate").innerText = availablePreferenceNumbers.length===0 ? "None" : availablePreferenceNumbers[0];
     document.getElementById("despisedCandidate").innerText = (availablePreferenceNumbers.length===0) ? "None" : availablePreferenceNumbers[availablePreferenceNumbers.length-1];
-    document.getElementById("togoCandidates").innerText = availablePreferenceNumbers.length;
+    document.getElementById("togoCandidates").innerText = availablePreferenceNumbers.length.toString();
     const tePreferences=document.getElementById("preferences");
     if (adjustSummary) tePreferences.value = summary;
     tePreferences.style.width = (tePreferences.scrollWidth+10) + 'px';
@@ -43,11 +43,17 @@ function checkAllNumbers(adjustSummary) {
         }
         onVoteChanged(candidatesInPreferenceOrder);
     }
+    const url = document.getElementById("BookmarkableURL");
+    if (url) {
+        let wanted_url = new URL(window.location.href);
+        wanted_url.search = "?"+(new URLSearchParams({btl:summary}).toString());
+        url.setAttribute("href",wanted_url.href);
+    }
 }
 
 
 function setupCandidates() {
-    function createNumberBoxForCandidate(div,candidateIndex) { // create the box at the start of a candidate
+    function createNumberBoxForCandidate(div,_candidateIndex) { // create the box at the start of a candidate
         let cNumber = add(div,"input");
         cNumber.type="number";
         cNumber.min=1;
