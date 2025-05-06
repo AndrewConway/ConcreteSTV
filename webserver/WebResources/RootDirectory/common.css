@@ -216,7 +216,7 @@ text.transfer_value_continuing, text.transfer_value_used {
 
 rect.transfer_value_used {
     stroke: black;
-    fill: green;
+    fill: lightgreen;
 }
 
 rect.transfer_value_used_negative {
@@ -226,7 +226,7 @@ rect.transfer_value_used_negative {
 
 rect.transfer_value_continuing {
     stroke: black;
-    fill: deepskyblue;
+    fill: lightskyblue;
 }
 
 rect.transfer_value_continuing_exhausted {
