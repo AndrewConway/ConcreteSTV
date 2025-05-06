@@ -20,11 +20,16 @@
         <p class="noprint">This page enables one to see who your (or any other) vote ended up helping elect,
             tracking through the preferences. You enter a vote, and the page will show how it is affected by
             the exclusions and surplus distributions that actually happened. </p>
+        <p class="noprint">If you enter an above the line vote, it will be converted to the corresponding
+            below the line vote by giving preference first to the candidates in your most preferred party,
+            in the order listed on the ballot paper, then the candidates in your second most preferred party,
+            etc. This is the technique used in Australian federal elections post 2013, and almost everywhere else
+            (subject to formality requirements). </p>
         <p class="noprint">If you enter a vote which actually was one of the votes counted in the election,
             then the following should be accurate. If you enter a vote that was not one of the votes counted,
             this page will attempt to show what would have happened with such a vote, assuming that the vote didn't change
             the course of the election (usually but not always a decent approximation).</p>
-        <p class="noprint">The formality requirements of a minimum number of preferences will not be enforced.</p>
+        <p class="noprint">Formality requirements of a minimum number of preferences will <em>not</em> be enforced.</p>
         <div class="noprint"><p><em>Usage:</em></p>
             <ul>
                 <li>You can enter numbers by typing in the boxes adjacent to a name. Duplicated numbers will get a red background.</li>
@@ -39,9 +44,11 @@
             </ul>
         </div>
         <div id="tools"  class="noprint">
-            <p>Next liked candidate (click a name to assign): <span id="likedCandidate">???</span></p>
-            <p>Next despised candidate (alt-click a name to assign) : <span id="despisedCandidate">???</span></p>
+            <p>Next liked candidate (click a candidate name to assign): <span id="likedCandidate">???</span></p>
+            <p>Next despised candidate (alt-click a candidate name to assign) : <span id="despisedCandidate">???</span></p>
             <p>Candidates to go : <span id="togoCandidates">???</span> </p>
+            <p>Next liked party (click a party name to assign): <span id="likedParty">???</span></p>
+            <p>Next despised party (alt-click a party name to assign) : <span id="despisedParty">???</span></p>
         </div>
     </details>
     <h2 id="TitleHeading">Loading...</h2>

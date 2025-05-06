@@ -168,12 +168,15 @@ window.onload = function () {
         getWebJSONResult("info.json",info=> {
             if (info.simple && info.rules && (info.rules.rules_used || info.rules.rules_recommended)) {
                 if (is_where_did_my_vote_go_supported(info)) {
-                    setupCandidates();
+                    setupCandidates(!!metadata.parties);
                     let search = window.location.search;
                     if (search) {
                         let params = new URLSearchParams(search);
+                        let atl = params.get("atl");
                         let btl = params.get("btl");
-                        if (btl) {
+                        if (atl) {
+                            loadFromATLPreferenceList(atl);
+                        } else if (btl) {
                             document.getElementById("preferences").value=btl;
                             loadFromPreferenceList();
                         }

@@ -30,13 +30,13 @@ function drawBallotPaper(showCandidates,createX,clickOnName,createXparty,clickOn
     removeAllChildElements(paperDiv); // get rid of loading message
     let candidateBoxes = [];
     let partyBoxes = [];
-    function centralPurpose(parent_div,name,isParty,clickFn,createFn) {
+    function centralPurpose(parent_div,name,isParty,clickFn,createFn,elementType) {
         const allXs = isParty?partyBoxes:candidateBoxes;
         const index = allXs.length;
         const cDiv=add(parent_div,"div","CandidateAndNumber");
         const x = createFn(cDiv,index);
         allXs.push(x);
-        const cName=add(cDiv,"span");
+        const cName=add(cDiv,elementType);
         cName.innerText = name;
         if (clickFn) cName.addEventListener("click",function (event) { clickFn(index,x,event); });
     }
@@ -46,12 +46,12 @@ function drawBallotPaper(showCandidates,createX,clickOnName,createXparty,clickOn
         add(groupDiv,"h4").innerText=group.column_id;
         if (showCandidates) {
             if (createXparty) {
-                centralPurpose(groupDiv,group.name,true,clickOnPartyName,createXparty); // TODO change what it is used for
+                centralPurpose(groupDiv,group.name,true,clickOnPartyName,createXparty,"h5");
             } else {
                 add(groupDiv,"h5").innerText=group.name;
             }
         } else {
-            centralPurpose(groupDiv,group.name,true,clickOnName,createX);
+            centralPurpose(groupDiv,group.name,true,clickOnName,createX,"span");
         }
     }
     let ungrouped_box = null;
@@ -61,7 +61,7 @@ function drawBallotPaper(showCandidates,createX,clickOnName,createXparty,clickOn
         if (!showCandidates) centralPurpose(ungrouped_box,"");
     }
     if (showCandidates) for (const candidate of metadata.candidates) {
-        centralPurpose(candidate.hasOwnProperty("party")?groupBoxes[candidate.party]:ungrouped_box,candidate.name,false,clickOnName,createX);
+        centralPurpose(candidate.hasOwnProperty("party")?groupBoxes[candidate.party]:ungrouped_box,candidate.name,false,clickOnName,createX,"span");
     }
     return { candidateBoxes : candidateBoxes, partyBoxes:partyBoxes };
 }
