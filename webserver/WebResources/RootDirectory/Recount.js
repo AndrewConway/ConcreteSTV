@@ -237,7 +237,7 @@ function process_good_metadata(_metadata) {
         input.type="checkbox";
         input.addEventListener("input",checkCouldRecompute)
         return input;
-    },(_index,box)=> {box.checked=!box.checked;});
+    },(_index,box)=> {box.checked=!box.checked;}).candidateBoxes;
     if (metadata.excluded) for (const candidate of metadata.excluded) candidateBoxes[candidate].checked=true;
     document.getElementById("NumVacancies").value=metadata.vacancies;
     ec_tie_resolutions_being_edited=metadata.tie_resolutions || [];

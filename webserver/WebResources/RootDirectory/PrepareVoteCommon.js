@@ -66,7 +66,7 @@ function setupCandidates() {
         else cNumber.value = availablePreferenceNumbers[event.altKey?availablePreferenceNumbers.length-1:0];
         checkAllNumbersAdjustingSummary();
     }
-    candidateBoxesZeroBased=drawBallotPaper(true,createNumberBoxForCandidate,clickOnName)
+    candidateBoxesZeroBased=drawBallotPaper(true,createNumberBoxForCandidate,clickOnName).candidateBoxes;
     document.getElementById("preferences").addEventListener("input",loadFromPreferenceList);
     document.getElementById("preferences").addEventListener("change",checkAllNumbersAdjustingSummary);
     checkAllNumbersAdjustingSummary();
