@@ -158,6 +158,54 @@ function showWhereVoteWent(preferenceList) {
     }
 }
 
+/// Given metadata, set up party tickets and how to vote recommendations in DOM objects with ids "PartyTickets" and "PartyHowToVote".
+function setupHowToVote(metadata) {
+    function makeAddTickets(id) {
+        const where = document.getElementById(id);
+        where.className=""; // make visible
+        let hadPrior = false;
+        function addTickets(tickets,isATL,party) {
+            if (tickets) {
+                let indexOutOf=tickets.length;
+                for (let index=0;index<indexOutOf;index++) {
+                    const ticket = tickets[index];
+                    if (hadPrior) where.append(" • "); else hadPrior=true;
+                    const a = add(where,"a");
+                    a.innerText=(party.name || party.column_id)+(indexOutOf===1?"":(" "+(index+1)));
+                    let preferenceList = [];
+                    for (let c=0;c<metadata.candidates.length;c++) preferenceList.push("");
+                    for (let j=0;j<ticket.length;j++) preferenceList[ticket[j]]=j+1;
+                    let wanted_url = new URL(window.location.href);
+                    wanted_url.search = "?"+(new URLSearchParams(isATL?{atl:preferenceList.join(",")}:{btl:preferenceList.join(",")}).toString());
+                    a.href = wanted_url.href;
+                    a.onclick = function (event) {
+                        event.preventDefault();
+                        //event.stopPropagation();
+                        if (isATL) {
+                            loadFromATLPreferenceList(preferenceList.join(","));
+                        } else {
+                            document.getElementById("preferences").value=preferenceList.join(",");
+                            loadFromPreferenceList();
+                        }
+                        return false;
+                    }
+                }
+            }
+        }
+        return addTickets;
+    }
+    if (metadata.parties && metadata.parties.some(p=>p.tickets && p.tickets.length>0)) {
+        const addTickets = makeAddTickets("PartyTickets");
+        for (const party of metadata.parties) addTickets(party.tickets,false,party);
+    }
+    if (metadata.parties && metadata.parties.some(p=>(p.how_to_vote_atl && p.how_to_vote_atl.length>0)||(p.how_to_vote_btl && p.how_to_vote_btl.length>0))) {
+        const addTickets = makeAddTickets("PartyHowToVote");
+        for (const party of metadata.parties) {
+            addTickets(party.how_to_vote_atl,true,party);
+            addTickets(party.how_to_vote_btl,false,party);
+        }
+    }
+}
 
 
 window.onload = function () {
@@ -165,6 +213,7 @@ window.onload = function () {
     getWebJSONResult("metadata.json",meta=> {
         metadata=meta;
         set_heading_from_metadata(metadata);
+        setupHowToVote(metadata);
         getWebJSONResult("info.json",info=> {
             if (info.simple && info.rules && (info.rules.rules_used || info.rules.rules_recommended)) {
                 if (is_where_did_my_vote_go_supported(info)) {

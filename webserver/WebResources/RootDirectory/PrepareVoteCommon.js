@@ -139,6 +139,7 @@ function loadFromPreferenceList() {
         candidateBoxesZeroBased[i].value= (i<entered.length)? entered[i].trim() : "";
     }
     for (let b of partyBoxesZeroBased) b.value="";
+    hasATLvotes=false;
     checkAllNumbersNotAdjustingSummary();
 }
 
