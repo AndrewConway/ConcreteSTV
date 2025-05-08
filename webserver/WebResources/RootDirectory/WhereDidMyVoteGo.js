@@ -115,8 +115,16 @@ function showWhereVoteWent(preferenceList) {
             const candidate = add(tr,"td","left");
             if (my_preference_upto===preferenceList.length) candidate.innerText="Exhausted";
             else {
+                if (currently_showing_transcript.elected.includes(preferenceList[my_preference_upto])) {
+                    add(candidate,"span","ElectedSymbol").innerText="✓";
+                }
                 add(candidate,"span","number_in_ballot_box").innerText=""+(my_preference_upto+1);
-                add(candidate,"span").innerText=" "+metadata.candidates[preferenceList[my_preference_upto]].name;
+                const candidate_meta = metadata.candidates[preferenceList[my_preference_upto]]
+                add(candidate,"span").innerText=" "+candidate_meta.name;
+                if (candidate_meta.party!==undefined) {
+                    const party = metadata.parties[candidate_meta.party];
+                    add(candidate,"div","small_party").innerText=party.name || party.abbreviation;
+                }
             }
             let tvd = add(tr,"td","left");
             //tvd.innerText=transfer_value_text;

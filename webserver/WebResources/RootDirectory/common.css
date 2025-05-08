@@ -241,3 +241,12 @@ rect.transfer_value_continuing_loses {
 td.left {
     text-align: left;
 }
+
+div.smallparty {
+    font-size: small;
+}
+
+span.ElectedSymbol {
+    font-size: larger;
+    color: green;
+}
