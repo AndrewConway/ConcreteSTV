@@ -482,6 +482,8 @@ fn parse_json_lc_candidate_party(path:&PathBuf,region:&str) -> anyhow::Result<(V
                     atl_allowed: true,
                     candidates: vec![],
                     tickets: vec![],
+                    how_to_vote_btl: vec![],
+                    how_to_vote_atl: vec![],
                 });
                 last_column=Some(column);
             }

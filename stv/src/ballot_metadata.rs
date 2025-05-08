@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -251,6 +251,12 @@ pub struct Party {
     /// the group voting tickets for this party, if any.
     #[serde(skip_serializing_if = "Vec::is_empty",default)]
     pub tickets : Vec<Vec<CandidateIndex>>,
+    /// The "How to Vote" advertisements the party gave out, if any and known and for below the line.
+    #[serde(skip_serializing_if = "Vec::is_empty",default)]
+    pub how_to_vote_btl : Vec<Vec<CandidateIndex>>,
+    /// The "How to Vote" advertisements the party gave out, if any and known and for above the line
+    #[serde(skip_serializing_if = "Vec::is_empty",default)]
+    pub how_to_vote_atl : Vec<Vec<PartyIndex>>,
 }
 
 impl Party {
@@ -326,6 +332,8 @@ impl CandidateAndPartyBuilder {
             atl_allowed,
             candidates: vec![],
             tickets: vec![],
+            how_to_vote_btl: vec![],
+            how_to_vote_atl: vec![],
         })
     }
 

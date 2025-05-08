@@ -1,4 +1,4 @@
-// Copyright 2021-2024 Andrew Conway.
+// Copyright 2021-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -41,8 +41,8 @@ fn test_retroscope() {
                 Candidate{ name: "C1".to_string(),  party: None, position: None, ec_id: None },
             ],
             parties: vec![
-                Party{ column_id: "A".to_string(), name: "The group of people who like A".to_string(),  abbreviation: None, atl_allowed: true, candidates: vec![CandidateIndex(0),CandidateIndex(1)], tickets: vec![] },
-                Party{ column_id: "B".to_string(), name: "The group of people who like B".to_string(),  abbreviation: None, atl_allowed: true, candidates: vec![CandidateIndex(2),CandidateIndex(3)], tickets: vec![] },
+                Party{ column_id: "A".to_string(), name: "The group of people who like A".to_string(),  abbreviation: None, atl_allowed: true, candidates: vec![CandidateIndex(0),CandidateIndex(1)], tickets: vec![], how_to_vote_btl: vec![], how_to_vote_atl: vec![] },
+                Party{ column_id: "B".to_string(), name: "The group of people who like B".to_string(),  abbreviation: None, atl_allowed: true, candidates: vec![CandidateIndex(2),CandidateIndex(3)], tickets: vec![], how_to_vote_btl: vec![], how_to_vote_atl: vec![] },
             ],
             source: vec![],
             results: Some(vec![CandidateIndex(0),CandidateIndex(2),CandidateIndex(3)]),

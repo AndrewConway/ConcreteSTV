@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -422,6 +422,8 @@ impl NSWLGEDataLoader {
                     atl_allowed: group_code!="UG",
                     candidates: vec![],
                     tickets: vec![],
+                    how_to_vote_btl: vec![],
+                    how_to_vote_atl: vec![],
                 });
             }
             parties.last_mut().unwrap().candidates.push(CandidateIndex(candidates.len()));
@@ -726,6 +728,8 @@ pub(crate) fn parse_fp_by_grp_and_candidate_by_vote_type(mut file:File,mayoral:b
                         atl_allowed: !col1_text.is_empty(),
                         candidates: vec![],
                         tickets: vec![],
+                        how_to_vote_btl: vec![],
+                        how_to_vote_atl: vec![],
                     });
                     current_position = 0;
                 }

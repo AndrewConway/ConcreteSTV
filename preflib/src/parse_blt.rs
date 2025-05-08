@@ -1,4 +1,4 @@
-// Copyright 2024 Andrew Conway.
+// Copyright 2024-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -77,6 +77,8 @@ pub fn parse<P:AsRef<Path>>(path:P) -> anyhow::Result<ElectionData> {
             atl_allowed: false,
             candidates: vec![],
             tickets: vec![],
+            how_to_vote_btl: vec![],
+            how_to_vote_atl: vec![],
         }); parties.len()-1});
         parties[party].candidates.push(CandidateIndex(candidates.len()));
         candidates.push(Candidate{

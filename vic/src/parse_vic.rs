@@ -394,7 +394,9 @@ impl VicDataLoader {
                                     abbreviation: None,
                                     atl_allowed: had_atl,
                                     candidates: vec![],
-                                    tickets: vec![]
+                                    tickets: vec![],
+                                    how_to_vote_btl: vec![],
+                                    how_to_vote_atl: vec![],
                                 });
                                 if !had_atl {
                                     if atl_votes.len()+1!=parties.len() {
@@ -470,7 +472,9 @@ impl VicDataLoader {
                     abbreviation: None,
                     atl_allowed: name!="Ungrouped",
                     candidates: vec![],
-                    tickets: vec![]
+                    tickets: vec![],
+                    how_to_vote_btl: vec![],
+                    how_to_vote_atl: vec![],
                 });
                 position_in_party=1;
             } else if let Some(candidate_name) = tr.select(&scraper::Selector::parse("tr.candidate-row td").unwrap()).next() {

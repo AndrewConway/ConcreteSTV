@@ -211,7 +211,13 @@ impl RawDataSource for ACTDataLoader {
                 rules_recommended: Some("ACT2021".into()),
                 comment: Some("The election was initially run with buggy rules ACT2020. After we pointed out the bugs, the counts on Elections ACT website were changed in 2021 to use the correct rules ACT2021".into()),
                 reports: vec!["https://github.com/AndrewConway/ConcreteSTV/blob/main/reports/2020%20Errors%20In%20ACT%20Counting.pdf".into()]
-            }, // TODO 2024
+            },
+            "2024" => AssociatedRules{
+                rules_used: Some("ACT2021".into()),
+                rules_recommended: Some("ACT2021".into()),
+                comment: None,
+                reports: vec![]
+            },
             _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
         }
     }
@@ -264,6 +270,8 @@ impl ACTDataLoader {
                     atl_allowed: false,
                     candidates: vec![],
                     tickets: vec![],
+                    how_to_vote_btl: vec![],
+                    how_to_vote_atl: vec![],
                 })
             }
         }

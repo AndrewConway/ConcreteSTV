@@ -482,6 +482,8 @@ impl NSWLCDataLoader {
                     atl_allowed: group!="UG",
                     candidates: vec![],
                     tickets: vec![],
+                    how_to_vote_btl: vec![],
+                    how_to_vote_atl: vec![],
                 });
                 current_position = 0;
                 current_group = group.to_string();
