@@ -83,20 +83,54 @@ pub struct FederalDataLoader {
 }
 
 impl FederalDataLoader {
-    /// These are from public reporting by the ABC, e.g.
+    /// This terrible cryptic monstrosity is a hand compiled collection of how to vote recommendations
+    /// where I am aware of them from parties advising voters on how they recommend they vote.
+    /// 
+    /// These are generally a list of parties, with their own party as the first one. Parties are
+    /// listed by AEC column (a letter starting from A). Each string is a single party's how to vote
+    /// card with the party columns separated by whitespace.
+    /// 
+    /// These are not reported in any central database, but are collected by the national 
+    /// library and also public reporting by the ABC, e.g.
     /// https://www.abc.net.au/news/elections/federal/2022/guide/senate-nsw-htv
+    ///
+    /// Unfortunately these come from my interpretation of images and 
+    /// are very hard to test against a mistake. If anyone spots an error, 
+    /// please report it!
+    /// 
+    /// Some parties have multiple recommendations, in which case all are included.
+    /// 
+    /// Some parties recommend voting for a small number of specific people (usually just the 
+    /// party in question) and then filling our further by your choice, usually at least 6
+    /// due to the AEC's statement to voters to do so. These are recorded as the small number of
+    /// specific parties.
+    ///
+    /// One party one time (liberal, ACT, 2022) just listed themselves without recommending
+    /// other ATL votes. This is also listed as just that one party.
+    /// 
+    /// Some parties recommend voting themselves first, and then recommend weakly a set of next
+    /// preferences in a particular order. These weak recommendations are included.
+    /// 
+    /// Some parties recommend voting themselves first, and then list a set of suggested
+    /// next preferences not in a particular order. These unordered recommendations are not
+    /// included.
+    /// 
+    /// Some parties had errors in their How To Vote cards which have been fixed to my interpretation
+    /// of what was intended. For instance in TAS 2016, One Nation recommended a third preference for
+    /// group "AG - Shooters, Fishers and Farmers" by which I assume they meant group P (there is no
+    /// group AG). 
     pub(crate) fn get_how_to_vote_cards(&self, state: &str) -> anyhow::Result<&[&str]> {
         Ok(match self.year.as_str() {
-            "2013" | "2014" => &[],
-            "2016" => match state { // TODO
-                "ACT" => &[],
-                "NSW" => &[],
-                "NT" => &[],
-                "QLD" => &[],
-                "SA" => &[],
-                "TAS" => &[],
-                "VIC" => &[],
-                "WA" => &[],
+            "2013" | "2014" => &[], // formal tickets in use.
+            "2016" => match state {
+                "ACT" => &["A","C H J G B A","D I F A G E","E G","F I A G E C","G E B","H B J G C E"],
+                "NSW" => &["C H D X AM AF","D J AG C AM X","F AF J C D AA","H C AF X J A","I AC AL AB AG N","J AF AM M D F","L AL AH K AJ AO AB N","M S AF H J C","N AL AN AB AG D","P","Q","R AL AG I N AN","S M AB H AM AD","T P B I V","W","AB AK AN A AL N","AD","AG AO K AN U AB","AH","AI","AK AB AN","AL R I L AB N","AM C J X S D","AN AB AK AG AL N AO E I"],
+                "NT" => &["A G C E F D","D F B E C G","E G F B D A","F D B G E C"],
+                "QLD" => &["A B H AK J D","D AK V AD AC I","E AG J","G T AA Q I AF","H AL U A AK D","I AC Q N T X","L","M AK V D U C","N X T I Q G","O","Q Y X AA N G","S Y AF I AH AA Q T AI AJ X G","T Y N I AC X G","U AL H AH AK D V AG W","V J H C B A","X N Y Q T I","Y T X AF Q S AA","Z","AC I T AK D G","AD","AE","AF T Y AA S N G","AJ O K AI AH AD","AK U J B D A","AL H U"],
+                "SA" => &["B D U P F J","D U E P C B","E D U R C B","F","G","H N K M J Q","K N Q R V S","N M S Q O K","O N Q A S J","Q N M O S K","R P V U C E","S Q K N H M","T","U D P E B V"],
+                "TAS" => &["A P T N S F","B C M S H L","C L S B R U","E M","F D P T A B","H U S R Q L","I D P A S N","J","L S C H Q B J R O","M","N D T P A M","P D I A N T S","Q L R C B","R Q C H U B","T S P N"],
+                "VIC" => &["A","C I M X AK D","D AL A M AK E","E X AK C Q D","G","H R O AI P AF","I C M","J AK AL E D M","K","M AL C I AK D W AC N","O H R P AB A","R H O L AA AI AF","U AG A O AE AA","V","W","X AK AL E C Q","Y AI AG P AE A","Z AJ AK X AL M D","AF O H R AA A","AG AI O Y P AH","AH W AL AG O AB","AI Y H O AG R P","AJ","AK X E C Q D","AL AD X T Q M"],
+                "WA" => &["B P Q R A X","B P Q R A F","B P Q R AB X","B P Q R AB F","C","D J S H B F","G J M O S N K D","H","J O N K S D","K O N U J D","N M K J S C","O S K U J D AA N L","P B W Q AB Z","Q B R W AB T A","R Q B AB L A","S K O M J D","W AB Q A T P X","X F W B Z AB","Z I F S AB B","AB B W T P Q"],
                 _ => anyhow::bail!("Invalid state or territory {state}"),
             },
             "2019" => match state {
@@ -121,15 +155,15 @@ impl FederalDataLoader {
                 "WA" => &["A O H D S I","C L B M G Q","D A O L F T","E","F E V K D A","G N L B C Q","I","L C G Q N B","M J Q B I C G L","N G Q L M C","O A D E S T","P B C G N M J Q L T I K V F O S E","R B T L Q F","R B T L Q G","S A H K V D","U K G N A M"],
                 _ => anyhow::bail!("Invalid state or territory {state}"),
             },
-            "2025" => match state { // TODO
-                "ACT" => &[],
-                "NSW" => &[],
-                "NT" => &[],
-                "QLD" => &[],
-                "SA" => &[],
-                "TAS" => &[],
-                "VIC" => &[],
-                "WA" => &[],
+            "2025" => match state { 
+                "ACT" => &["A","B","C A F B G D","D B G C A E","E","G B C A D E"],
+                "NSW" => &["A R J O G D","B","E I H M F N","F E I H M N","G D R Q J A","H E F I M N","I E F H M N","J G D L K R","K","M E H I O P","N H E F I O","O","Q R L C J G A","R L G Q J A"],
+                "NT" => &["A","B A H E C D","C E B A D G","D F H B A C","E B C A G D","F H G D A B","G"],
+                "QLD" => &["A C P E M O J","B N H G F L","G S N B K Q","I Q N S G B","J P O M F H","L G Q E P C","M D R O P J","N G Q S I K","O M D C H P","P O M A C J","Q G S B L I","R","S G Q N I K"],
+                "SA" => &["A P M J G K","C H P M A F","D N F K E B","E B N K O D","F I B D N C","G M A J F L","H C F P M J","J M A G P F","K E B N F A","L","M J A C P H","N I K E D F","O","P A G L H C"],
+                "TAS" => &["A","B I H L G K","C G H B K J","D E A F G H","F D E G K A","I H L C J B","J L D A I F","K G F E L D"],
+                "VIC" => &["A J P K N L","B C F D L Q","C F B M Q I","G","H J L O P R","I B Q C L M","J A O P K S","K P S H J A","L","M Q E C F I","N","O P J R H K","P O K S F J","Q M B E C I","R O E D Q K"],
+                "WA" => &["B M H D Q R","C","D B F H G C","E","H A G B D M","I N O K P L","K P I O J L","L I N O F K","M H G B R Q","N J O F I G","O J N E I L","Q R M B G E","R Q M G F B"],
                 _ => anyhow::bail!("Invalid state or territory {state}"),
             },
             _ => anyhow::bail!("Invalid year {}",self.year),

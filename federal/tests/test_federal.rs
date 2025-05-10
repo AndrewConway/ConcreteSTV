@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -10,7 +10,7 @@
 
 #[cfg(test)]
 mod tests {
-    use federal::parse::{get_federal_data_loader_2016, get_federal_data_loader_2019, get_federal_data_loader_2013, get_federal_data_loader_2022, get_federal_data_loader_2014};
+    use federal::parse::{get_federal_data_loader_2016, get_federal_data_loader_2019, get_federal_data_loader_2013, get_federal_data_loader_2022, get_federal_data_loader_2014, get_federal_data_loader_2025};
     use stv::preference_distribution::distribute_preferences;
     use federal::{FederalRulesUsed2019, FederalRulesUsed2016, FederalRulesUsed2013};
     use std::collections::HashSet;
@@ -22,14 +22,37 @@ mod tests {
     use stv::parse_util::{RawDataSource, FileFinder};
     use stv::random_util::Randomness;
 
+    fn test2025(state:&str) -> anyhow::Result<()> {
+        let loader = get_federal_data_loader_2025(&FileFinder::find_ec_data_repository());
+        let _metadata = loader.read_raw_metadata(state)?;
+        /*
+        let data = loader.read_raw_data(state)?;
+        data.print_summary();
+        let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote);
+        let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
+        std::fs::create_dir_all("test_transcripts")?;
+        let file = File::create(format!("test_transcripts/transcript{}2022.json",state))?;
+        serde_json::to_writer_pretty(file,&transcript)?;
+        let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
+
+        if official_transcript.all_elected()!=transcript.transcript.elected {
+            let lists : DeltasInCandidateLists = DifferentCandidateLists{list1:official_transcript.all_elected(),list2:transcript.transcript.elected.clone() }.into();
+            println!("Official elected differs from computed : {}",lists.pretty_print(&transcript.metadata));
+        }
+        official_transcript.compare_with_transcript(&transcript.transcript);
+        for (number,count) in transcript.transcript.counts.iter().enumerate() {
+            for decision in &count.decisions {
+                println!("Decision made in count {} : {}",number+1,decision)
+            }
+        }*/
+        Ok(())
+    }
+
 
     fn test2022(state:&str) -> anyhow::Result<()> {
         let loader = get_federal_data_loader_2022(&FileFinder::find_ec_data_repository());
         let data = loader.read_raw_data(state)?;
         data.print_summary();
-        //use stv::ballot_metadata::CandidateIndex;
-        //let mut excluded = HashSet::default();
-        //excluded.insert(CandidateIndex(8));
         let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
@@ -217,5 +240,30 @@ mod tests {
     #[allow(non_snake_case)]
     fn test_TAS2022() { test2022("TAS").unwrap() }
 
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_ACT2025() { test2025("ACT").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_WA2025() { test2025("WA").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_SA2025() { test2025("SA").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_NT2025() { test2025("NT").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_QLD2025() { test2025("QLD").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_NSW2025() { test2025("NSW").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_VIC2025() { test2025("VIC").unwrap() }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_TAS2025() { test2025("TAS").unwrap() }
 
 }
