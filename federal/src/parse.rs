@@ -11,6 +11,7 @@ use std::fs::File;
 use stv::ballot_metadata::{ElectionName, Candidate, CandidateIndex, PartyIndex, ElectionMetadata, DataSource, NumberOfCandidates};
 use stv::ballot_paper::{RawBallotMarking, parse_marking, RawBallotMarkings, UniqueVoteBuilderMultipleTypes};
 use std::collections::{HashMap};
+use std::io::Read;
 use csv::{StringRecord, StringRecordsIntoIter};
 use zip::ZipArchive;
 use zip::read::ZipFile;
@@ -434,7 +435,7 @@ impl FederalDataLoader {
 }
 
 
-fn read_official_dop_transcript_work(file : ZipFile,metadata : &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+fn read_official_dop_transcript_work<R:Read>(file : ZipFile<'_,R>,metadata : &ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
     let mut reader = csv::ReaderBuilder::new().flexible(false).has_headers(true).from_reader(file);
     #[derive(Debug, Deserialize)]
     struct Record {
@@ -580,17 +581,17 @@ fn read_candidate_list_file_available_before_election2022(builder: &mut Candidat
 
 
 
-struct ParsedRawVoteIterator<'a> {
+struct ParsedRawVoteIterator<'a,R:Read> {
     electorate_column : usize,
     collection_column : usize,
     preferences_column : Option<usize>,
     num_atl_plus_num_btl_hint : usize,
     // reader : Reader<ZipFile<'a>>,
-    records : StringRecordsIntoIter<ZipFile<'a>>
+    records : StringRecordsIntoIter<ZipFile<'a,R>>
 }
 
 
-impl<'a> ParsedRawVoteIterator<'a> {
+impl<'a> ParsedRawVoteIterator<'a,File> {
     /// the num_atl_plus_num_btl_hint is used for initial capacity of the vector - it only matters for performance, and if it is a few over that is fine,
     fn new(zipfile : &'a mut ZipArchive<File>,num_atl_plus_num_btl_hint:usize) -> anyhow::Result<Self> {
         let zip_contents = zipfile.by_index(0)?;
@@ -626,7 +627,7 @@ impl ParsedRawVote {
     }
 }
 
-impl <'a> Iterator for ParsedRawVoteIterator<'a> {
+impl <'a,R:Read> Iterator for ParsedRawVoteIterator<'a,R> {
     type Item = Result<ParsedRawVote,csv::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {

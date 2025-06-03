@@ -8,7 +8,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0"
 stv = { path = "../stv" }
-calamine = "0.27"
+calamine = "0.26.1" # Calamine 0.27 depends on Zip 2.5 which is yanked.
 serde = {version="1.0", features = ["derive"]}
 serde_json = "1.0"
 scraper = "0.23"

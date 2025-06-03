@@ -1,4 +1,4 @@
-// Copyright 2023 Andrew Conway.
+// Copyright 2023-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -9,6 +9,7 @@
 
 use std::borrow::Cow;
 use std::fs::File;
+use std::io::Read;
 use std::path::PathBuf;
 use anyhow::anyhow;
 use zip::read::ZipFile;
@@ -226,7 +227,7 @@ fn parse_dop(path: &PathBuf, metadata: &ElectionMetadata) -> anyhow::Result<Offi
 
 /// Parse the Distribution of Preferences csv file, which is inside a zip file.
 /// Unfortunately it does not have ballots or transfer values of lots of things.
-fn parse_dop_csv(file:ZipFile,_metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+fn parse_dop_csv<R:Read>(file:ZipFile<'_,R>,_metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
     let mut reader = csv::ReaderBuilder::new().flexible(true).from_reader(file);
     for result in reader.records() {
         let _line = result?;
