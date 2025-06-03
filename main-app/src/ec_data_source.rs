@@ -8,7 +8,7 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use stv::election_data::ElectionData;
-use federal::parse::{get_federal_data_loader_2013, get_federal_data_loader_2016, get_federal_data_loader_2019, get_federal_data_loader_2022};
+use federal::parse::{get_federal_data_loader_2013, get_federal_data_loader_2016, get_federal_data_loader_2019, get_federal_data_loader_2022, get_federal_data_loader_2025};
 use stv::parse_util::{RawDataSource, FileFinder};
 use act::parse::{get_act_data_loader_2008, get_act_data_loader_2012, get_act_data_loader_2016, get_act_data_loader_2020, get_act_data_loader_2024};
 use nsw::parse_lge::{get_nsw_lge_data_loader_2021, get_nsw_lge_data_loader_2024};
@@ -20,6 +20,7 @@ pub enum ECDataSource {
     AEC2016,
     AEC2019,
     AEC2022,
+    AEC2025,
     ACT2008,
     ACT2012,
     ACT2016,
@@ -41,6 +42,7 @@ impl FromStr for ECDataSource {
             "AEC2016" => Ok(ECDataSource::AEC2016),
             "AEC2019" => Ok(ECDataSource::AEC2019),
             "AEC2022" => Ok(ECDataSource::AEC2022),
+            "AEC2025" => Ok(ECDataSource::AEC2025),
             "ACT2008" => Ok(ECDataSource::ACT2008),
             "ACT2012" => Ok(ECDataSource::ACT2012),
             "ACT2016" => Ok(ECDataSource::ACT2016),
@@ -51,7 +53,7 @@ impl FromStr for ECDataSource {
             "VIC2014" => Ok(ECDataSource::VIC2014),
             "VIC2018" => Ok(ECDataSource::VIC2018),
             "VIC2022" => Ok(ECDataSource::VIC2022),
-            _ => Err("No such source supported. Allowed sources are AEC2013, AEC2016, AEC2019, AEC2022, ACT2008, ACT2012, ACT2016, ACT2020, ACT2024, NSWLG2021, NSWLG2021, VIC2014, VIC2018, VIC2022")
+            _ => Err("No such source supported. Allowed sources are AEC2013, AEC2016, AEC2019, AEC2022, AEC2025, ACT2008, ACT2012, ACT2016, ACT2020, ACT2024, NSWLG2021, NSWLG2021, VIC2014, VIC2018, VIC2022")
         }
     }
 }
@@ -63,6 +65,7 @@ impl Display for ECDataSource {
             ECDataSource::AEC2016 => "AEC2016",
             ECDataSource::AEC2019 => "AEC2019",
             ECDataSource::AEC2022 => "AEC2022",
+            ECDataSource::AEC2025 => "AEC2025",
             ECDataSource::ACT2008 => "ACT2008",
             ECDataSource::ACT2012 => "ACT2012",
             ECDataSource::ACT2016 => "ACT2016",
@@ -86,6 +89,7 @@ impl ECDataSource {
             ECDataSource::AEC2016 => get_federal_data_loader_2016(finder).read_raw_data_checking_electorate_valid(electorate),
             ECDataSource::AEC2019 => get_federal_data_loader_2019(finder).read_raw_data_checking_electorate_valid(electorate),
             ECDataSource::AEC2022 => get_federal_data_loader_2022(finder).read_raw_data_checking_electorate_valid(electorate),
+            ECDataSource::AEC2025 => get_federal_data_loader_2025(finder).read_raw_data_checking_electorate_valid(electorate),
             ECDataSource::ACT2008 => get_act_data_loader_2008(finder)?.read_raw_data_checking_electorate_valid(electorate),
             ECDataSource::ACT2012 => get_act_data_loader_2012(finder)?.read_raw_data_checking_electorate_valid(electorate),
             ECDataSource::ACT2016 => get_act_data_loader_2016(finder)?.read_raw_data_checking_electorate_valid(electorate),

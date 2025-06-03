@@ -12,7 +12,7 @@
 mod tests {
     use federal::parse::{get_federal_data_loader_2016, get_federal_data_loader_2019, get_federal_data_loader_2013, get_federal_data_loader_2022, get_federal_data_loader_2014, get_federal_data_loader_2025};
     use stv::preference_distribution::distribute_preferences;
-    use federal::{FederalRulesUsed2019, FederalRulesUsed2016, FederalRulesUsed2013};
+    use federal::{FederalRulesUsed2019, FederalRulesUsed2016, FederalRulesUsed2013, FederalRulesPost2021};
     use std::collections::HashSet;
     use stv::tie_resolution::TieResolutionsMadeByEC;
     use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
@@ -24,27 +24,27 @@ mod tests {
 
     fn test2025(state:&str) -> anyhow::Result<()> {
         let loader = get_federal_data_loader_2025(&FileFinder::find_ec_data_repository());
-        let _metadata = loader.read_raw_metadata(state)?;
-        /*
+        //let _metadata = loader.read_raw_metadata(state)?;
         let data = loader.read_raw_data(state)?;
         data.print_summary();
-        let transcript = distribute_preferences::<FederalRulesUsed2019>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote);
+        let transcript = distribute_preferences::<FederalRulesPost2021>(&data, loader.candidates_to_be_elected(state), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts")?;
-        let file = File::create(format!("test_transcripts/transcript{}2022.json",state))?;
+        let file = File::create(format!("test_transcripts/transcript{}2025.json",state))?;
         serde_json::to_writer_pretty(file,&transcript)?;
+        /*
         let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
 
         if official_transcript.all_elected()!=transcript.transcript.elected {
             let lists : DeltasInCandidateLists = DifferentCandidateLists{list1:official_transcript.all_elected(),list2:transcript.transcript.elected.clone() }.into();
             println!("Official elected differs from computed : {}",lists.pretty_print(&transcript.metadata));
         }
-        official_transcript.compare_with_transcript(&transcript.transcript);
+        official_transcript.compare_with_transcript(&transcript.transcript);*/
         for (number,count) in transcript.transcript.counts.iter().enumerate() {
             for decision in &count.decisions {
                 println!("Decision made in count {} : {}",number+1,decision)
             }
-        }*/
+        }
         Ok(())
     }
 

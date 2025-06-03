@@ -47,7 +47,7 @@ pub fn get_federal_data_loader_2022(finder:&FileFinder) -> FederalDataLoader {
 }
 
 pub fn get_federal_data_loader_2025(finder:&FileFinder) -> FederalDataLoader {
-    FederalDataLoader::new(finder,"2025",false,"https://results.aec.gov.au/",0)
+    FederalDataLoader::new(finder,"2025",false,"https://results.aec.gov.au/",31496)
 }
 
 
@@ -254,6 +254,7 @@ impl RawDataSource for FederalDataLoader {
             "2016" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2016,Self>(self,electorate),
             "2019" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
             "2022" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
+            "2025" => self.read_raw_data(electorate), // TODO check ec resolutions
             _ => Err(anyhow!("Invalid year {}",self.year)),
         }
     }
@@ -324,11 +325,17 @@ impl RawDataSource for FederalDataLoader {
                 comment: Some(Cow::Borrowed("The AEC seems to me to have used the same rules as they used in 2019 (AEC2019). This is similar to my interpretation of the legislation (FederalPost2021) other than in Queensland, where on the last count the AEC did not distribute any votes. This did not change who was elected, or, in this case, the order.")),
                 reports: vec![]
             },
+            "2025" => AssociatedRules{
+                rules_used: Some("AEC2019".into()),
+                rules_recommended: Some("FederalPost2021".into()),
+                comment: Some(Cow::Borrowed("Full results are not out yet, based on current data it is not clear whether the bug in AEC2019 was fixed or not since the situation didn't appear to arise. So I don't know whether the same buggy software was used as in 2019 and 2022 or not.")), // TODO update when data is released.
+                reports: vec![]
+            },
             _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
         }
     }
-    fn can_read_raw_markings(&self) -> bool  { self.year=="2016" || self.year=="2019" || self.year=="2022" }
-    fn can_load_full_data(&self,_state:&str) -> bool { self.year!="2025" }
+    fn can_read_raw_markings(&self) -> bool  { self.year=="2016" || self.year=="2019" || self.year=="2022" || self.year=="2025" } 
+    fn can_load_full_data(&self,_state:&str) -> bool { true }
 
     fn read_official_dop_transcript(&self,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let filename = self.name_of_official_transcript_zip_file();
