@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Andrew Conway.
+// Copyright 2022-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -265,4 +265,55 @@ fn test_Vic2022() {
 fn test_NSW2022() {
     assert_eq!(test::<FederalRulesUsed2019>("2022","NSW").unwrap(),Ok(None));
     assert_eq!(test::<FederalRulesPost2021>("2022","NSW").unwrap(),Ok(None));
+}
+
+
+
+#[test]
+#[allow(non_snake_case)]
+fn test_ACT2025() {
+    assert_eq!(test::<FederalRulesUsed2019>("2025","ACT").unwrap(),Ok(None));
+    assert_eq!(test::<FederalRulesPost2021>("2025","ACT").unwrap(),Ok(None));
+}
+#[test]
+#[allow(non_snake_case)]
+fn test_NT2025() {
+    assert_eq!(test::<FederalRulesUsed2019>("2025","NT").unwrap(),Ok(None));
+    assert_eq!(test::<FederalRulesPost2021>("2025","NT").unwrap(),Ok(None));
+}
+#[test]
+#[allow(non_snake_case)]
+fn test_QLD2025() {
+    assert_eq!(test::<FederalRulesUsed2019>("2025","QLD").unwrap(),Ok(None));
+    assert_eq!(test::<FederalRulesPost2021>("2025","QLD").unwrap(),Ok(None));
+}
+#[test]
+#[allow(non_snake_case)]
+fn test_WA2025() {
+    assert_eq!(test::<FederalRulesUsed2019>("2025","WA").unwrap(),Ok(None));
+    assert_eq!(test::<FederalRulesPost2021>("2025","WA").unwrap(),Ok(None));
+}
+#[test]
+#[allow(non_snake_case)]
+fn test_SA2025() {
+    assert_eq!(test::<FederalRulesUsed2019>("2025","SA").unwrap(),Ok(None));
+    assert_eq!(test::<FederalRulesPost2021>("2025","SA").unwrap(),Ok(None));
+}
+#[test]
+#[allow(non_snake_case)]
+fn test_Tas2025() {
+    assert_eq!(test::<FederalRulesUsed2019>("2025","TAS").unwrap(),Ok(None));
+    assert_eq!(test::<FederalRulesPost2021>("2025","TAS").unwrap(),Ok(None));
+}
+#[test]
+#[allow(non_snake_case)]
+fn test_Vic2025() {
+    assert_eq!(test::<FederalRulesUsed2019>("2025","VIC").unwrap(),Ok(None));
+    assert_eq!(test::<FederalRulesPost2021>("2025","VIC").unwrap(),Ok(None));
+}
+#[test]
+#[allow(non_snake_case)]
+fn test_NSW2025() {
+    assert_eq!(test::<FederalRulesUsed2019>("2025","NSW").unwrap(),Ok(None));
+    assert_eq!(test::<FederalRulesPost2021>("2025","NSW").unwrap(),Ok(None));
 }

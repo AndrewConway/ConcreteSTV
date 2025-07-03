@@ -32,14 +32,13 @@ mod tests {
         std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}2025.json",state))?;
         serde_json::to_writer_pretty(file,&transcript)?;
-        /*
         let official_transcript = loader.read_official_dop_transcript(&transcript.metadata)?;
 
         if official_transcript.all_elected()!=transcript.transcript.elected {
             let lists : DeltasInCandidateLists = DifferentCandidateLists{list1:official_transcript.all_elected(),list2:transcript.transcript.elected.clone() }.into();
             println!("Official elected differs from computed : {}",lists.pretty_print(&transcript.metadata));
         }
-        official_transcript.compare_with_transcript(&transcript.transcript);*/
+        official_transcript.compare_with_transcript(&transcript.transcript);
         for (number,count) in transcript.transcript.counts.iter().enumerate() {
             for decision in &count.decisions {
                 println!("Decision made in count {} : {}",number+1,decision)

@@ -48,7 +48,7 @@ pub fn get_federal_data_loader_2022(finder:&FileFinder) -> FederalDataLoader {
 }
 
 pub fn get_federal_data_loader_2025(finder:&FileFinder) -> FederalDataLoader {
-    FederalDataLoader::new(finder,"2025",false,"https://results.aec.gov.au/",31496)
+    FederalDataLoader::new(finder,"2025",false,"https://results.aec.gov.au/31496/Website/SenateDownloadsMenu-31496-Csv.htm",31496)
 }
 
 
@@ -255,7 +255,7 @@ impl RawDataSource for FederalDataLoader {
             "2016" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2016,Self>(self,electorate),
             "2019" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
             "2022" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
-            "2025" => self.read_raw_data(electorate), // TODO check ec resolutions
+            "2025" => read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutions::<FederalRulesUsed2019,Self>(self,electorate),
             _ => Err(anyhow!("Invalid year {}",self.year)),
         }
     }
@@ -329,7 +329,7 @@ impl RawDataSource for FederalDataLoader {
             "2025" => AssociatedRules{
                 rules_used: Some("AEC2019".into()),
                 rules_recommended: Some("FederalPost2021".into()),
-                comment: Some(Cow::Borrowed("Full results are not out yet, based on current data it is not clear whether the bug in AEC2019 was fixed or not since the situation didn't appear to arise. So I don't know whether the same buggy software was used as in 2019 and 2022 or not.")), // TODO update when data is released.
+                comment: Some(Cow::Borrowed("It is not clear whether the bug in AEC2019 was fixed or not since the situation didn't appear to arise. So I don't know whether the same buggy software was used as in 2019 and 2022 or not.")),
                 reports: vec![]
             },
             _ => AssociatedRules{rules_used:None,rules_recommended:None,comment:None,reports:vec![]},
