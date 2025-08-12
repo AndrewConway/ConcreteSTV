@@ -118,6 +118,11 @@ th, tr.Head td {
     font-weight: bold;
 }
 
+table.WhereDidMyVoteGo tr {
+    margin-top: 3px;
+    margin-bottom: 3px;
+}
+
 tr.Group { background : #CCCCCC; }
 
 /* Cells in even rows (2,4,6...) are one color */

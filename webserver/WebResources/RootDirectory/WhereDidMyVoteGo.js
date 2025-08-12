@@ -1,7 +1,12 @@
 "use strict";
 
 const use_exact_numbers = false;
-const digits_for_transfer_values = 3;
+const digits_for_transfer_values = 2;
+
+/** How to display the transfer value as a human readable string. */
+function formatTransferValue(transfer_value) {
+    return transfer_value.toLocaleString(undefined,{style:"percent",maximumSignificantDigits:digits_for_transfer_values});  //transfer_value.toPrecision(digits_for_transfer_values);
+}
 
 let currently_showing_transcript = null;
 // Display where the vote went in the div with id "resultsDiv".
@@ -10,7 +15,7 @@ function showWhereVoteWent(preferenceList) {
     let div = document.getElementById("resultsDiv");
     removeAllChildElements(div);
     add(div,"h2").innerText="Where did my vote listing consecutive preferences for "+preferenceList.length+" candidates go?";
-    const table = add(div,"table");
+    const table = add(div,"table","WhereDidMyVoteGo");
     const head = add(add(table,"thead"),"tr");
     add(head,"th").innerText="Count";
     add(head,"th").innerText="Reason";
@@ -58,7 +63,7 @@ function showWhereVoteWent(preferenceList) {
                 let split = transfer_value_text.split("/")
                 if (split.length===2) {
                     transfer_value = parseInt(split[0])/parseInt(split[1]);
-                    transfer_value_text=(use_exact_numbers?transfer_value_text+" ≈ ":"")+transfer_value.toPrecision(digits_for_transfer_values);
+                    transfer_value_text=(use_exact_numbers?transfer_value_text+" ≈ ":"")+formatTransferValue(transfer_value);
                 }
             }
             const transfer_value_used = old_transfer_value-transfer_value;
@@ -80,7 +85,7 @@ function showWhereVoteWent(preferenceList) {
                 rect_continuing.setAttribute("width",transfer_value*full_svg_width);
                 rect_continuing.setAttribute("height", normal_svg_height);
                 const text_used = addSVG(svg,"text","transfer_value_used");
-                text_used.textContent = "Used "+transfer_value_used.toPrecision(digits_for_transfer_values)+" to elect "+metadata.candidates[count.reason.ExcessDistribution].name;
+                text_used.textContent = "Used "+formatTransferValue(transfer_value_used)+" to elect "+metadata.candidates[count.reason.ExcessDistribution].name;
                 text_used.setAttribute("x",2+x_start_used);
                 text_used.setAttribute("y",normal_svg_height/2);
                 const text_continuing = addSVG(svg,"text","transfer_value_continuing");
@@ -156,11 +161,13 @@ function showWhereVoteWent(preferenceList) {
         }
         if (my_preference_upto===preferenceList.length) break;
     }
-    if (my_preference_upto!==preferenceList.length) {
+    if (my_preference_upto!==preferenceList.length) { // if not exhausted, say what happened at end.
         const tr = add(body,"tr");
+        const count_name = currently_showing_transcript.counts[currently_showing_transcript.counts.length-1].count_name || (""+(currently_showing_transcript.counts.length));
+        add(tr,"td","left").innerText=count_name;
         const desc = add(tr,"td","left");
         let was_elected = currently_showing_transcript.elected.includes(preferenceList[my_preference_upto]);
-        desc.setAttribute("colspan",3);
+        desc.setAttribute("colspan",2);
         desc.innerText="At the end of the counting "+metadata.candidates[preferenceList[my_preference_upto]].name+(was_elected?" was elected.":" was not elected.");
         make_simple_transfer_value_picture(add(tr,"td","left"),false,!was_elected);
     }
