@@ -198,7 +198,7 @@ impl <Tally:PartialEq+Clone+Display+FromStr+CanConvertToF64PossiblyLossily> EndC
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Debug)]
+#[derive(Clone,Serialize,Deserialize,Debug,Eq,PartialEq)]
 pub enum ReasonForCount {
     FirstPreferenceCount,
     ExcessDistribution(CandidateIndex),

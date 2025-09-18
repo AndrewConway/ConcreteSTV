@@ -132,7 +132,7 @@ impl From<f64> for ECTally {
 impl Eq for ECTally {}
 
 /// Information for a particular count from the official transcript.
-#[derive(Default)]
+#[derive(Default,Debug,Clone)]
 pub struct OfficialDOPForOneCount {
     pub transfer_value : Option<f64>,
     pub elected : Vec<CandidateIndex>,

@@ -63,6 +63,24 @@ as it will encourage the AEC to actually provide some meaningful evidence that t
 A more detailed discussion is [available](federal/legislation/AssuranceOfSenateCountingAct2021.md).
 This has cause the creation of ruleset **FederalPost2021** and **FederalPost2021Manual**.
 
+## Federal House of Representatives (IRV)
+
+IRV can be considered a simpler form of STV, and can be counted using ConcreteSTV. There are very few choices in an IRV
+election - tie resolution and termination being the main one.
+
+- **AEC_IRV** : The rules the AEC seems to use to generate the files like HouseDopByDivisionDownload-27966.csv.
+  This is a classic IRC eliminate the lowest until there are exactly two candidates left, with tie resolutions
+  for exclusions as per the legislation.
+- **FederalIRV** : My interpretation of the legislation. This differs from **AEC_IRV** in having early
+  termination if one candidate has an absolute majority of the first preference votes, and also multiple
+  exclusion in some situations. 
+
+Note that **AEC_IRV** will always produce the same winner as **FederalIRV**, although it may take more
+counts. Thus **AEC_IRV** is in general more informative and it seems reasonable to me for the AEC to 
+give out the distribution of preferences using it.
+
+Note that attempting to use either in an election with more than one vacancy will not work.
+
 ## ACT Legislative Assembly
 
 The ACT Legislative Assembly is elected by STV with a generally well written and minimal
