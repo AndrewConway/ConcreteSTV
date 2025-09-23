@@ -23,9 +23,11 @@ mod tests {
     fn test<Rules:PreferenceDistributionRules>(electorate:&str,loader:ACTDataLoader,sub_folder:Option<&str>) -> anyhow::Result<()> {
         let data = loader.read_raw_data(electorate)?;
         data.print_summary();
+        let file = File::create(format!("test_transcripts/{}{}{}.stv",electorate,data.metadata.name.year,sub_folder.unwrap_or("")))?;
+        serde_json::to_writer_pretty(file,&data)?;
+        std::fs::create_dir_all("test_transcripts")?;
         let transcript = distribute_preferences::<Rules>(&data, loader.candidates_to_be_elected(electorate), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
-        std::fs::create_dir_all("test_transcripts")?;
         let file = File::create(format!("test_transcripts/transcript{}{}{}.json",electorate,transcript.metadata.name.year,sub_folder.unwrap_or("")))?;
         serde_json::to_writer_pretty(file,&transcript)?;
         let official_transcript = loader.read_official_dop_transcript_with_subfolder(&transcript.metadata,sub_folder)?;
