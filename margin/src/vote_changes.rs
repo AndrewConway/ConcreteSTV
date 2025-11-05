@@ -161,6 +161,19 @@ pub struct VoteChange<Tally> {
     pub to : Option<CandidateIndex>,
 }
 
+impl FromStr for VoteChange<u64> {
+    type Err = &'static str;
+
+    /// parse a string of the form `56:4→2` meaning 56 votes from candidate 4 to candidate 2. A `-` can be used instead of the `→`.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (num,candidates) = s.split_once(':').ok_or_else(||"Missing :")?;
+        let vote_value : u64 = num.parse().map_err(|_|"Expecting an integer number of votes before :")?;
+        let (from,to) = candidates.split_once(['-','→']).ok_or_else(||"Missing - or → between from and to candidates")?;
+        let from = if from.is_empty() { None } else { Some(CandidateIndex::from_str(from).map_err(|_|"Expecting integer candidate index between : and →")?) };
+        let to = if to.is_empty() { None } else { Some(CandidateIndex::from_str(to).map_err(|_|"Expecting integer candidate index after →")?) };
+        Ok(VoteChange{vote_value,from,to})
+    }
+}
 impl <Tally:Display> Display for VoteChange<Tally> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f,"{} votes {} → {}",self.vote_value,self.from.map(|c|c.to_string()).unwrap_or("-".to_string()),self.to.map(|c|c.to_string()).unwrap_or("-".to_string()))

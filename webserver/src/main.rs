@@ -25,6 +25,8 @@ use stv::tie_resolution::TieResolutionsMadeByEC;
 use crate::cache::cache_json;
 use crate::find_election::{ALL_ELECTIONS_AS_LIST, ElectionInfo, ElectionsOfOneType, FoundElection};
 use serde::{Serialize,Deserialize};
+use examples::example_datasource::ExampleDataSource;
+use stv::datasource_description::ElectionDataSource;
 use stv::random_util::Randomness;
 
 #[get("/get_all_contests.json")]
@@ -133,7 +135,8 @@ async fn recount(election : web::Path<FoundElection>,query:Json<RecountQuery>) -
     async fn recount_uncached(election : &web::Path<FoundElection>,query:&RecountQuery) -> Result<PossibleTranscripts,String> {
         let vote_types : Option<&[String]> = if let Some(vt) = &query.vote_types { Some(vt) } else { None };
         let mut randomness : Randomness = query.seed.into();
-        Ok(query.rules.count(&election.data().await?,query.candidates_to_be_elected,&query.excluded.iter().cloned().collect(),&query.tie_resolutions,vote_types,false,&mut randomness,&[],false))
+        let include_list_of_votes_in_transcript = election.spec.name.as_str()==ExampleDataSource{}.name().as_ref();
+        Ok(query.rules.count(&election.data().await?,query.candidates_to_be_elected,&query.excluded.iter().cloned().collect(),&query.tie_resolutions,vote_types,false,&mut randomness,&[],include_list_of_votes_in_transcript))
     }
     cache_json("recount",&(election.spec.clone(),query.clone()),||recount_uncached(&election,&query)).await
 }

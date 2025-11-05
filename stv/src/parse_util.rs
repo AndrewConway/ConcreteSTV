@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -69,6 +69,8 @@ impl CandidateAndGroupInformationBuilder {
             atl_allowed: g.ticket_id.is_some(),
             candidates: vec![],
             tickets: g.tickets.clone(),
+            how_to_vote_btl: vec![],
+            how_to_vote_atl: vec![],
         }).collect();
         for candidate_index in 0..self.candidates.len() {
             let candidate = & self.candidates[candidate_index];
@@ -437,4 +439,20 @@ impl CalamineLikeWrapper {
 }
 impl CalamineLikeCellWrapper {
     pub fn get_string(&self) -> Option<String> { Some(self.contents.to_string()) }
+}
+
+/// Add parties' advertised "how to vote" cards to the metadata, for above the line votes in a certain format.
+/// 
+/// Each card is an entry in the how_to_vote_cards array, and is a string listing whitespace separated parties.
+/// The card is for the party that is listed first. The parties listed should correspond to their column_id string.
+pub fn add_atl_how_to_vote_to_metadata(metadata:&mut ElectionMetadata,how_to_vote_cards:&[&str]) -> anyhow::Result<()> {
+    let decoder = metadata.get_party_id_lookup();
+    for card in how_to_vote_cards {
+        let parties: anyhow::Result<Vec<PartyIndex>> = card.split_whitespace().map(|s|decoder.get(s).map(|r|*r).ok_or_else(||anyhow!("Could not find group {s} in add_atl_how_to_vote_to_metadata"))).collect();
+        let parties=parties?;
+        if let Some(originator) = parties.get(0) {
+            metadata.parties[originator.0].how_to_vote_atl.push(parties)
+        }
+    }
+    Ok(())
 }

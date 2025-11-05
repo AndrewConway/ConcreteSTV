@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/common.css">
+    <link rel="icon" href="/favicon.svg"/>
+    <script src="/util.js"></script>
+    <script src="/common.js"></script>
+    <script src="/PrepareVoteCommon.js"></script>
+    <script src="/WhereDidMyVoteGo.js"></script>
+
+    <title>Where did my vote go?</title>
+</head>
+<body>
+
+<div id="MainBody">
+    <h1>Where did my vote go?</h1>
+    <details class="noprint">
+        <summary>Instructions for this page</summary>
+        <p class="noprint">This page enables one to see who your (or any other) vote ended up helping elect,
+            tracking through the preferences. You enter a vote, and the page will show how it is affected by
+            the exclusions and surplus distributions that actually happened. </p>
+        <p class="noprint">If you enter an above the line vote, it will be converted to the corresponding
+            below the line vote by giving preference first to the candidates in your most preferred party,
+            in the order listed on the ballot paper, then the candidates in your second most preferred party,
+            etc. This is the technique used in Australian federal elections post 2013, and almost everywhere else
+            (subject to formality requirements). </p>
+        <p class="noprint">If you enter a vote which actually was one of the votes counted in the election,
+            then the following should be accurate. If you enter a vote that was not one of the votes counted,
+            this page will attempt to show what would have happened with such a vote, assuming that the vote didn't change
+            the course of the election (usually but not always a decent approximation).</p>
+        <p class="noprint">Formality requirements of a minimum number of preferences will <em>not</em> be enforced.</p>
+        <div class="noprint"><p><em>Usage:</em></p>
+            <ul>
+                <li>You can enter numbers by typing in the boxes adjacent to a name. Duplicated numbers will get a red background.</li>
+                <li>As a shortcut, clicking on the name (not the box) of a candidate will assign the candidate the best
+                    preference not already assigned.</li>
+                <li>Holding down the ALT key while clicking on a name of a candidate will assign the worst preference not already assigned.</li>
+                <li>If the box already contains a number when you click on a name, the current number in the box will be cleared.</li>
+                <li>If you wish to save a partially completed ballot to resume later, record the numbers in the summary
+                    section. Then next time you visit this page, copy the saved numbers into the summary field.
+                    This uses the same format as the <a href="PrepareVote.html">Prepare Vote</a> page.</li>
+                <li>Currently only below the line votes are supported.</li>
+            </ul>
+        </div>
+        <div id="tools"  class="noprint">
+            <p>Next liked candidate (click a candidate name to assign): <span id="likedCandidate">???</span></p>
+            <p>Next despised candidate (alt-click a candidate name to assign) : <span id="despisedCandidate">???</span></p>
+            <p>Candidates to go : <span id="togoCandidates">???</span> </p>
+            <p>Next liked party (click a party name to assign): <span id="likedParty">???</span></p>
+            <p>Next despised party (alt-click a party name to assign) : <span id="despisedParty">???</span></p>
+        </div>
+    </details>
+    <h2 id="TitleHeading">Loading...</h2>
+    <div class="noprint">
+        <details id="PartyTickets" class="hidden">
+            <summary>Party Tickets</summary>
+            <p>These are the party-assigned tickets given to the electoral commission. An above the line
+            vote for the given party will be converted to the specified ticket. If a party has more than one
+            ticket then votes for that party will be split as evenly as possible between the tickets.</p>
+        </details>
+        <details id="PartyHowToVote" class="hidden">
+            <summary>Party How To Vote recommendations</summary>
+            <p>These are the recommendations that parties give out, frequently on pieces of paper
+                at polling places, often referred to as <em>How to Vote</em>. As they are not
+            formal I have tried to gather those that I could find either physical copies of
+            or images. So the listed entries here are possibly incomplete, and may be wrong if
+            I found a forged image or misread or mistyped one. If you are aware of any errors or
+            omissions please tell me so I can fix it.</p>
+            <p>Many parties just listed themselves as first preference and suggested numbering another
+            five parties without specifying a specific order. These just have themselves listed here.</p>
+            <p>Some parties had multiple how to vote cards depending upon electorate and/or who was
+            handing them out or because different options were given depending upon the voter's preference.
+            All choices are listed here.</p>
+        </details>
+    </div>
+    <div id="paperDiv"><img src="/ajax-loader.gif" alt="Loading"/></div>
+    <p class="noprint">Vote summary : <input name="preferences" id="preferences" autocomplete="off"/> </p>
+
+    <div id="resultsDiv"><img src="/ajax-loader.gif" alt="Loading"/></div>
+
+    <details class="noprint">
+        <summary>Challenges</summary>
+        If you would like a challenge, try to find a vote for some federal election that causes the following situations:
+        <ul>
+            <li><b>Total Loser</b> (Easy) The entire vote is not used to elect anyone, and is not exhausted. <a href="/Federal%20Senate/2022/ACT/WhereDidMyVoteGo.html?btl=%2C%2C%2C%2C%2C%2C1%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C">(spoiler)</a></li>
+            <li><b>Kingmaker</b> (Medium) You contribute to all winners in the election. <a href="/Federal%20Senate/2019/ACT/WhereDidMyVoteGo.html?btl=2%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C1%2C%2C%2C%2C">(spoiler)</a> </li>
+            <li><b>With Friends Like This</b> (Hard) Your vote contributes a negative amount to elect some candidate. <a href="/Federal%20Senate/2016/TAS/WhereDidMyVoteGo.html?btl=%2C%2C%2C%2C%2C3%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C2%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C1%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C">(spoiler)</a> </li>
+            <li><b>It was here a moment ago</b> (Hard) The vote vanishes during an exclusion. <a href="/Federal%20Senate/2016/WA/WhereDidMyVoteGo.html?btl=%2C%2C%2C%2C%2C%2C1%2C%2C%2C%2C%2C%2C%2C%2C%2C2%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C3%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C">(spoiler)</a> or worse
+                <a href="/Federal%20Senate/2022/QLD/WhereDidMyVoteGo.html?btl=%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C1%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C2%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C%2C">(spoiler)</a> </li>
+        </ul>
+        If you want to share interesting scenarios, use <a href="" id="BookmarkableURL">a bookmarkable and sharable URL</a>.
+        <p>Note that the provided spoilers are simple examples of one possible solution for illustrative purposes. There are other solutions, and the given solutions
+            have too few candidates listed to actually be formal votes, but could be made formal by adding extra, irrelevant candidates.</p>
+    </details>
+    <details class="noprint">
+        <summary>Privacy for this page</summary>
+        <p>
+        I want to preserve your <a href="/Privacy.html">privacy</a>. This is particularly important and difficult for this specific page. This web page should not
+        make any network accesses after initial loading, so you can check (using standard network
+        monitoring tools) that your preferences
+        are not being sent anywhere. So I never see what you do, other than the standard
+        things your browser sends when going to a web site.
+        But I may be lying (possibly coerced), so even better than trusting me
+        you can disconnect your computer from the internet after loading this page and
+        before entering your preferences into it.
+        This should protect you against me observing your computer.</p>
+        <p>Note that if you use the shareable URL link in the Challenges section, then the vote you entered is recorded in this URL and will be visible to anyone you share it
+        with, the server when anyone accesses that URL, anyone with access to the browser history or activity of anyone who looked at that URL, and possibly others.</p>
+    </details>
+</div>
+
+</body>
+</html>

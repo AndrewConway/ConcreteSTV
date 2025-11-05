@@ -45,12 +45,14 @@ function recomputeTable() {
 }
 
 function redrawMajorPartiesList() {
-    candidateBoxes=drawBallotPaper(!document.getElementById("isGroupsColumns").checked,function (div,_index) {
+    const showCandidates = !document.getElementById("isGroupsColumns").checked
+    const boxes = drawBallotPaper(showCandidates,function (div,_index) {
         const input = add(div,"input");
         input.type="checkbox";
         input.addEventListener("input",recomputeTable)
         return input;
-    },(_index,box)=> {box.checked=!box.checked;});
+    },(_index,box)=> {box.checked=!box.checked; recomputeTable(); });
+    candidateBoxes= showCandidates?boxes.candidateBoxes:boxes.partyBoxes;
 }
 
 window.onload = function () {

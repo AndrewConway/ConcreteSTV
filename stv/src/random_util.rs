@@ -1,4 +1,4 @@
-// Copyright 2023 Andrew Conway.
+// Copyright 2023-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -8,7 +8,7 @@
 //! Some utility routines using pseudo-random numbers.
 
 
-use rand::distributions::{Distribution, Uniform};
+use rand::distr::{Distribution, Uniform};
 use rand::prelude::SliceRandom;
 use crate::ballot_metadata::CandidateIndex;
 
@@ -54,6 +54,7 @@ impl Randomness {
     /// assert_eq!(vec![true,true,true,true,false,false],a4_6);
     /// ```
     pub fn make_array_with_some_randomly_true(&mut self,len:usize,num_true:usize) -> Vec<bool> {
+        assert!(num_true<=len);
         match self {
             Randomness::ReverseDonkeyVote => {
                 let mut res = vec![false;len];
@@ -64,10 +65,12 @@ impl Randomness {
                 let inverse = num_true>len/2;
                 let mut res = vec![inverse;len];
                 let mut togo = if inverse {len-num_true} else {num_true};
-                let uniform = Uniform::from(0..len);
-                while togo>0 {
-                    let pos = uniform.sample(prng);
-                    if res[pos]==inverse { res[pos]=!inverse; togo-=1; }
+                if togo>0 && len>0 { // if len is zero, then the Uniform creator below will crash.
+                    let uniform = Uniform::new(0,len).expect("len = 0");
+                    while togo>0 {
+                        let pos = uniform.sample(prng);
+                        if res[pos]==inverse { res[pos]=!inverse; togo-=1; }
+                    }
                 }
                 res
             }

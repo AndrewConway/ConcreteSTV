@@ -1,4 +1,4 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -59,6 +59,31 @@ pub struct ChooseVotesOptions {
     /// Allow votes of a type considered verifiable. Only meaningful if ballot_types_considered_unverifiable is non-empty.
     pub allow_verifiable: bool,
     pub ballot_types_considered_unverifiable:HashSet<String>,
+    /// Whether additional ballots are allowed to be added.
+    pub allow_additions : bool,
+    /// Give a list of candidate indices (starting at zero) such that votes cannot be taken away from any other candidates.
+    /// Empty means allow everyone.
+    pub allow_from : Option<HashSet<CandidateIndex>>,
+    /// Give a list of candidate indices (starting at zero) that votes can be given to.
+    /// Empty means allow everyone.
+    pub allow_to : Option<HashSet<CandidateIndex>>
+}
+
+impl ChooseVotesOptions {
+    /// See if it is OK to give a vote to the given candidate.
+    pub fn allow_to_candidate(&self,candidate: CandidateIndex) -> bool {
+        match self.allow_to.as_ref() {
+            None => true,
+            Some(allowed) => allowed.contains(&candidate),
+        }
+    }
+    /// See if it is OK to take a vote from the given candidate.
+    pub fn allow_from_candidate(&self,candidate: CandidateIndex) -> bool {
+        match self.allow_from.as_ref() {
+            None => true,
+            Some(allowed) => allowed.contains(&candidate),
+        }
+    }
 }
 /*
 pub struct VotesAvailable<Tally> {
@@ -128,16 +153,32 @@ impl <'a> ChooseVotesUpTo<'a> {
                         let party = election_data.metadata.party(election_data.atl[v.0].first_party());
                         party.tickets.is_empty() && ( retroscope.votes.atl[v.0].upto>=party.candidates.len())} {
                         if options.allow_verifiable || options.ballot_types_considered_unverifiable.is_empty() || !election_data.is_atl_verifiable(v.0, &options.ballot_types_considered_unverifiable) {
-                            res.atl.current_votes.push(v);
-                            res.atl.ballots_remaining+=BallotPaperCount(election_data.atl[v.0].n);
+                            let ok_from = match options.allow_from.as_ref() {
+                                None => true,
+                                Some(allowed) =>
+                                    if let Some(current_candidate) = retroscope.votes.atl[v.0].candidate() { allowed.contains(&current_candidate)}
+                                    else {false}
+                            };
+                            if ok_from {
+                                res.atl.current_votes.push(v);
+                                res.atl.ballots_remaining+=BallotPaperCount(election_data.atl[v.0].n);
+                            }
                         }
                     }
                 }
             } else {
                 if options.allow_first_pref || retroscope.votes.btl[v.0-num_atl].upto>0 {
                     if options.allow_verifiable || options.ballot_types_considered_unverifiable.is_empty() || !election_data.is_btl_verifiable(v.0-num_atl, &options.ballot_types_considered_unverifiable) {
-                        res.btl.current_votes.push(v);
-                        res.btl.ballots_remaining+=BallotPaperCount(election_data.btl[v.0-num_atl].n);
+                        let ok_from = match options.allow_from.as_ref() {
+                            None => true,
+                            Some(allowed) =>
+                                if let Some(current_candidate) = retroscope.votes.btl[v.0-num_atl].candidate() { allowed.contains(&current_candidate)}
+                                else {false}
+                        };
+                        if ok_from {
+                            res.btl.current_votes.push(v);
+                            res.btl.ballots_remaining+=BallotPaperCount(election_data.btl[v.0-num_atl].n);
+                        }
                     }
                 }
             }

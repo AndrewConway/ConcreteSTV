@@ -1,4 +1,4 @@
-// Copyright 2022 Andrew Conway.
+// Copyright 2022-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -9,10 +9,9 @@
 
 
 
-use std::fmt;
 use std::future::Future;
 use actix_web::web::Json;
-use serde::{Serialize,Deserialize};
+use serde::{Serialize};
 use serde::de::DeserializeOwned;
 
 const CACHE_DIR: &str = "./Cache/WebJSON";
@@ -54,7 +53,14 @@ pub async fn cache_async<F,R,A,Fut,E>(name:&str,args:&A,f:F) -> Result<R,String>
 
     match cacache::read(CACHE_DIR,&key).await {
         Ok(bytes) => {
-            let deserialized : R = serde_json::from_slice(&bytes).map_err(|e|{println!("{}",String::from_utf8_lossy(&bytes)); format!("Internal error - could not deserialize cached value ({})",e)})?;
+            let deserialized : R = serde_json::from_slice(&bytes).map_err(|e|{
+                println!("Internal Error {}. Failed to deserialize {}",e,String::from_utf8_lossy(&bytes));
+                // let try2 : Result<TranscriptWithMetadata<isize>,_> = serde_json::from_slice(&bytes);
+                // if let Err(err) = try2 {
+                //     println!("try2 error : {}",err);
+                // }
+                format!("Internal error - could not deserialize cached value ({})",e)
+            })?;
             Ok(deserialized)
         }
         Err(_) => {
@@ -83,7 +89,7 @@ pub async fn cache_json<F,R,A,Fut,E>(name:&str,args:&A,f:F) -> Json<Result<R,Str
 {
     Json(cache_async(name,args,f).await)
 }
-
+/*
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StringError(String);
 
@@ -98,3 +104,4 @@ impl std::error::Error for StringError {}
 impl From<String> for StringError {
     fn from(v: String) -> Self { StringError(v) }
 }
+*/

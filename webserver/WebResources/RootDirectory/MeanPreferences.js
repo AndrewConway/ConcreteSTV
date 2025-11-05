@@ -7,7 +7,7 @@ let showingCandidate = -1;
 let candidateBoxes = []; // will be one per candidate.
 
 function setupCandidates() {
-    candidateBoxes=drawBallotPaper(true,(div,_index)=>add(div,"span","NumberBox"),setCandidate);
+    candidateBoxes=drawBallotPaper(true,(div,_index)=>add(div,"span","NumberBox"),setCandidate).candidateBoxes;
     document.getElementById("showATL").addEventListener("change",function () { setCandidate(showingCandidate); });
 }
 

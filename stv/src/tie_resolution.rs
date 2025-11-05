@@ -52,6 +52,25 @@ pub enum MethodOfTieResolution {
     AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinishedGiveUpIfNotFullSolution,
     /// Like AnyDifferenceIsADiscriminator but only consider major counts like RequireHistoricalCountsToBeAllDifferentOnlyConsideringCountsWhereAnActionIsFinished
     AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished,
+    /// In between AnyDifferenceIsADiscriminatorGiveUpIfNotFullSolution and RequireHistoricalCountsToBeAllDifferent,
+    /// 
+    /// As described in the Federal House of Representatives tie resolution, 
+    /// Commonwealth Electoral Act 1918, Section 275, (9)
+    /// ```text
+    /// If, on any count other than the final count:
+    /// (a) 2 or more candidates (lowest ranking candidates) have an
+    ///     equal number of votes; and
+    /// (b) one of them has to be excluded;
+    /// the candidate to be excluded is the candidate with less votes than
+    /// any of the other lowest ranking candidates at the last count at
+    /// which one of those candidates had less votes than any of the others,
+    /// but, if there has been no such count, the Divisional Returning
+    /// Officer must decide by lot which of them is to be excluded
+    /// ```
+    /// 
+    /// This is a slightly more general version of this - if there are 2 lowest needed, then it is required
+    /// that the 2 lowest are both lower than the third lowest.
+    RequireHistoricalUniqueLowest,
 }
 
 /// Sometimes you need tie resolution to distinguish all candidates (e.g. for order elected),
@@ -77,6 +96,7 @@ impl MethodOfTieResolution {
             MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferentOnlyConsideringCountsWhereAnActionIsFinished => resolve_ties_require_all_different(tied_candidates,transcript,true),
             MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinishedGiveUpIfNotFullSolution => resolve_ties_any_different_give_up_if_cant_do_everything(tied_candidates, transcript, granularity, true),
             MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinished => return resolve_ties_any_different(tied_candidates, transcript, granularity, true),
+            MethodOfTieResolution::RequireHistoricalUniqueLowest => resolve_ties_require_unique_minimum_granularity(tied_candidates, transcript, granularity, false),
         };
         if resolved { vec![] } else { vec![(tied_candidates,granularity)] }
     }
@@ -323,7 +343,7 @@ impl TieResolutionsMadeByEC {
         TieResolutionExplicitDecision::from_resolution(tied_candidates,granularity,usage)
     }
     fn resolve_work(&self, tied_candidates: &mut [CandidateIndex], granularity: TieResolutionGranularityNeeded,usage:TieResolutionUsage,current_count:CountIndex,randomness:&mut Randomness)  {
-        // println!("Trying to resolve {:?}",tied_candidates);
+        // println!("Trying to resolve {:?}. There are {} tie resolutions given.",tied_candidates,self.tie_resolutions.len());
         for atom in &self.tie_resolutions {
             match atom {
                 TieResolutionAtom::IncreasingFavour(decision) => {
@@ -345,7 +365,7 @@ impl TieResolutionsMadeByEC {
                     let appropriate_usage = match decision.usage {
                         None => true,
                         Some(TieResolutionUsage::Exclusion) => usage==TieResolutionUsage::Exclusion,
-                        Some(TieResolutionUsage::OrderElected) => usage==TieResolutionUsage::Exclusion || usage==TieResolutionUsage::OrderSurplusDistributed,
+                        Some(TieResolutionUsage::OrderElected) => usage==TieResolutionUsage::OrderElected || usage==TieResolutionUsage::OrderSurplusDistributed,
                         Some(TieResolutionUsage::ShortcutWinner) => usage==TieResolutionUsage::ShortcutWinner,
                         Some(TieResolutionUsage::OrderSurplusDistributed) => usage==TieResolutionUsage::OrderSurplusDistributed,
                         Some(TieResolutionUsage::RoundingUp) => usage==TieResolutionUsage::RoundingUp,
@@ -358,8 +378,10 @@ impl TieResolutionsMadeByEC {
                         TieResolutionGranularityNeeded::Total => decision.increasing_favour.iter().all(|v|v.len()==1),
                         TieResolutionGranularityNeeded::LowestSeparated(num_low) => decision.increasing_favour.len()==2 && decision.increasing_favour[0].len()==num_low
                     };
+                    // println!("Found {:?} appropriate usage : {appropriate_usage} appropriate time : {appropriate_time} appropriate division : {appropriate_division}",decision);
                     if appropriate_usage && appropriate_time && appropriate_division && decision.mentions_exactly_these_candidates(tied_candidates) { // this decision is perfect for this particular case.
                         // load tied_candidates from flattened decision.increasing_favour.
+                        // println!("Found ideal decision.");
                         let mut upto = 0;
                         for v in &decision.increasing_favour {
                             tied_candidates[upto..upto+v.len()].copy_from_slice(v);
@@ -438,5 +460,36 @@ fn resolve_ties_any_different<'a,Tally:Clone+Eq+Hash+Ord+Display+FromStr+Debug>(
 /// Like resolve_ties_any_different_work but give up if there are any problems.
 fn resolve_ties_any_different_give_up_if_cant_do_everything<Tally:Clone+Eq+Hash+Ord+Display+FromStr+Debug>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded,just_consider_major_counts:bool) -> bool {
     resolve_ties_any_different(tied_candidates,transcript,granularity,just_consider_major_counts).is_empty()
+}
+
+/// Sort candidates low to high based on a countback where one finds the most recent 
+/// count where the required granularity are all strictly lower than the next highest. (if any)
+/// 
+/// Return true iff ties are resolved to the required granularity.
+fn resolve_ties_require_unique_minimum_granularity<Tally:Clone+Eq+Hash+Ord+Display+FromStr+Debug>(tied_candidates: &mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded,just_consider_major_counts:bool) -> bool {
+    let unique_min = match granularity {
+        TieResolutionGranularityNeeded::LowestSeparated(n) if n < tied_candidates.len() => n, // most common case
+        TieResolutionGranularityNeeded::LowestSeparated(n) if n == tied_candidates.len() => return true, // umm, why did we need tie resolution? 
+        TieResolutionGranularityNeeded::Total if tied_candidates.len() ==2 => 1, // can only produce complete granularity if there are exactly 2 to select
+        _ => return false, 
+    };
+    assert!(unique_min>0);
+    assert!(unique_min<tied_candidates.len());
+    for count in transcript.counts.iter().rev() {if count.reason_completed || !just_consider_major_counts {
+        let mut tallies : Vec<Tally> = tied_candidates.iter().map(|candidate|count.status.tallies.candidate[candidate.0].clone()).collect();
+        tallies.sort_unstable();
+        if tallies[unique_min-1]<tallies[unique_min] { // we have unique losers!
+            let mut found_losers = 0;
+            for i in 0..tied_candidates.len() {
+                if count.status.tallies.candidate[tied_candidates[i].0].clone()<tallies[unique_min] { // this candidate is a loser. Move them to spot found_losers.
+                    tied_candidates.swap(i,found_losers);
+                    found_losers+=1;
+                }
+            }
+            assert_eq!(found_losers, unique_min);
+            return true
+        }
+    }}
+    false
 }
 

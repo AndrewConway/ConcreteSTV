@@ -71,19 +71,21 @@ impl FromStr for ListOfVotes {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut res : ListOfVotes = ListOfVotes::default();
-        for vote in s.split(';') {
-            if vote.starts_with("TV:") {
-                res.tvs.push(VotesWithGivenTransferValue{
-                    tv: vote[3..].parse::<TransferValue>().map_err(|e|ParseVoteError::NotTransferValue(e))?,
-                    votes: vec![],
-                });
-            } else {
-                let vote : Vote = vote.parse()?;
-                if res.tvs.is_empty() {
-                    res.tvs.push(VotesWithGivenTransferValue{ tv: TransferValue::one(), votes: vec![]})
-                };
-                // previous statement ensured that tvs is non-empty so last_mut won't return None, so unwrap() is safe.
-                res.tvs.last_mut().unwrap().votes.push(vote);
+        if !s.is_empty() {
+            for vote in s.split(';') {
+                if vote.starts_with("TV:") {
+                    res.tvs.push(VotesWithGivenTransferValue{
+                        tv: vote[3..].parse::<TransferValue>().map_err(|e|ParseVoteError::NotTransferValue(e))?,
+                        votes: vec![],
+                    });
+                } else {
+                    let vote : Vote = vote.parse()?;
+                    if res.tvs.is_empty() {
+                        res.tvs.push(VotesWithGivenTransferValue{ tv: TransferValue::one(), votes: vec![]})
+                    };
+                    // previous statement ensured that tvs is non-empty so last_mut won't return None, so unwrap() is safe.
+                    res.tvs.last_mut().unwrap().votes.push(vote);
+                }
             }
         }
         Ok(res)

@@ -11,6 +11,7 @@ members= [
     "vic",
     "wa",
     "sa",
+    "examples",
     "statistics",
     "preflib",
     "main-app",

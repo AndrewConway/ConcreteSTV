@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -27,7 +27,7 @@ fn main() -> anyhow::Result <()> {
     let mut summary = File::create("changes/summary.csv")?;
     let ballot_types_considered_unverifiable = ["iVote"];
     let ballot_types_considered_unverifiable : HashSet<String> = ballot_types_considered_unverifiable.iter().map(|s|s.to_string()).collect();
-    let options1 = ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: false, ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone() };
+    let options1 = ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: false, ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone(), allow_additions: false, allow_from: None, allow_to: None };
     // let options2 = ChooseVotesOptions{ allow_atl: true, allow_first_pref: true, allow_verifiable: true, ballot_types_considered_unverifiable:ballot_types_considered_unverifiable.clone() };
     writeln!(summary,"Electorate,Votes,Min Addition,Min Manipulation,Old Min Add,Old Min Manipulation")?;
     for electorate in &electorates {
@@ -49,7 +49,7 @@ fn main() -> anyhow::Result <()> {
         let out = File::create(format!("nsw2021stv/{}.stv", electorate))?;
         serde_json::to_writer(out,&data)?;
 
-        let mut results = find_outcome_changes::<NSWECLocalGov2021>(&data,&options1,true);
+        let mut results = find_outcome_changes::<NSWECLocalGov2021>(&data,&options1,true,None);
         results.merge_reevaluating::<NSWECLocalGov2021>(&old_changes,&data,&ballot_types_considered_unverifiable,true); // add in old data to make sure we don't do worse!
         //let results2 = find_outcome_changes::<NSWECLocalGov2021>(&data,&options2);
         //results.merge(results2);

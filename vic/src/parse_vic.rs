@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Andrew Conway.
+// Copyright 2022-2025 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -394,7 +394,9 @@ impl VicDataLoader {
                                     abbreviation: None,
                                     atl_allowed: had_atl,
                                     candidates: vec![],
-                                    tickets: vec![]
+                                    tickets: vec![],
+                                    how_to_vote_btl: vec![],
+                                    how_to_vote_atl: vec![],
                                 });
                                 if !had_atl {
                                     if atl_votes.len()+1!=parties.len() {
@@ -470,7 +472,9 @@ impl VicDataLoader {
                     abbreviation: None,
                     atl_allowed: name!="Ungrouped",
                     candidates: vec![],
-                    tickets: vec![]
+                    tickets: vec![],
+                    how_to_vote_btl: vec![],
+                    how_to_vote_atl: vec![],
                 });
                 position_in_party=1;
             } else if let Some(candidate_name) = tr.select(&scraper::Selector::parse("tr.candidate-row td").unwrap()).next() {
@@ -714,7 +718,7 @@ struct DOPFileFormat {
 
 impl DOPFileFormat {
     // Read the spreadsheet to get the metadata (quota), and columns for candidates and other things.
-    fn new(sheet1:&calamine::Range<DataType>,metadata:&ElectionMetadata) -> anyhow::Result<Self> {
+    fn new(sheet1:&calamine::Range<calamine::Data>,metadata:&ElectionMetadata) -> anyhow::Result<Self> {
         let mut formal_ballots : Option<BallotPaperCount> = None;
         let mut quota_size : Option<f64> = None;
         let mut count_details_columm = 1;
@@ -787,7 +791,7 @@ impl DOPFileFormat {
     }
 
     /// Reads the rest of the spreadsheet given this format.
-    fn parse_spreadsheet(self,sheet1:&calamine::Range<DataType>,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
+    fn parse_spreadsheet(self,sheet1:&calamine::Range<calamine::Data>,metadata:&ElectionMetadata) -> anyhow::Result<OfficialDistributionOfPreferencesTranscript> {
         let mut counts = vec![];
         let mut already_excluded : HashSet<CandidateIndex> = HashSet::new();
         for row in (self.table_headings_row+1)..(sheet1.height() as u32) {

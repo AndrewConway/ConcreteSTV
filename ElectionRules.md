@@ -63,6 +63,24 @@ as it will encourage the AEC to actually provide some meaningful evidence that t
 A more detailed discussion is [available](federal/legislation/AssuranceOfSenateCountingAct2021.md).
 This has cause the creation of ruleset **FederalPost2021** and **FederalPost2021Manual**.
 
+## Federal House of Representatives (IRV)
+
+IRV can be considered a simpler form of STV, and can be counted using ConcreteSTV. There are very few choices in an IRV
+election - tie resolution and termination being the main one.
+
+- **AEC_IRV** : The rules the AEC seems to use to generate the files like HouseDopByDivisionDownload-27966.csv.
+  This is a classic IRC eliminate the lowest until there are exactly two candidates left, with tie resolutions
+  for exclusions as per the legislation.
+- **FederalIRV** : My interpretation of the legislation. This differs from **AEC_IRV** in having early
+  termination if one candidate has an absolute majority of the first preference votes, and also multiple
+  exclusion in some situations. 
+
+Note that **AEC_IRV** will always produce the same winner as **FederalIRV**, although it may take more
+counts. Thus **AEC_IRV** is in general more informative and it seems reasonable to me for the AEC to 
+give out the distribution of preferences using it.
+
+Note that attempting to use either in an election with more than one vacancy will not work.
+
 ## ACT Legislative Assembly
 
 The ACT Legislative Assembly is elected by STV with a generally well written and minimal
@@ -83,7 +101,8 @@ at the same time which we pointed out. In March 2021 ElectionsACT quietly change
 website having fixed the bugs we reported. This leads to different rules needed for 2020 and 2021.
 
 Prior to 2020, ElectionsACT made their counting code publicly available (and it was unusually good quality).
-In 2020 they made it a secret (just in time for the bugs).
+In 2020 they rewote it and made it a secret (just in time for the bugs). In 2021 they fixed the bugs we
+identified, recounted the election, and in 2024 made the code publicly available again.
 
 - **ACTPre2020** : This is my interpretation of the rules used by ElectionsACT for the 2008, 2012, and 2016
   elections. It seems to match the legislation well.

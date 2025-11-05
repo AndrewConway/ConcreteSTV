@@ -18,6 +18,7 @@ use anyhow::anyhow;
 use act::{ACTPre2020, ACT2020, ACT2021};
 use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 use serde::{Serialize,Deserialize};
+use federal::parse_house_reps::{FederalHouseRepresentativesIRV, FederalHouseRepresentativesIRVAlwaysSimpleIRVToTwoCandidates};
 use margin::record_changes::ElectionChanges;
 use nsw::{NSWECLocalGov2021, NSWECLocalGov2021Literal, NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation, SimpleIRVAnyDifferenceBreaksTies};
 use nsw::nsw_random_rules::{NSWECRandomLC2015, NSWECRandomLC2019, NSWECRandomLGE2012, NSWECRandomLGE2016, NSWECRandomLGE2017};
@@ -29,6 +30,7 @@ use wa::WALegislativeCouncil;
 use crate::ChangeOptions;
 
 #[derive(Copy, Clone,Serialize,Deserialize)]
+#[allow(non_camel_case_types)]
 pub enum Rules {
     AEC2013,
     AEC2016,
@@ -49,6 +51,8 @@ pub enum Rules {
     NSWECRandomLC2019,
     Vic2018,
     WA2008,
+    AEC_IRV,
+    FederalIRV,
     IRV,
 }
 
@@ -76,6 +80,8 @@ impl FromStr for Rules {
             "NSWECRandomLC2019" => Ok(Rules::NSWECRandomLC2019),
             "Vic2018" => Ok(Rules::Vic2018),
             "WA2008" => Ok(Rules::WA2008),
+            "AEC_IRV" => Ok(Rules::AEC_IRV),
+            "FederalIRV" => Ok(Rules::FederalIRV),
             "IRV" => Ok(Rules::IRV),
             _ => Err("No such rule supported")
         }
@@ -104,6 +110,8 @@ impl Display for Rules {
             Rules::NSWECRandomLC2019 => "NSWECRandomLC2019",
             Rules::Vic2018 => "Vic2018",
             Rules::WA2008 => "WA2008",
+            Rules::AEC_IRV => "AEC_IRV",
+            Rules::FederalIRV => "FederalIRV",
             Rules::IRV => "IRV",
         };
         f.write_str(s)
@@ -138,6 +146,8 @@ impl Rules {
             Rules::NSWECRandomLC2019 => distribute_preferences_with_extractors::<NSWECRandomLC2019>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
             Rules::Vic2018 => distribute_preferences_with_extractors::<Vic2018LegislativeCouncil>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
             Rules::WA2008 => distribute_preferences_with_extractors::<WALegislativeCouncil>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
+            Rules::AEC_IRV => distribute_preferences_with_extractors::<FederalHouseRepresentativesIRVAlwaysSimpleIRVToTwoCandidates>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
+            Rules::FederalIRV => distribute_preferences_with_extractors::<FederalHouseRepresentativesIRV>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
             Rules::IRV => distribute_preferences_with_extractors::<SimpleIRVAnyDifferenceBreaksTies>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
             _ => { // handle 6 digit transcripts.
                 let transcript = match self {
@@ -167,6 +177,8 @@ impl Rules {
             Rules::NSWECLocalGov2021Literal => PossibleChanges::SignedIntegers(options.find_changes::<NSWECLocalGov2021Literal>(data,verbose)?),
             Rules::Vic2018 => PossibleChanges::Integers(options.find_changes::<Vic2018LegislativeCouncil>(data,verbose)?),
             Rules::WA2008 => PossibleChanges::Integers(options.find_changes::<WALegislativeCouncil>(data,verbose)?),
+            Rules::AEC_IRV => PossibleChanges::Integers(options.find_changes::<FederalHouseRepresentativesIRVAlwaysSimpleIRVToTwoCandidates>(data,verbose)?),
+            Rules::FederalIRV => PossibleChanges::Integers(options.find_changes::<FederalHouseRepresentativesIRV>(data,verbose)?),
             Rules::IRV => PossibleChanges::Integers(options.find_changes::<SimpleIRVAnyDifferenceBreaksTies>(data,verbose)?),
             Rules::NSWECRandomLGE2012 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLGE2012>(data, verbose)?),
             Rules::NSWECRandomLGE2016 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLGE2016>(data, verbose)?),
@@ -197,7 +209,8 @@ impl RulesDetails {
             RulesDetails{ name: "ACT2020".to_string(), description: "My interpretation of the rules actually but incorrectly used by Elections ACT in 2020.".to_string() },
             RulesDetails{ name: "ACT2021".to_string(), description: "My interpretation of the rules that should have been used by Elections ACT in 2020, and were actually used in 2021 to recount the 2020 election after we pointed out errors.".to_string() },
             RulesDetails{ name: "NSWLocalGov2021".to_string(), description: "My interpretation of the very ambiguous rules covering the NSW 2021 local government elections.".to_string() },
-            RulesDetails{ name: "NSWECLocalGov2021".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2021 local government elections. It is not how I would interpret the very ambiguous legislation, but not implausible.".to_string() },
+            RulesDetails{ name: "NSWECLocalGov2021".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2021 local government elections, assuming they didn't take (7)(4)(a) literally. It is not how I would interpret the very ambiguous legislation, but not implausible.".to_string() },
+            RulesDetails{ name: "NSWECLocalGov2021Literal".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2021 local government elections, assuming they did take (7)(4)(a) literally. It is not how I would interpret the very ambiguous legislation, but not implausible.".to_string() },
             RulesDetails{ name: "NSWECRandomLGE2012".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2012 local government elections. Note that there is considerable randomness so recounting with a different random choices will probably produce different results. Same as NSWECRandomLGE2016 except sometimes incorrectly computes last parcel.".to_string() },
             RulesDetails{ name: "NSWECRandomLGE2016".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2016 local government elections. Note that there is considerable randomness so recounting with a different random choices will probably produce different results. Same as NSWECRandomLGE2017 except gets some fractions wrong and gets some tie resolutions wrong.".to_string() },
             RulesDetails{ name: "NSWECRandomLGE2017".to_string(), description: "My interpretation of the rules actually used by the NSW electoral commission for the NSW 2017 local government elections. Note that there is considerable randomness so recounting with a different random choices will probably produce different results.".to_string() },

@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2024 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -35,7 +35,7 @@ pub enum DifferenceBetweenOfficialDoPAndComputed<Tally:Display+Debug> {
     DifferentNumbersOfPapersInQuota(BallotPaperCount,BallotPaperCount),
     #[error("The quota is {0} in the official DoP quota computation and {1} in the ConcreteSTV case.")]
     DifferentQuota(ECTally,Tally),
-    #[error("There is a difference on count {} : {2}", count_name(*.0,&.1))]
+    #[error("There is a difference on count {} : {}", count_name(*.0,&.1),&.2)]
     DifferentOnCount(CountIndex,Option<String>,DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally>),
 }
 
@@ -132,7 +132,7 @@ impl From<f64> for ECTally {
 impl Eq for ECTally {}
 
 /// Information for a particular count from the official transcript.
-#[derive(Default)]
+#[derive(Default,Debug,Clone)]
 pub struct OfficialDOPForOneCount {
     pub transfer_value : Option<f64>,
     pub elected : Vec<CandidateIndex>,
@@ -277,7 +277,10 @@ impl OfficialDistributionOfPreferencesTranscript {
         if my_count.count_name!=official_count.count_name { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::CountName(my_count.count_name.clone(), official_count.count_name.clone()))}
         if self.elected_candidates_are_in_order {
             let my_order = my_count.elected.iter().map(|e| e.who).collect::<Vec<CandidateIndex>>();
-            if official_count.elected!=my_order { return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::ElectedCandidatesOrdered(official_count.elected.clone(),my_order))}
+            if official_count.elected!=my_order {
+                // One should check for ties that could have been resolved differently here. I don't think it has come up, other than in NSW LGE where the elected candidates are not in order anyway, so I haven't bothered.
+                return Err(DifferenceBetweenOfficialDoPAndComputedOnParticularCount::ElectedCandidatesOrdered(official_count.elected.clone(),my_order))
+            }
         } else {
             let mut official_order = official_count.elected.clone();
             official_order.sort_by_key(|c|c.0);

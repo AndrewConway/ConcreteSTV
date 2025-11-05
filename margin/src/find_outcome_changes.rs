@@ -19,8 +19,7 @@ use crate::record_changes::ElectionChanges;
 use crate::retroscope::Retroscope;
 use crate::vote_changes::{VoteChange, VoteChanges};
 
-pub fn find_outcome_changes <Rules>(original_data:&ElectionData, vote_choice_options:&ChooseVotesOptions,verbose:bool) -> ElectionChanges<Rules::Tally>
-where Rules : PreferenceDistributionRules {
+pub fn find_outcome_changes <Rules:PreferenceDistributionRules>(original_data:&ElectionData, vote_choice_options:&ChooseVotesOptions,verbose:bool,just_try : Option<&VoteChanges<Rules::Tally>>) -> ElectionChanges<Rules::Tally> {
 
     let transcript = original_data.distribute_preferences::<Rules>(&mut Randomness::ReverseDonkeyVote);
     let mut not_continuing = HashSet::new();
@@ -36,6 +35,12 @@ where Rules : PreferenceDistributionRules {
         if !count.reason_completed {
             continue;
         }
+        if let Some(vote_changes) = just_try { // see if we just want to use the provided hints.
+            if let Some(possible_manipulation) = optimise::<Rules>(&vote_changes, &original_data, &retroscope, vote_choice_options,verbose) {
+                change_recorder.add(possible_manipulation,verbose);
+            }
+            continue;
+        }
         let mut sorted_continuing_candidates:Vec<CandidateIndex> = retroscope.continuing.iter().cloned().collect();
         sorted_continuing_candidates.sort_by_key(| c | count.status.tallies.candidate[c.0].clone());
         match if countnumber < transcript.counts.len()-1 { Some(&transcript.counts[countnumber+1].reason) } else { None } {
@@ -47,13 +52,14 @@ where Rules : PreferenceDistributionRules {
             // eliminated candidate in order to raise it above the next-lowest.
             Some(ReasonForCount::Elimination(eliminated_candidates)) if eliminated_candidates.len()==1 => {
                 let eliminated_candidate = eliminated_candidates[0];
-                // TODO: Add break when we've found at least one value for each kind of change (manipulation and addition)
                 for (index_of_target_in_sorted_list,&candidate) in sorted_continuing_candidates.iter().enumerate() {
                     if candidate!=eliminated_candidate {
-                        let vote_change = compute_vote_change::<Rules>(eliminated_candidate, candidate, count,verbose);
-                        let vote_changes = VoteChanges{ changes: vec![vote_change] };
-                        if let Some(possible_manipulation) = optimise::<Rules>(&vote_changes, &original_data, &retroscope, vote_choice_options,verbose) {
-                            change_recorder.add(possible_manipulation,verbose);
+                        if vote_choice_options.allow_to_candidate(eliminated_candidate)&&vote_choice_options.allow_from_candidate(candidate) { // try very simple transfer from candidate to eliminated_candidate.
+                            let vote_change = compute_vote_change::<Rules>(eliminated_candidate, candidate, count,verbose);
+                            let vote_changes = VoteChanges{ changes: vec![vote_change] };
+                            if let Some(possible_manipulation) = optimise::<Rules>(&vote_changes, &original_data, &retroscope, vote_choice_options,verbose) {
+                                change_recorder.add(possible_manipulation,verbose);
+                            }
                         }
                         // try leveling
                         if let Some(leveling) = compute_vote_change_leveling::<Rules>(index_of_target_in_sorted_list,true,count,&sorted_continuing_candidates,&original_data, &retroscope, vote_choice_options,true,verbose) {
@@ -83,11 +89,13 @@ where Rules : PreferenceDistributionRules {
                         }
                     }
                 }
-                // Addition-only option.
-                let vote_addition = compute_vote_addition::<Rules>(eliminated_candidate, sorted_continuing_candidates[1], count,verbose);
-                let vote_additions = VoteChanges{ changes: vec![vote_addition] };
-                if let Some(possible_addition) = optimise::<Rules>(&vote_additions, &original_data, &retroscope, vote_choice_options,verbose) {
-                    change_recorder.add(possible_addition,verbose);
+                if vote_choice_options.allow_additions {
+                    // Addition-only option.
+                    let vote_addition = compute_vote_addition::<Rules>(eliminated_candidate, sorted_continuing_candidates[1], count,verbose);
+                    let vote_additions = VoteChanges{ changes: vec![vote_addition] };
+                    if let Some(possible_addition) = optimise::<Rules>(&vote_additions, &original_data, &retroscope, vote_choice_options,verbose) {
+                        change_recorder.add(possible_addition,verbose);
+                    }
                 }
             }
 
@@ -117,11 +125,13 @@ where Rules : PreferenceDistributionRules {
                         change_recorder.add(possible_manipulation,verbose);
                     }
 
-                    // Addition-only
-                    let vote_addition = compute_vote_addition::<Rules>(highest_non_winner, lowest_winner, &count,verbose);
-                    let vote_additions = VoteChanges{ changes: vec![vote_addition] };
-                    if let Some(possible_addition) = optimise::<Rules>(&vote_additions, &original_data, &retroscope, vote_choice_options,verbose) {
-                        change_recorder.add(possible_addition,verbose);
+                    if vote_choice_options.allow_additions {
+                        // Addition-only
+                        let vote_addition = compute_vote_addition::<Rules>(highest_non_winner, lowest_winner, &count,verbose);
+                        let vote_additions = VoteChanges{ changes: vec![vote_addition] };
+                        if let Some(possible_addition) = optimise::<Rules>(&vote_additions, &original_data, &retroscope, vote_choice_options,verbose) {
+                            change_recorder.add(possible_addition,verbose);
+                        }
                     }
                 }
             }
@@ -133,6 +143,7 @@ where Rules : PreferenceDistributionRules {
     if verbose { println!("Electorate: {}. {} total votes. Min manipulations: size {:?}", original_data.metadata.name.electorate, original_data.num_votes(),  change_recorder.changes.iter().map(| c | c.ballots.n).collect::<Vec<_>>()); }
     change_recorder
 }
+
 
 /// Find an addition that makes to_candidate have a higher number of votes that next_largest.
 /// Used to make the current candidate be eliminated.
@@ -181,6 +192,10 @@ fn compute_vote_change_leveling<Rules:PreferenceDistributionRules>(index_of_targ
         let mut currently_being_considered_level = current_target_tally.clone();
         while sub_targets_to_raise < index_of_target_in_sorted_list {
             let subtarget_tally = count.status.tallies.candidate[sorted_continuing_candidates[sub_targets_to_raise].0].clone();
+            if !options.allow_to_candidate(sorted_continuing_candidates[sub_targets_to_raise]) {
+                currently_being_considered_level=if subtarget_tally<=Rules::Tally::from(BallotPaperCount(1)) { Rules::Tally::zero() } else { subtarget_tally-Rules::Tally::from(BallotPaperCount(1))};
+                break;
+            }
             if currently_being_considered_level<subtarget_tally { break; } // the currently considered level is sufficient.
             sum_of_target_plus_subtargets_plus_one+=subtarget_tally;
             sub_targets_to_raise+=1;
@@ -189,7 +204,12 @@ fn compute_vote_change_leveling<Rules:PreferenceDistributionRules>(index_of_targ
             currently_being_considered_level = consider_level.max(current_target_tally.clone()-max_can_take_from_target.clone())
         }
         currently_being_considered_level
-    } else { current_target_tally.clone() };
+    } else {
+        for i in 0..index_of_target_in_sorted_list {
+            if !options.allow_to_candidate(sorted_continuing_candidates[i]) { return None; } // can't take from target or give to lower candidate
+        }
+        current_target_tally.clone()
+    };
     if verbose { println!("{}Target candidate {} with tally {} is to be reduced to {}. Can take {} from target.",if election_data.metadata.results.as_ref().unwrap().contains(&target) {"ELECTED "} else {""},target,current_target_tally,base_level,max_can_take_from_target); }
     // need to raise everything up to target.
     let mut res =VoteChanges { changes: vec![] };

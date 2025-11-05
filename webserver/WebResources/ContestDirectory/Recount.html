@@ -69,7 +69,19 @@
         </select>
 
         <input type="checkbox" id="ShowPapers"> <label for="ShowPapers">Show Papers</label>
-        <input type="checkbox" id="ShowSetAside"> <label id="ShowSetAsideLabel" for="ShowPapers">Show Set Aside</label>
+        <span id="ShowRawBallotsIncludingLabel">
+            <input type="checkbox" id="ShowRawBallots"> <label for="ShowRawBallots">Show Actual Votes</label>
+        </span>
+        <input type="checkbox" id="ShowSetAside"> <label id="ShowSetAsideLabel" for="ShowSetAside">Show Set Aside</label>
+        <details>
+            <summary>Detailed Formatting</summary>
+            <input type="checkbox" id="ShowECDecisions" checked> <label for="ShowPapers">Show EC decisions</label>
+            <input type="checkbox" id="ShowCandidateNumbersInDecisions"> <label for="ShowPapers">Show Candidate numbers in decisions</label>
+            <input type="checkbox" id="ShowFromCount" checked> <label for="ShowPapers">Show From count</label>
+            <input type="checkbox" id="ShowHeadingAndComments" checked> <label for="ShowHeadingAndComments">Show heading and comments</label>
+            <input type="checkbox" id="ShowListOfWinningCandidates" checked> <label for="ShowPapers">Show list of winning candidates</label>
+        </details>
+
         <button type="button" onclick="saveHTML('RenderThingToView',document.getElementById('TitleHeading').innerText);">Save as HTML</button>
 
     </div>

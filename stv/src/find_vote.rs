@@ -90,9 +90,9 @@ impl FindMyVoteResult {
         let my_query = query.parse_query();
         let callback = |markings:&RawBallotMarkings,meta:&[(&str,&str)]| {
             let mut score : usize = 0;
-            for i in 0..markings.btl.len().min(my_query.len()) {
+            for i in 0..my_query.len() { // ideally we should do the number of candidates, but we don't know. Trailing blanks at the end of BTLs may not be included. But then the query may be incorrect.
                 let me = my_query[i];
-                let them = markings.btl[i];
+                let them = *markings.btl.get(i).unwrap_or(&RawBallotMarking::Blank);
                 if me==them || (query.blank_matches_anything && me==RawBallotMarking::Blank) { score+=1; }
             }
             if let Some(destination) = res.find_where_to_insert(score) {

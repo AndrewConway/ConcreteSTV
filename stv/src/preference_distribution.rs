@@ -54,6 +54,12 @@ pub enum WhenToDoElectCandidateClauseChecking {
     AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers,
     /// Like AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers, but don't interrupt for 1 of 2.
     AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapersOrQuotaButOnlyIfContinuingCandidatesEqualsUnfilledVacanciesAndNotAfterSurplusIfMoreSurplusesAvailable,
+    /// Check twice, after:
+    /// * The first round counting first preferences.
+    /// * When there are only 2 candidates remaining.
+    AfterFirstPreferencesAndWhenOnly2CandidatesAreContinuing,
+    /// Check only when there are exactly 2 candidates remaining.
+    WhenOnly2CandidatesAreContinuing,
 }
 
 #[derive(Copy,Clone,Serialize,Deserialize,Debug)]
@@ -181,9 +187,26 @@ pub trait PreferenceDistributionRules {
     /// Whether the Commonwealth Electoral Act 1918, Section 273, subsection 13A multiple elimination abomination should be used. This is defaulted to false as no one else would do such a terrible thing, and even the AEC has only sometimes done it.
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
 
+    /// Whether the Commonwealth Electoral Act 1918, Section 274, subsection (7AA)(b)(i) rule should be used. This is defaulted to false as it is rarely used.
+    /// ```text
+    /// if the total number of first preference votes for all the
+    /// candidates, other than the first and second ranked
+    /// candidates, is less than the number of first preference
+    /// votes for the second ranked candidate—exclude all the
+    /// candidates other than the first and second ranked
+    /// candidates
+    /// ```
+    /// 
+    /// This only applies for the count just after the first preference count is done.
+    fn should_eliminate_all_but_top_two_candidates_if_all_remaining_add_to_fewer_on_count_2() -> bool { false }
+
     /// If the TV calculation is limited due to incoming TV (such as in ACT) this causes votes to be set aside. These will normally be counted as set aside, but Elections ACT counts them as lost to rounding. Set to true if you want to do this. This is defaulted to false as no one else would do such a terrible thing. Yes, I know, there are a lot of terrible things that no one else would do, but sic.
     fn count_set_aside_due_to_transfer_value_limit_as_rounding() -> bool { false }
 
+    /// if there is one remaining vacancy, and 2 candidates who are tied, should one
+    /// declare that the election is a failure and neither are elected?
+    fn declare_election_over_if_2_tied_candidates_remain() -> bool { false }
+    
     /// A name describing these rules.
     fn name() -> String;
 
@@ -644,6 +667,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapers => true,
             WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapersOrQuotaButOnlyIfContinuingCandidatesEqualsUnfilledVacanciesAndNotAfterSurplusIfMoreSurplusesAvailable => !(reason.is_surplus() && self.has_distributable_surplus()),
             WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExists => self.pending_surplus_distribution.is_empty(),
+            WhenToDoElectCandidateClauseChecking::AfterFirstPreferencesAndWhenOnly2CandidatesAreContinuing => *reason==ReasonForCount::FirstPreferenceCount || self.continuing_candidates_sorted_by_tally.len()==2,
+            WhenToDoElectCandidateClauseChecking::WhenOnly2CandidatesAreContinuing => self.continuing_candidates_sorted_by_tally.len()==2,
         }
     }
     pub fn check_elected(&mut self,reason : &ReasonForCount,reason_completed : bool) {
@@ -812,6 +837,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let votes : Rules::Tally = self.tally(candidate_to_distribute);
         let surplus: Rules::Tally  = votes.clone()-self.quota.clone();
         self.tallys[candidate_to_distribute.0]=self.quota.clone();
+        // the code below is not production but is to find the oddity of a transfer value being increased.
+        // let original_provinances = self.papers[candidate_to_distribute.0].get_all_provenance_keys();
         let (_tally_here,ballots,provenance) = match Rules::use_last_parcel_for_surplus_distribution() {
             LastParcelUse::No => self.papers[candidate_to_distribute.0].extract_all_ballots_ignoring_transfer_value(),
             LastParcelUse::LiterallyLast => self.papers[candidate_to_distribute.0].extract_last_parcel(),
@@ -829,6 +856,14 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         let continuing_ballots = ballots_considered-distributed.exhausted;
         let tv_denom = if Rules::transfer_value_method().denom_is_just_continuing() {continuing_ballots} else {ballots.num_ballots};
         let mut transfer_value : TransferValue = if tv_denom.is_zero() { TransferValue::one() } else {Rules::make_transfer_value(surplus.clone(),tv_denom)};
+        // the code below is not production but is to find the oddity of a transfer value being increased.
+        //for (_,original_tv) in original_provinances {
+        //    if original_tv.lt(&transfer_value) {
+        //        println!("Found case count {} of tv {} less than {} election {}",self.current_count,original_tv,transfer_value,self.data.metadata.name.human_readable_name());
+        //        panic!("Found oddity")
+        //    }
+        //}
+        //
         let mut original_worth : Rules::Tally = surplus.clone();
         if Rules::transfer_value_method().limit_to_incoming_transfer_value() {
             let old_tv = provenance.transfer_value.clone().expect("If you are going to limit to an incoming transfer value, there must be a unique one.");
@@ -1184,6 +1219,17 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         Some(self.continuing_candidates_sorted_by_tally[0..candidates_to_exclude].to_vec())
     }
 
+    /// If the sum of all the tallies of all candidates other than the top 2 are less than the second top,
+    /// then eliminate all but the top 2.
+    pub fn find_candidates_for_multiple_elimination_all_but_top_two_candidates_if_all_remaining_add_to_fewer(&mut self) -> Option<Vec<CandidateIndex>> {
+        if self.continuing_candidates_sorted_by_tally.len()<3 { return None; } // no one to exclude.
+        let sum_of_lowest : Rules::Tally = self.continuing_candidates_sorted_by_tally[0..self.continuing_candidates_sorted_by_tally.len()-2].iter().map(|candidate|self.tallys[candidate.0].clone()).sum();
+        if sum_of_lowest<self.tallys[self.continuing_candidates_sorted_by_tally[self.continuing_candidates_sorted_by_tally.len()-2].0] {
+            Some(self.continuing_candidates_sorted_by_tally[0..self.continuing_candidates_sorted_by_tally.len()-2].to_vec())
+        } else { None }
+    }
+    
+    
     /// Federal legislation:
     /// > (13AA) Where a candidate is, or candidates are, excluded in accordance
     /// > with this section, the ballot papers of the excluded candidate or
@@ -1292,6 +1338,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn exclude_lowest(&mut self) {
         let candidates_to_exclude : Vec<CandidateIndex> =
             if Rules::should_eliminate_multiple_candidates_federal_rule_13a() { self.find_candidates_for_multiple_elimination_federal_rule_13a().unwrap_or_else(||self.find_lowest_candidate()) }
+            else if Rules::should_eliminate_all_but_top_two_candidates_if_all_remaining_add_to_fewer_on_count_2() && self.transcript.counts.len()==1 { self.find_candidates_for_multiple_elimination_all_but_top_two_candidates_if_all_remaining_add_to_fewer().unwrap_or_else(||self.find_lowest_candidate()) }
             else { self.find_lowest_candidate() };
         self.exclude(candidates_to_exclude);
     }
@@ -1312,7 +1359,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
     pub fn go(&mut self) {
         if self.print_progress_to_stdout { self.print_candidates_names(); }
         self.distribute_first_preferences();
-        while (self.remaining_to_elect()>NumberOfCandidates(0) && self.continuing_candidates.len()>0) || (Rules::finish_all_surplus_distributions_when_all_elected() && (!self.continuing_candidates_sorted_by_tally.is_empty()) && !self.pending_surplus_distribution.is_empty()) {
+        while (self.remaining_to_elect()>NumberOfCandidates(0) && self.continuing_candidates.len()>0 &&!(Rules::declare_election_over_if_2_tied_candidates_remain() && self.continuing_candidates.len()==2)) || (Rules::finish_all_surplus_distributions_when_all_elected() && (!self.continuing_candidates_sorted_by_tally.is_empty()) && !self.pending_surplus_distribution.is_empty()) {
             if self.should_defer_surplus() {
                 self.exclude_lowest();
             } else {

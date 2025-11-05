@@ -17,29 +17,41 @@ function set_heading_from_metadata(metadata) {
 ///
 /// createX : Create the X before the candidate name. Function taking two args. First is the div that the X should be created in; the second is the index associated with this element. Return the thing.
 /// clickOnName: Function called when the name after the X is clicked on. First arg is the index, secondly is the X returned by createX, third is the event of the action
-/// returns a list of all the "X"s added.
-function drawBallotPaper(showCandidates,createX,clickOnName) {
+///
+/// createXparty is optional, only used if showCandidates is true. If present, it is a function that is like createX but for parties.
+/// clickOnPartyName is also optional and only used if showCandidates is true. If present, it is a function that is called when the party name is clicked on like clickOnName.
+///
+/// returns a structure with two fields:
+///  * candidateBoxes list of all the "X"s added by createX for candidates
+///  * partyBoxes list of all the "X"s added by createXparty (or createX if showCandidates is false) for parties.
+function drawBallotPaper(showCandidates,createX,clickOnName,createXparty,clickOnPartyName) {
     let groupBoxes = []; // map from candidate group index to div
     const paperDiv = document.getElementById("paperDiv");
     removeAllChildElements(paperDiv); // get rid of loading message
-    let allXs = [];
-    function centralPurpose(parent_div,name) {
+    let candidateBoxes = [];
+    let partyBoxes = [];
+    function centralPurpose(parent_div,name,isParty,clickFn,createFn,elementType) {
+        const allXs = isParty?partyBoxes:candidateBoxes;
         const index = allXs.length;
         const cDiv=add(parent_div,"div","CandidateAndNumber");
-        const x = createX(cDiv,index);
+        const x = createFn(cDiv,index);
         allXs.push(x);
-        const cName=add(cDiv,"span");
+        const cName=add(cDiv,elementType);
         cName.innerText = name;
-        if (clickOnName) cName.addEventListener("click",function (event) { clickOnName(index,x,event); });
+        if (clickFn) cName.addEventListener("click",function (event) { clickFn(index,x,event); });
     }
     if (metadata.parties) for (const group of metadata.parties) {
         const groupDiv = add(paperDiv,"div","group");
         groupBoxes.push(groupDiv);
         add(groupDiv,"h4").innerText=group.column_id;
         if (showCandidates) {
-            add(groupDiv,"h5").innerText=group.name;
+            if (createXparty) {
+                centralPurpose(groupDiv,group.name,true,clickOnPartyName,createXparty,"h5");
+            } else {
+                add(groupDiv,"h5").innerText=group.name;
+            }
         } else {
-            centralPurpose(groupDiv,group.name);
+            centralPurpose(groupDiv,group.name,true,clickOnName,createX,"span");
         }
     }
     let ungrouped_box = null;
@@ -49,12 +61,12 @@ function drawBallotPaper(showCandidates,createX,clickOnName) {
         if (!showCandidates) centralPurpose(ungrouped_box,"");
     }
     if (showCandidates) for (const candidate of metadata.candidates) {
-        centralPurpose(candidate.hasOwnProperty("party")?groupBoxes[candidate.party]:ungrouped_box,candidate.name);
+        centralPurpose(candidate.hasOwnProperty("party")?groupBoxes[candidate.party]:ungrouped_box,candidate.name,false,clickOnName,createX,"span");
     }
-    return allXs;
+    return { candidateBoxes : candidateBoxes, partyBoxes:partyBoxes };
 }
 
-const computingHTML = '<img src="/ajax-loader.gif"/> Computing...';
+const computingHTML = '<img src="/ajax-loader.gif" alt="loading..."/> Computing...';
 
 function sumArray(a) { return a.reduce((a,b)=>a+b); }
 
@@ -136,4 +148,12 @@ function checkGroupsCheckboxForMeaning(id,metadata,shouldBeCheckedIfNoGroups) {
         let label = document.querySelector("label[for='"+id+"']");
         if (label) label.className="disabled";
     }
+}
+
+function is_where_did_my_vote_go_supported(info) {
+    if (!info) return false;
+    if (!info.rules) return false;
+    let rules = info.rules.rules_used || info.rules.rules_recommended;
+    if (!rules) return false;
+    return rules==="IRV" || rules.startsWith("AEC") || rules.startsWith("Federal");
 }
