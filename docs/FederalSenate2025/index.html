@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="../Viewer.css">
+    <title>2025 Federal Senate Margins</title>
+    <style>
+        td {
+            text-align: right;
+            padding-right: 1em;
+        }
+    </style>
+</head>
+<body>
+<h1>2025 Federal Senate Margins</h1>
+
+
+<p>This is an attempt to compute margins for the 2025 Federal Senate.
+    The margin is the smallest number of votes that need to be changed in order
+    to change who is elected. This is useful to know for looking at the effect
+    of error rates, the meaningfullness of random sampling audits, and the ease
+    of cheating.</p>
+
+    <p>
+    This is a surprisingly
+difficult thing to do. A common misconception that one can look at the final count, and get the
+difference in tallies between the last candidate elected, and the highest candidate not elected.
+One could then imagine half (plus one) of the votes for the last candidate elected instead
+being for the highest candidate not elected; it seems as if that would be the margin. However this
+    is neither necessary not sufficient. It is not necessary, as, for example, there may be smaller
+        changes that could change the order of elimination which could cause the otherwise last candidate elected to be eliminated
+    before the last count. It is not sufficient, as the final round of the tally may be part way through
+    an exclusion where one candidate went over quota. Changing half the votes as above will cause the
+    exclusion to continue, probably giving more votes to the original last elected candidate.
+    Both these situations occurred in the 2025 Federal Senate - Tasmania and Queensland had margins
+        smaller than half the final round difference, and NT and SA had margins higher than
+        half the final round difference.</p>
+<p>
+
+    <p>
+    Finding the best margin is computationally intractable with any algorithms I am aware of.
+    However one can easily find an upper bound on the margins - if one finds an actual set of ballot changes
+    that would change who would have be elected, then the margin is no larger than that number of ballots.
+    So I have found various such changes for each state and territory. The actual margin may be lower than
+    the margins I found.
+
+    In case of ties, the result is chosen randomly. This may lead to margins a vote or so higher or lower
+    than in this table.
+</p>
+
+<table class="changes">
+    <thead>
+    <tr>
+        <th>State</th><th>Formal Votes</th><th style="padding-left: 1em">Smallest margin found</th><th style="padding-left: 1em">Percentage</th><th colspan="2">Effect of change</th><th>Votes needed to change</th>
+    </tr>
+    <tr>
+        <th></th><th></th><th></th><th></th><th>New winner</th><th>New Loser</th><th></th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr><td>ACT</td><td>293474</td><td>23194</td><td>7.90%</td><td>VARDY, Hannah</td><td>GALLAGHER, Katy</td><td>23194 TV 1 GALLAGHER, Katy → VARDY, Hannah</td><tr>
+    <tr><td>NSW</td><td>4986832</td><td>8664</td><td>0.17%</td><td>BELJIC, Emilija</td><td>STACEY, Warwick</td><td>8664 STACEY, Warwick → BELJIC, Emilija</td></tr>
+    <tr><td>NT</td><td>106807</td><td>13260</td><td>12.41%</td><td>LAWRENCE, Lance Alfred</td><td>PRICE, Jacinta Nampijinpa</td><td>772 PRICE, Jacinta Nampijinpa → CHIVERS, Ian <br/>
+        5560 PRICE, Jacinta Nampijinpa → LAWRENCE, Lance Alfred <br/>
+        4579 PRICE, Jacinta Nampijinpa → ALSOP, Michael William <br/>
+        2349 PRICE, Jacinta Nampijinpa → NUGENT, Darren</td></tr>
+    <tr><td>QLD</td><td>3224436</td><td>93463</td><td>2.90%</td><td>FRASER, Stuart</td><td>ROBERTS, Malcolm</td><td>32096 ROBERTS, Malcolm → FONG, Harry<br/>
+        49938 ROBERTS, Malcolm → FRASER, Stuart <br/>
+        11429 ROBERTS, Malcolm → JONES, Belinda</td></tr>
+    <tr><td>SA</td><td>1164072</td><td>20289</td><td>1.74%</td><td>GAME, Jennifer</td><td>WALKER, Charlotte</td><td>20289 GROGAN, Karen → GAME, Jennifer <br/>
+        19235 of these have a transfer value less than 1.<br/>A tighter margin probably exists.</td></tr>
+    <tr><td>TAS</td><td>371790</td><td>5746</td><td>1.55%</td><td>FALLS, Bailey</td><td>COLBECK, Richard Mansell</td><td>1743 COLBECK, Richard Mansell → HANSON, Lee <br/>
+        4003 COLBECK, Richard Mansell → FALLS, Bailey</td></tr>
+    <tr><td>VIC</td><td>4101762</td><td>16021</td><td>0.39%</td><td>PICKERING, Warren</td><td>ANANDA-RAJAH, Michelle</td><td>16021 ANANDA-RAJAH, Michelle → PICKERING, Warren</td></tr>
+    <tr><td>WA</td><td>1622016</td><td>4185</td><td>0.26%</td><td> SINGH, Deep</td><td>WHITTEN, Tyron</td><td>4185 WHITTEN, Tyron → KLOMP, Steve</td></tr>
+    </tbody>
+</table>
+
+<h3>Details of the Queensland case</h3>
+In the last round, the difference between the last candidate elected and the last candidate not elected is 211112,
+while the best margin found was only 93463. This is because it one of the elected candidates was at one point close
+to being excluded.
+
+<p>
+In the unmodified distribution of preferences transcript, on round 232-236, Stuart Fraser gets eliminated. <br/>
+On round 237-241, Harry Fong gets eliminated, making Larissa Waters go over quota.<br/>
+On round 242, Larissa Waters’ surplus is redistributed.<br/>
+On round 243 Belinda Jones is eliminated, and Malcolm Roberts goes over quota.
+</p>
+
+<p>
+Given the described changes, on count 232-236, Malcolm Roberts gets eliminated, being just below the three gaining candidates.
+On the subsequent count Belinda Jones gets eliminated, making Larrissa Waters go over quota.
+</p>
+
+<h3>Details of the Tasmania case</h3>
+In the last round, the difference between the last candidate elected and the last candidate not elected is 13058,
+while the best margin found was only 5746. This is because the count finished part way through an exclusion with a sufficient
+number of candidates going over quota. A modification makes the count continue, including a surplus distribution from Jacqui Lambie that favours
+Richard Mansell.
+<p>
+In the unmodified case, Richard Colbeck (Lib) and Jacqui Lambie go over quota on round 127 during the exclusion of Lee Hanson (ON) with Bailey Falls (ALP) the only still continuing candidate.
+</p>
+
+<p>
+    In the modified case,
+    Lee Hanson still gets excluded on round 127, and Jacqui Lambie still goes over quota. But Richard Colbeck does not. This causes the count to continue. The exclusion continues to count 131 with lower transfer values.
+    On round 132, Jacqui Lambie’s surplus gets distributed, with 1785 votes going to Richard Mansell and 711 to Richard Colbeck.
+
+    It is likely that a tighter margin exists with more votes going to Bailey Falls and fewer to Lee Hanson, but I do not have the tools to find it.
+</p>
+
+
+<!-- Not included as the files are too large :-(
+<p>Details of exactly the changes used (and margins for some other possible changes to who is elected
+are <a href="../Viewer.html?list=FederalSenate2025/changes/list.json">available here</a>. Note that it
+may take several seconds to update when selecting a large state.</p>
+-->
+<h3>Copyright, Acknowledgements</h3>
+
+<p>
+ These lists are partially derived from data from the
+    <a href="https://www.aec.gov.au/">Australian Electoral Commission (AEC)</a>
+    <a href="https://www.aec.gov.au/footer/Copyright.htm">© Commonwealth of Australia 2017</a>
+    licensed under <a href="https://creativecommons.org/licenses/by/4.0">Creative Commons Attribution 4.0 International Licence</a>.
+Kudos to the AEC for the use of such a license.
+</p>
+
+<h3>Privacy Policy</h3>
+<p>This is a static website hosted by github. We the authors do not collect any
+information about visitors. Github itself may do so. See <a href="https://docs.github.com/en/github/site-policy/github-privacy-statement">Github's privacy statement</a></p>
+
+</body>
+</html>
