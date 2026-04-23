@@ -1,4 +1,4 @@
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -9,7 +9,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::str::FromStr;
 use stv::ballot_metadata::{CandidateIndex, ElectionMetadata, NumberOfCandidates};
 use stv::distribution_of_preferences_transcript::{CountIndex, ReasonForCount, SingleCount};
@@ -144,7 +144,7 @@ impl Retroscope {
         }
     }
     /// Apply the given count to the Retroscope. Update all the internal fields.
-    pub fn apply<Tally:PartialEq+Clone+Display+FromStr>(&mut self,count:CountIndex,transcript:&SingleCount<Tally>) {
+    pub fn apply<Tally:PartialEq+Clone+Display+FromStr+Debug>(&mut self,count:CountIndex,transcript:&SingleCount<Tally>) {
         if count.0>0 && self.count.0+1!=count.0 { panic!("Counts must be processed in order without skipping any.")}
         self.count=count;
         for c in &transcript.not_continuing {
@@ -155,6 +155,7 @@ impl Retroscope {
             ReasonForCount::FirstPreferenceCount => { self.first_preferences(count); }
             ReasonForCount::ExcessDistribution(c) => { self.update(count,transcript.reason_completed,&[*c],&transcript.portion.papers_came_from_counts); }
             ReasonForCount::Elimination(c) => { self.update(count,transcript.reason_completed,c,&transcript.portion.papers_came_from_counts); }
+            ReasonForCount::MeekIteration => {} // TODO Meek Iteration currently not supported
         }
         // elections occur after distribution.
         for c in &transcript.elected {

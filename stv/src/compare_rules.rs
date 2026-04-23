@@ -83,6 +83,7 @@ impl CompareRules {
             }
             impl <R:PreferenceDistributionRules> PreferenceDistributionRules for AltRule<R> {
                 type Tally = R::Tally;
+                type KeepValueType = R::KeepValueType;
                 type SplitByNumber = R::SplitByNumber;
 
                 fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { R::use_last_parcel_for_surplus_distribution() }
@@ -125,6 +126,7 @@ impl CompareRules {
             }
             impl <R:PreferenceDistributionRules> PreferenceDistributionRules for AltRule<R> {
                 type Tally = R::Tally;
+                type KeepValueType = R::KeepValueType;
                 type SplitByNumber = R::SplitByNumber;
                 fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { R::use_last_parcel_for_surplus_distribution() }
                 fn transfer_value_method() -> TransferValueMethod { R::transfer_value_method() }

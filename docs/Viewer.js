@@ -1,6 +1,6 @@
 "use strict";
 
-// Copyright 2021-2022 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -78,6 +78,8 @@ function Render() {
         document.getElementById("ShowSetAsideLabel").className=has_set_aside?"":"hidden";
         const has_raw_votes = document_to_show.transcript.counts.some(a=>a.status && a.status.list_of_votes);
         document.getElementById("ShowRawBallotsIncludingLabel").className=has_raw_votes?"":"hidden";
+        const has_meek_sources = document_to_show.transcript.counts.some(a=>a.status && a.status.meek_vote_sources);
+        document.getElementById("ShowMeekSourcesIncludingLabel").className=has_meek_sources?"":"hidden";
         RenderTranscript(document_to_show,render_div);
     } else if (document_to_show.original && document_to_show.changes) {
         document.getElementById("ChangeOnly").className="";
@@ -161,17 +163,23 @@ function RenderChanges(vote_changes_document,render_div) {
 
 /** Display a distribution of preferences transcript */
 function RenderTranscript(full_transcript,render_div) {
+    const metadata = full_transcript.metadata;
+    const transcript = full_transcript.transcript;
+
+    const has_keep_values = transcript.counts.some(c=>c.status && c.status.hasOwnProperty("keep_values"));
     const heading_orientation = document.getElementById("heading-orientation").value;
     const show_papers = document.getElementById("ShowPapers").checked;
     const show_raw_ballots = document.getElementById("ShowRawBallots").checked;
+    const show_meek_sources = document.getElementById("ShowMeekSources").checked;
     const show_set_aside = document.getElementById("ShowSetAside").checked;
     const show_list_of_winning_candidates = document.getElementById("ShowListOfWinningCandidates").checked;
     const show_ec_decisions = document.getElementById("ShowECDecisions").checked;
     const show_candidate_numbers_in_decisions = document.getElementById("ShowCandidateNumbersInDecisions").checked;
     const show_from_count = document.getElementById("ShowFromCount").checked;
+    const show_keep_values = has_keep_values;
+    const show_transfer_value = !has_keep_values;
+    const show_quota_column = transcript.counts.some(c=>c.status && c.hasOwnProperty("quota"));
 
-    const metadata = full_transcript.metadata;
-    const transcript = full_transcript.transcript;
     const rounding_ever_used = transcript.counts.some(c=>c.status.papers.rounding || c.status.tallies.rounding);
     const exhausted_ever_used = transcript.counts.some(c=>c.status.papers.exhausted || c.status.tallies.exhausted);
     if (transcript.quota) {
@@ -186,6 +194,7 @@ function RenderTranscript(full_transcript,render_div) {
     let people_before_parties = heading_orientation==="slanted";
     let people_row = people_before_parties?add(table,"tr"):null;
 
+    let num_columns_per_candidate = 1+(show_papers?1:0)+(show_set_aside?1:0)+(show_keep_values?1:0);
     if (metadata.parties && metadata.parties.length>0) {
         let party_row = add(table,"tr");
         add(party_row,"td");
@@ -193,11 +202,11 @@ function RenderTranscript(full_transcript,render_div) {
         for (const party of metadata.parties) {
             // assume party.candidates is a contiguous sequence, after any previous ones.
             if (party.candidates[0]>num_candidates_done) { // there were some candidates not part of a party in between
-                add(party_row,"td","PartyName").colSpan=(party.candidates[0]-num_candidates_done)*(1+(show_papers?1:0)+(show_set_aside?1:0));
+                add(party_row,"td","PartyName").colSpan=(party.candidates[0]-num_candidates_done)*num_columns_per_candidate;
             }
             let td = add(party_row,"td","PartyName");
             td.innerText=party.abbreviation||party.name;
-            td.colSpan=party.candidates.length*(1+(show_papers?1:0)+(show_set_aside?1:0));
+            td.colSpan=party.candidates.length*num_columns_per_candidate;
             num_candidates_done=party.candidates[party.candidates.length-1]+1;
             FirstCandidate.add(party.candidates[0]);
             LastCandidate.add(party.candidates[party.candidates.length-1]);
@@ -216,17 +225,18 @@ function RenderTranscript(full_transcript,render_div) {
         const candidate = metadata.candidates[i];
         let td = name_td((FirstCandidate.has(i)?" FirstCandidate":"")+(LastCandidate.has(i)?" LastCandidate":""));
         td.text.innerText=candidate.name;
-        if (show_papers||show_set_aside) td.td.colSpan=1+(show_papers?1:0)+(show_set_aside?1:0);
+        if (num_columns_per_candidate>1) td.td.colSpan=num_columns_per_candidate;
     }
     if (exhausted_ever_used) {
         const exhausted_name_td = name_td();
         exhausted_name_td.text.innerText="Exhausted";
-        if (show_papers||show_set_aside) exhausted_name_td.td.colSpan=1+(show_papers?1:0)+(show_set_aside?1:0);
+        if (num_columns_per_candidate>1) exhausted_name_td.td.colSpan=num_columns_per_candidate-(show_keep_values?1:0);
     }
     if (rounding_ever_used) {
         name_td().text.innerText="Rounding";
     }
-    add(people_row,"th").innerText="Transfer Value";
+    if (show_transfer_value) add(people_row,"th").innerText="Transfer Value";
+    if (show_quota_column) add(people_row,"th").innerText="Quota";
     add(people_row,"th").innerText="Count action";
     if (show_ec_decisions) add(people_row,"th").innerText="EC decisions needed";
     if (show_from_count) add(people_row,"th").innerText="From Count";
@@ -249,6 +259,16 @@ function RenderTranscript(full_transcript,render_div) {
             for (const vote of votes_with_tv.votes) {
                 add(div,"div","preflist").innerText=""+vote.n+"×"+vote.candidates.map(cname).join(",");
             }
+        }
+    }
+    function render_meek_sources(render_element, meek_vote_sources) {
+        if ((!meek_vote_sources) || meek_vote_sources.length===0) return
+        const div = add(render_element,"div","ListOfVotes Meek");
+        for (const source of meek_vote_sources) {
+            if (source.route.length>0) {
+                add(div,"div","MeekRoute").innerText="via "+source.route.map(cname).join(",");
+            }
+            add(div,"div","MeekContribution").innerText=""+source.count+"×"+source.weight;
         }
     }
     let last_count = null;
@@ -283,7 +303,14 @@ function RenderTranscript(full_transcript,render_div) {
                 if (deltarow) {
                     add(deltarow,"td",status+" SetAside Delta").innerText=count.set_aside_for_quota?zero_is_blank(count.set_aside_for_quota.candidate[i]):"";
                 }
-                const papers = add(row,"td",status+" SetAside Cumulative");
+                const _papers = add(row,"td",status+" SetAside Cumulative");
+            }
+            if (show_keep_values) {
+                if (deltarow) {
+                    add(deltarow,"td",status+" KeepValue Delta").innerText="";
+                }
+                const papers = add(row,"td",status+" KeepValue Cumulative");
+                papers.innerText=count.status.keep_values[i];
             }
             let tally = count.status.tallies.candidate[i];
             let text = zero_is_blank(tally);
@@ -306,9 +333,20 @@ function RenderTranscript(full_transcript,render_div) {
             if (show_raw_ballots && count.status.list_of_votes) {
                 render_list_of_votes(delta_td || addStart(td,"div"),count.status.list_of_votes.candidate[i]);
             }
+            if (show_meek_sources && count.status.meek_vote_sources) {
+                if (delta_td) delta_td.innerText=""; // don't want delta text if have a new Meek computation. Deltas for Meek are not that useful anyway.
+                render_meek_sources(delta_td || addStart(td,"div"),count.status.meek_vote_sources.candidate[i]);
+            }
         }
         if (exhausted_ever_used) {
-            if (deltarow) add(deltarow,"td","Continuing Delta").innerText=delta(count.status.tallies.exhausted,last_count.status.tallies.exhausted);
+            if (deltarow) {
+                let delta_td = add(deltarow,"td","Continuing Delta");
+                if (show_meek_sources && count.status.meek_vote_sources) {
+                    render_meek_sources(delta_td || addStart(td,"div"),count.status.meek_vote_sources.exhausted);
+                } else {
+                    delta_td.innerText=delta(count.status.tallies.exhausted,last_count.status.tallies.exhausted);
+                }
+            }
             add(row,"td","Continuing Cumulative").innerText=zero_is_blank(count.status.tallies.exhausted);
             if (show_papers) {
                 if (deltarow) add(deltarow,"td","Continuing BallotPapers Delta").innerText=delta(count.status.papers.exhausted,last_count.status.papers.exhausted);
@@ -323,16 +361,31 @@ function RenderTranscript(full_transcript,render_div) {
             if (deltarow) add(deltarow,"td","Continuing Delta").innerText=delta(count.status.tallies.rounding,last_count.status.tallies.rounding);
             add(row,"td","Continuing Cumulative").innerText=zero_is_blank(count.status.tallies.rounding);
         }
-        const tv_td = fullSpanTD("TransferValue");
-        tv_td.innerText=format_transfer_value(count.created_transfer_value&&count.created_transfer_value.transfer_value || count.portion.transfer_value,count.created_transfer_value?null:format_from(count.portion.when_tv_created));
-        if (count.created_transfer_value) {
-            let title = "Surplus : "+count.created_transfer_value.surplus+" Ballots considered : "+count.created_transfer_value.ballots_considered+" continuing : "+count.created_transfer_value.continuing_ballots;
-            if (count.created_transfer_value.original_transfer_value) title+=" original transfer value : "+count.created_transfer_value.original_transfer_value;
-            if (count.created_transfer_value.multiplied_transfer_value) title+=" common multiple "+count.created_transfer_value.multiplied_transfer_value;
-            if (count.created_transfer_value.excluded_exhausted_tally) title+=" exhausted tally "+count.created_transfer_value.excluded_exhausted_tally;
-            tv_td.title=title;
+        if (show_transfer_value) {
+            const tv_td = fullSpanTD("TransferValue");
+            tv_td.innerText=format_transfer_value(count.created_transfer_value&&count.created_transfer_value.transfer_value || count.portion.transfer_value,count.created_transfer_value?null:format_from(count.portion.when_tv_created));
+            if (count.created_transfer_value) {
+                let title = "Surplus : "+count.created_transfer_value.surplus+" Ballots considered : "+count.created_transfer_value.ballots_considered+" continuing : "+count.created_transfer_value.continuing_ballots;
+                if (count.created_transfer_value.original_transfer_value) title+=" original transfer value : "+count.created_transfer_value.original_transfer_value;
+                if (count.created_transfer_value.multiplied_transfer_value) title+=" common multiple "+count.created_transfer_value.multiplied_transfer_value;
+                if (count.created_transfer_value.excluded_exhausted_tally) title+=" exhausted tally "+count.created_transfer_value.excluded_exhausted_tally;
+                tv_td.title=title;
+            }
         }
-        fullSpanTD("CountAction").innerText=count.reason==="FirstPreferenceCount"?"First Preference Count":count.reason.hasOwnProperty("ExcessDistribution")?"Surplus distribution for "+cname(count.reason.ExcessDistribution):"Exclusion of "+count.reason.Elimination.map(cname).join(" & "); // TODO prettify
+        if (show_quota_column) {
+            const quota_td = fullSpanTD("Quota");
+            if (count.quota) {
+                quota_td.innerText=count.quota.quota;
+                let title = "Papers : "+count.quota.papers+(count.quota.exhausted?" exhausted : "+count.quota.exhausted:"")+" vacancies : "+count.quota.vacancies;
+                quota_td.title=title;
+            }
+        }
+        fullSpanTD("CountAction").innerText=
+            count.reason==="FirstPreferenceCount"?"First Preference Count":
+                count.reason.hasOwnProperty("ExcessDistribution")?"Surplus distribution for "+cname(count.reason.ExcessDistribution):
+                    count.reason.hasOwnProperty("Elimination")?"Exclusion of "+count.reason.Elimination.map(cname).join(" & "):
+                        count.reason==="MeekIteration"?"Meek Iteration":
+                            "Unknown!!!!!";
         function candidate_index_array_to_string(candidate_list) {
             return candidate_list.map(candidate=>metadata.candidates[candidate].name+(show_candidate_numbers_in_decisions?" ("+candidate+")":"")).join(",");
         }
@@ -401,6 +454,7 @@ function MainViewerOnLoadFunction() {
     }
     document.getElementById("ShowPapers").onchange = Render;
     document.getElementById("ShowRawBallots").onchange = Render;
+    document.getElementById("ShowMeekSources").onchange = Render;
     document.getElementById("ShowSetAside").onchange = Render;
     document.getElementById("ShowHeadingAndComments").onchange = Render;
     document.getElementById("ShowListOfWinningCandidates").onchange = Render;

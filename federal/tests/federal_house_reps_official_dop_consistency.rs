@@ -1,4 +1,4 @@
-// Copyright 2022-2025 Andrew Conway.
+// Copyright 2022-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -13,7 +13,7 @@ use std::fs::File;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use federal::parse_house_reps::{parse_HouseDopByDivisionDownload, FederalHouseRepresentativesIRV, FederalHouseRepresentativesIRVAlwaysSimpleIRVToTwoCandidates};
-use stv::ballot_metadata::{Candidate, CandidateIndex, NumberOfCandidates};
+use stv::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use stv::ballot_pile::BallotPaperCount;
 use stv::distribution_of_preferences_transcript::{CountIndex, ReasonForCount, TranscriptWithMetadata};
 use stv::official_dop_transcript::{DifferenceBetweenOfficialDoPAndComputed, DifferenceBetweenOfficialDoPAndComputedOnParticularCount, ECTally};

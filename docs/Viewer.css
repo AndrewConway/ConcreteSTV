@@ -94,7 +94,9 @@ td.BallotPapers {
 td.SetAside {
     color: lightgray;
 }
-
+td.KeepValue {
+    color: purple;
+}
 table {
     border-collapse: collapse;
 }

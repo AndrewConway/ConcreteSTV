@@ -1,4 +1,4 @@
-// Copyright 2025 Andrew Conway.
+// Copyright 2025-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -16,7 +16,7 @@ use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber, HowSplitByCoun
 use stv::distribution_of_preferences_transcript::{PerCandidate, Transcript};
 use stv::official_dop_transcript::{OfficialDOPForOneCount, OfficialDistributionOfPreferencesTranscript};
 use stv::parse_util::{skip_first_line_of_file};
-use stv::preference_distribution::{BigRational, CountNamingMethod, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
+use stv::preference_distribution::{BigRational, CountNamingMethod, KeepValuesNotUsed, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
 use stv::signed_version::SignedVersion;
 use stv::tie_resolution::MethodOfTieResolution;
 use stv::transfer_value::{convert_usize_to_rational, round_rational_down_to_usize, TransferValue};
@@ -137,6 +137,7 @@ pub struct FederalHouseRepresentativesIRV {
 impl PreferenceDistributionRules for FederalHouseRepresentativesIRV { 
     type Tally = usize;
     type SplitByNumber = DoNotSplitByCountNumber;
+    type KeepValueType = KeepValuesNotUsed;
 
     /// MAKE IT IRV!
     fn has_quota() -> bool { false }
@@ -233,6 +234,7 @@ pub struct FederalHouseRepresentativesIRVAlwaysSimpleIRVToTwoCandidates {
 impl PreferenceDistributionRules for FederalHouseRepresentativesIRVAlwaysSimpleIRVToTwoCandidates {
     type Tally = usize;
     type SplitByNumber = DoNotSplitByCountNumber;
+    type KeepValueType = KeepValuesNotUsed;
 
     /// MAKE IT IRV!
     fn has_quota() -> bool { false }

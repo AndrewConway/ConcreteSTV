@@ -1,4 +1,4 @@
-// Copyright 2021-2025 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -368,6 +368,7 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                     papers : BallotPaperCount(total_formal_votes),
                     vacancies,
                     quota,
+                    exhausted: None,
                 })
             } else { None }
         } else { None }

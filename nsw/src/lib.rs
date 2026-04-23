@@ -21,7 +21,7 @@ pub mod run_election_multiple_times;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display};
 use std::str::FromStr;
-use stv::preference_distribution::{BigRational, CountNamingMethod, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
+use stv::preference_distribution::{BigRational, CountNamingMethod, KeepValuesNotUsed, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber, FullySplitByCountNumber, HowSplitByCountNumber};
 use stv::distribution_of_preferences_transcript::{CountIndex, Transcript};
 use stv::transfer_value::{convert_usize_to_rational, round_rational_down_to_isize, round_rational_down_to_usize, TransferValue};
@@ -36,6 +36,7 @@ pub struct NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation {
 
 impl PreferenceDistributionRules for NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation {
     type Tally = usize;
+    type KeepValueType = KeepValuesNotUsed;
     type SplitByNumber = FullySplitByCountNumber;
 
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::No }
@@ -113,6 +114,7 @@ pub struct NSWECLocalGov2021 {
 
 impl PreferenceDistributionRules for NSWECLocalGov2021 {
     type Tally = usize;
+    type KeepValueType = KeepValuesNotUsed;
     type SplitByNumber = FullySplitByCountNumber;
 
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::No }
@@ -275,6 +277,7 @@ pub struct NSWECLocalGov2021Literal {
 impl PreferenceDistributionRules for NSWECLocalGov2021Literal {
     fn prohibit_negative_surplus_fraction() -> bool { false }
     type Tally = isize;
+    type KeepValueType = KeepValuesNotUsed;
     type SplitByNumber = FullySplitByCountNumber;
 
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::No }
@@ -322,6 +325,7 @@ pub struct SimpleIRVAnyDifferenceBreaksTies {
 
 impl PreferenceDistributionRules for SimpleIRVAnyDifferenceBreaksTies {
     type Tally = usize;
+    type KeepValueType = KeepValuesNotUsed;
     type SplitByNumber = DoNotSplitByCountNumber;
 
     /// MAKE IT IRV!

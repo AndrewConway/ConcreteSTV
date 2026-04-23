@@ -1,4 +1,4 @@
-// Copyright 2025 Andrew Conway.
+// Copyright 2025-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -227,6 +227,7 @@ fn parse_dop_excel_file(sheet:&calamine::Range<calamine::Data>,metadata:&Electio
             papers: BallotPaperCount(captures[1].parse::<usize>()?),
             vacancies: NumberOfCandidates(captures[2].parse::<usize>()?),
             quota: captures[3].parse::<f64>()?,
+            exhausted: None,
         })
     } else { None };
     let col_who_caused_count : u32 = 0;

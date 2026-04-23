@@ -8,7 +8,7 @@
 
 //! A fixed precision decimal type for jurisdictions like ACT who count votes to a particular number of decimal places.
 
-use std::ops::{AddAssign, SubAssign, Sub, Add, Div};
+use std::ops::{AddAssign, SubAssign, Sub, Add, Div, Mul};
 use num::{Zero, BigRational, BigInt, ToPrimitive};
 use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
@@ -16,7 +16,7 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use std::str::FromStr;
 use crate::ballot_pile::BallotPaperCount;
 use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
-use crate::preference_distribution::RoundUpToUsize;
+use crate::preference_distribution::{KeepValue, RoundUpToUsize};
 
 /// Stores a fixed precision decimal number as an integer scaled by 10^DIGITS
 #[derive(Copy, Clone,Eq, PartialEq,Ord, PartialOrd,Hash)]
@@ -46,6 +46,21 @@ impl <const DIGITS:usize> FixedPrecisionDecimal<DIGITS> {
 
     pub fn to_rational(&self) -> BigRational { BigRational::new(BigInt::from(self.scaled_value),BigInt::from(Self::SCALE)) }
     pub fn from_rational_rounding_down(rational:BigRational) -> Self { FixedPrecisionDecimal{scaled_value: ((rational.numer().clone()*BigInt::from(Self::SCALE))/rational.denom()).to_u64().unwrap()} }
+
+    /// multiply two fixed precision values, rounding up if not exact.
+    pub fn multiply_rounding_up(self,other:Self) -> Self {
+        let s1 = (self.scaled_value as u128)*(other.scaled_value as u128);
+        let mut rounded_down = s1/(Self::SCALE as u128);
+        if rounded_down * (Self::SCALE as u128) != s1 { rounded_down+=1; }
+        Self{scaled_value:rounded_down as u64}
+    }
+    /// divide by a fixed precision value, rounding up if not exact.
+    pub fn divide_rounding_up(self,other:Self) -> Self {
+        let s1 = (self.scaled_value as u128)*(Self::SCALE as u128);
+        let mut rounded_down = s1/(other.scaled_value as u128);
+        if rounded_down * (other.scaled_value as u128) != s1 { rounded_down+=1; }
+        Self{scaled_value:rounded_down as u64}
+    }
 }
 
 impl <const DIGITS:usize> From<FixedPrecisionDecimal<DIGITS>> for f64 {
@@ -111,7 +126,7 @@ impl <const DIGITS:usize> Add for FixedPrecisionDecimal<DIGITS> {
 }
 impl <const DIGITS:usize> Sum for FixedPrecisionDecimal<DIGITS> {
     fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
-        let mut res = Self::zero();
+        let mut res = Zero::zero();
         for v in iter {
             res+=v
         }
@@ -121,7 +136,7 @@ impl <const DIGITS:usize> Sum for FixedPrecisionDecimal<DIGITS> {
 
 impl <'a,const DIGITS:usize> Sum<&'a Self> for FixedPrecisionDecimal<DIGITS> {
     fn sum<I: Iterator<Item=&'a Self>>(iter: I) -> Self {
-        let mut res = Self::zero();
+        let mut res : Self = Zero::zero();
         for v in iter {
             res+=*v
         }
@@ -171,7 +186,41 @@ impl <const DIGITS:usize> Div<usize> for FixedPrecisionDecimal<DIGITS> {
         FixedPrecisionDecimal{scaled_value: self.scaled_value/(rhs as u64)}
     }
 }
+impl <const DIGITS:usize> Mul<usize> for FixedPrecisionDecimal<DIGITS> {
+    type Output = Self;
 
+    fn mul(self, rhs: usize) -> Self::Output {
+        FixedPrecisionDecimal{scaled_value: self.scaled_value*(rhs as u64)}
+    }
+}
+
+/// Implement the New Zealand Keep Value rules (generalizing the number of digits)
+impl <const DIGITS:usize> KeepValue<FixedPrecisionDecimal<DIGITS>> for FixedPrecisionDecimal<DIGITS> {
+    /// Clause 17, New Zealand Local Electoral Regulation 2001, Schedule 1A,
+    /// "New Zealand method of counting single transferable votes" as inserted 1 Jan 2004
+    /// ```text
+    /// Use the following formula instead of the formula in clause 7:
+    ///   kc = q × kc ÷ vc
+    /// where—
+    ///   kc is the keep value for the successful candidate
+    ///   q is the quota for this step
+    ///   vc is the candidate’s votes
+    /// and the product of q and kc is truncated to 9 digits after the point and rounded up if not exact before being divided by vc and kc is also truncated to 9 digits after the point and rounded up if not exact.
+    /// ```
+    fn compute_keep_value(quota: FixedPrecisionDecimal<DIGITS>, tally: FixedPrecisionDecimal<DIGITS>, existing_keep_value: Self) -> Self {
+        quota.multiply_rounding_up(existing_keep_value).divide_rounding_up(tally)
+    }
+
+    fn zero() -> Self { Self{scaled_value:0} }
+    fn one() -> Self { Self{scaled_value:Self::SCALE} }
+    fn use_keep_value(incoming_keep_value: Self, keep_value_for_candidate: Self, ballot_paper_count: BallotPaperCount) -> (FixedPrecisionDecimal<DIGITS>, Self,Option<Self>) {
+        let per_paper_value = incoming_keep_value.multiply_rounding_up(keep_value_for_candidate);
+        let continued = if keep_value_for_candidate.scaled_value == Self::SCALE { None} else
+        // TODO resolve this line follows legislation, but doesn't match what was done, and is a bad idea as it probably could lead to too many candidates going over quota. { Some(incoming_keep_value.multiply_rounding_up(Self::one()-keep_value_for_candidate)) };
+        { Some(incoming_keep_value-per_paper_value) }; // This line matches the test data but not the legislation. It makes more sense and makes the definition of **non-transferable votes** unambiguous.
+        (per_paper_value*ballot_paper_count.0,per_paper_value, continued)
+    }
+}
 #[cfg(test)]
 mod tests {
     use crate::fixed_precision_decimal::FixedPrecisionDecimal;

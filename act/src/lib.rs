@@ -1,10 +1,10 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
-use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational, SurplusTransferMethod, LastParcelUse};
+use stv::preference_distribution::{PreferenceDistributionRules, WhenToDoElectCandidateClauseChecking, TransferValueMethod, BigRational, SurplusTransferMethod, LastParcelUse, KeepValuesNotUsed};
 use stv::tie_resolution::MethodOfTieResolution;
 use stv::transfer_value::{TransferValue, convert_usize_to_rational, round_rational_down_to_usize};
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber, SplitByWhenTransferValueWasCreated};
@@ -19,6 +19,7 @@ pub struct ACTPre2020 {
 
 impl PreferenceDistributionRules for ACTPre2020 {
     type Tally = usize;
+    type KeepValueType = KeepValuesNotUsed;
     type SplitByNumber = DoNotSplitByCountNumber;
 
     /// See below comment, (5)
@@ -169,6 +170,8 @@ pub struct ACT2021 {
 
 impl PreferenceDistributionRules for ACT2021 {
     type Tally = FixedPrecisionDecimal<6>;
+    type KeepValueType = KeepValuesNotUsed;
+
     type SplitByNumber = DoNotSplitByCountNumber;
 
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::LiterallyLast }
@@ -216,6 +219,8 @@ pub struct ACT2020 {
 
 impl PreferenceDistributionRules for ACT2020 {
     type Tally = FixedPrecisionDecimal<6>;
+    type KeepValueType = KeepValuesNotUsed;
+
     /// * Count transfer values computed in rule 1C(4) as having a different value to all other transfer values with the same value.
     /// E.g. Ginninderra Count 39
     type SplitByNumber = SplitByWhenTransferValueWasCreated;

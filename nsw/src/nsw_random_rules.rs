@@ -8,7 +8,7 @@
 
 use std::marker::PhantomData;
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber};
-use stv::preference_distribution::{BigRational, DeferSurplusDistribution, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
+use stv::preference_distribution::{BigRational, DeferSurplusDistribution, KeepValuesNotUsed, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
 use stv::tie_resolution::MethodOfTieResolution;
 use stv::transfer_value::{convert_usize_to_rational, TransferValue};
 
@@ -193,6 +193,7 @@ pub struct NSWRandomSamplingVariant<V:NSWRandomVariations> {
 
 impl <V:NSWRandomVariations> PreferenceDistributionRules for NSWRandomSamplingVariant<V> {
     type Tally = usize;
+    type KeepValueType = KeepValuesNotUsed;
     type SplitByNumber = DoNotSplitByCountNumber;
 
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { V::use_last_parcel_for_surplus_distribution() }

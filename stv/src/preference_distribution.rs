@@ -1,4 +1,4 @@
-// Copyright 2021-2024 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use crate::transfer_value::{TransferValue, StringSerializedRational};
 use std::ops::{AddAssign, Neg, SubAssign, Sub, Range, Div, Mul};
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug, Display, Formatter};
 use crate::distribution_of_preferences_transcript::{ElectionReason, CandidateElected, TransferValueCreation, Transcript, ReasonForCount, PortionOfReasonBeingDoneThisCount, SingleCount, EndCountStatus, PerCandidate, QuotaInfo, CountIndex};
 use crate::util::{DetectUnique, CollectAll};
 use crate::tie_resolution::{MethodOfTieResolution, TieResolutionsMadeByEC, TieResolutionGranularityNeeded, TieResolutionExplicitDecision, TieResolutionUsage};
@@ -28,6 +28,7 @@ use serde::{Serialize,Deserialize};
 use std::str::FromStr;
 use crate::ballot_paper::{ATL, BTL, VoteSource};
 use crate::extract_votes_in_pile::{ExtractionRequest, WhatToExtract};
+use crate::list_of_meek_vote_sources::{ListOfMeekVoteSources, ListOfMeekVoteSourcesBuilder};
 use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
 use crate::random_util::Randomness;
 use crate::signed_version::SignedVersion;
@@ -133,13 +134,77 @@ impl RoundUpToUsize for isize {
     fn ceil(&self) -> usize { self.to_usize().unwrap_or(0) } // not ideal but we shouldn't expect negative vote tallies to behave sensibly. Used in margin computation and surplus distribution so should not be a problem unless its use grows.
 }
 
+/// Something that can be used as a keep value for the Meek method.
+pub trait KeepValue<Tally> : Clone+ToString {
+    /// compute a keep value for an elected candidate, given quota/tally.
+    /// e.g.
+    /// Clause 17, New Zealand Local Electoral Regulation 2001, Schedule 1A,
+    /// "New Zealand method of counting single transferable votes" as inserted 1 Jan 2004
+    /// ```text
+    /// Use the following formula instead of the formula in clause 7:
+    ///   kc = q × kc ÷ vc
+    /// where—
+    ///   kc is the keep value for the successful candidate
+    ///   q is the quota for this step
+    ///   vc is the candidate’s votes
+    /// and the product of q and kc is truncated to 9 digits after the point and rounded up if not exact before being divided by vc and kc is also truncated to 9 digits after the point and rounded up if not exact.
+    /// ```
+    fn compute_keep_value(quota:Tally, tally:Tally, existing_keep_value:Self) -> Self;
+    /// Perform the recursive step in the use of a keep value, taking
+    /// incoming_keep_value of (1 – k1) × (1 – k2) × (1 – km-1), and the keep_value_for_candidate km,
+    /// and returning (count*vm,vm, and, if not zero, Some((1 – k1) × (1 – k2) ×...× (1 – km)) for
+    /// use in the next iteration. See for example:
+    /// Clause 10, New Zealand Local Electoral Regulation 2001, Schedule 1A,
+    /// "New Zealand method of counting single transferable votes" as inserted 1 Jan 2004
+    /// ```text
+    /// Allocate votes from each voting document according to the following scheme:
+    ///   vm = (1 – k1) × (1 – k2) × (1 – km-1) × km
+    /// where—
+    /// vm  is the votes to allocate to the mth preference candidate on the voting document
+    /// k1  is the keep value for the first preference candidate on the voting document
+    /// k2  is the keep value for the second preference candidate on the voting document
+    /// km  is the keep value for the mth preference candidate on the voting document
+    /// and the product of each multiplication on the right hand side of the equation must be calculated to 9 decimal digits after the point and rounded up if not exact and the multiplications must be calculated from left to right.
+    /// ```
+    fn use_keep_value(incoming_keep_value:Self,keep_value_for_candidate:Self,ballot_paper_count: BallotPaperCount) -> (Tally,Self,Option<Self>);
+    fn zero() -> Self;
+    fn one() -> Self;
+    //fn is_one(&self) -> bool;
+}
+
+/// A dummy type for most STV implementations that will not actually use keep values
+#[derive(Copy,Clone)]
+pub struct KeepValuesNotUsed {}
+
+impl Display for KeepValuesNotUsed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "KeepValuesNotUsed")
+    }
+}
+impl <T> KeepValue<T> for KeepValuesNotUsed {
+    fn compute_keep_value(_quota: T, _tally: T, _existing_keep_value:Self) -> Self { panic!("KeepValuesNotUsed should never be actually used") }
+    fn zero() -> Self { panic!("KeepValuesNotUsed should never be actually used") }
+    fn one() -> Self { panic!("KeepValuesNotUsed should never be actually used") }
+    //fn is_one(&self) -> bool { panic!("KeepValuesNotUsed should never be actually used") }
+
+    fn use_keep_value(_incoming_keep_value:Self,_keep_value_for_candidate:Self,_ballot_paper_count: BallotPaperCount) -> (T,Self,Option<Self>) { panic!("KeepValuesNotUsed should never be actually used") }
+}
+
+
 pub trait PreferenceDistributionRules {
     /// The type for the number of votes. Usually an integer.
     type Tally : Clone+AddAssign+SubAssign+From<BallotPaperCount>+Display+PartialEq+Serialize+FromStr+Debug+Ord+Sub<Output=Self::Tally>+Zero+Hash+Sum<Self::Tally>+RoundUpToUsize/*+Div<usize,Output=Self::Tally>*/+CanConvertToF64PossiblyLossily;
     type SplitByNumber : HowSplitByCountNumber;
+    /// The type for keep values, if using the Meek method. Irrelevant otherwise.
+    type KeepValueType : KeepValue<Self::Tally>;
 
-    /// Whether or not the system has a quota. False for IRV.
+
+    /// Whether the system has a quota. False for IRV.
     fn has_quota() -> bool { true }
+    /// The formula to compute quota. Usually but not always this.
+    fn compute_quota_formula(total_first_preferences:BallotPaperCount,_non_transferred_votes:Self::Tally,candidates_to_be_elected:NumberOfCandidates) -> Self::Tally {
+        Self::Tally::from(BallotPaperCount(total_first_preferences.0/(1+candidates_to_be_elected.0)+1))
+    }
     /// Whether to transfer all the votes or just the last parcel.
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse;
     fn transfer_value_method() -> TransferValueMethod;
@@ -241,6 +306,22 @@ pub trait PreferenceDistributionRules {
     /// In exclusions, sort the sub-counts by this function. Used to support wierd bug in NSWEC2021.
     /// Also used in surplus distributions when the surplus transfer method is ScaleTransferValues.
     fn sort_subcounts_by_count() -> Option<Box<dyn FnMut(&Transcript<Self::Tally>,<<Self as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide,<<Self as PreferenceDistributionRules>::SplitByNumber as HowSplitByCountNumber>::KeyToDivide) -> Ordering>> { None }
+
+
+    //
+    // Things to support the Meek method
+    //
+
+    /// If the method used is actually the Meek method rather than a traditional STV.
+    fn is_meek_method() -> bool { false }
+
+    /// At what point the candidate with the lowest tally should be excluded, if doing Meek style
+    /// iteration. This is irrelevant if not doing Meek style STV.
+    /// * total_surplus is the sum of the surplus of each of the successful candidates.
+    /// * lowest_tally is the tally of the candidate with the lowest tally
+    /// * second_lowest_tally is the tally of the candidate with the second-lowest tally, should there be more than one hopeful candidate.
+    fn should_exclude_lowest_candidate_meek_method(_total_surplus:Self::Tally,_lowest_tally:Self::Tally,_second_lowest_tally:Option<Self::Tally>) -> bool { false }
+
 }
 
 struct PendingTranscript<Tally> {
@@ -258,6 +339,7 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     original_votes:&'a Vec<(TransferValue,Vec<PartiallyDistributedVote<'a>>)>,
     num_candidates : usize,
     candidates_to_be_elected : NumberOfCandidates,
+    recomputed_quota : Option<QuotaInfo<Rules::Tally>>,
     quota : Rules::Tally,
     /// The tally, by candidate.
     tallys : Vec<Rules::Tally>,
@@ -289,6 +371,8 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     exhausted_list_of_votes : ListOfVotes,
     set_aside_list_of_votes : ListOfVotes,
     last_written_list_of_votes_by_candidate : Vec<ListOfVotes>,
+    include_list_of_meek_vote_sources_in_transcript : Option<PerCandidate<ListOfMeekVoteSources>>,
+    keep_values : Vec<Rules::KeepValueType> // only used for Meek method, in which case there is one per candidate.
 }
 
 impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
@@ -312,6 +396,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             original_votes,
             num_candidates,
             candidates_to_be_elected,
+            recomputed_quota: None,
             quota : Rules::Tally::zero(), // dummy until computed.
             tallys,
             papers,
@@ -349,6 +434,8 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             exhausted_list_of_votes: Default::default(),
             set_aside_list_of_votes: Default::default(),
             last_written_list_of_votes_by_candidate: vec![ListOfVotes::default();num_candidates],
+            include_list_of_meek_vote_sources_in_transcript : None,
+            keep_values: vec![],
         }
     }
 
@@ -364,6 +451,11 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
 
     pub fn distribute_first_preferences(& mut self) {
         let mut total_first_preferences = Rules::Tally::zero();
+        if Rules::is_meek_method() {
+            for c in 0..self.num_candidates {
+                self.keep_values.push(if self.continuing_candidates.contains(&CandidateIndex(c)) {Rules::KeepValueType::one()} else {Rules::KeepValueType::zero()});
+            }
+        }
         for (tv,original_votes) in self.original_votes {
             let mut ballots_with_this_tv = BallotPaperCount(0);
             for v in original_votes { ballots_with_this_tv+=v.n; }
@@ -387,21 +479,89 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
     }
 
+    /// Compute keep values for the Meek method
+    /// * 1 if hopeful (continuing)
+    /// * 0 if excluded
+    /// * fraction if elected.
+    pub fn recompute_keep_values(&mut self) {
+        for c in 0..self.num_candidates {
+            self.keep_values[c]=if self.continuing_candidates.contains(&CandidateIndex(c)) {Rules::KeepValueType::one()} else if self.elected_candidates.contains(&CandidateIndex(c)) {
+                Rules::KeepValueType::compute_keep_value(self.quota.clone(), self.tallys[c].clone(), self.keep_values[c].clone()) // elected candidates are most complex
+            } else {Rules::KeepValueType::zero()}; // excluded
+        }
+    }
+
+    /// Recompute the tallies using keep values (only applies to Meek method).
+    /// Return the number of non-transferable votes.
+    ///
+    /// e.g.
+    /// Clause 10, New Zealand Local Electoral Regulation 2001, Schedule 1A,
+    /// "New Zealand method of counting single transferable votes" as inserted 1 Jan 2004
+    /// ```text
+    /// Allocate votes from each voting document according to the following scheme:
+    ///   vm = (1 – k1) × (1 – k2) × (1 – km-1) × km
+    /// where—
+    /// vm  is the votes to allocate to the mth preference candidate on the voting document
+    /// k1  is the keep value for the first preference candidate on the voting document
+    /// k2  is the keep value for the second preference candidate on the voting document
+    /// km  is the keep value for the mth preference candidate on the voting document
+    /// and the product of each multiplication on the right hand side of the equation must be calculated to 9 decimal digits after the point and rounded up if not exact and the multiplications must be calculated from left to right.
+    /// ```
+    pub fn recompute_tallies_given_keep_values(&mut self) -> Rules::Tally {
+        for c in 0..self.num_candidates { self.tallys[c]=Rules::Tally::zero(); }
+        let mut non_transferable_votes = Rules::Tally::zero();
+        // could make the source optional.
+        let mut non_transferable_source = ListOfMeekVoteSourcesBuilder::default();
+        let mut candidate_sources = vec![ListOfMeekVoteSourcesBuilder::default(); self.num_candidates];
+        let mut route : Vec<CandidateIndex> = vec![];
+        for (tv,votes) in self.original_votes {
+            if !tv.is_one() { panic!("Meep method with partial value votes is not implemented.") } // does anyone do this? If so, there are possibly multiple ways of doing it so I shouldn't do my guess.
+            for vote in votes {
+                route.clear();
+                let mut untransferred_value = Some(Rules::KeepValueType::one());
+                for &c in vote.prefs {
+                    if let Some(value) = untransferred_value {
+                        let (value_for_c,value_per_ballot,next) = Rules::KeepValueType::use_keep_value(value,self.keep_values[c.0].clone(),vote.n);
+                        if !value_for_c.is_zero() {
+                            self.tallys[c.0]+=value_for_c;
+                            candidate_sources[c.0].add(vote.n,&route,||value_per_ballot.to_string());
+                        }
+                        if self.elected_candidates.contains(&c) { route.push(c) }
+                        untransferred_value=next;
+                    } else {break}
+                }
+                if let Some(value) = untransferred_value {
+                    non_transferable_source.add(vote.n,&route,||value.to_string());
+                    let (value_remaining,_,_) = Rules::KeepValueType::use_keep_value(value,Rules::KeepValueType::one(),vote.n);
+                    non_transferable_votes+=value_remaining;
+                }
+            }
+        }
+        self.include_list_of_meek_vote_sources_in_transcript = Some(PerCandidate{
+            candidate: candidate_sources.into_iter().map(|s|s.into()).collect(),
+            exhausted: non_transferable_source.into(),
+            rounding: SignedVersion { negative: false, value: ListOfMeekVoteSources::default() },
+            set_aside: None,
+        });
+        non_transferable_votes
+    }
+
     pub fn resort_candidates(&mut self) {
         let tallies = &self.tallys;
         let key = |c:&CandidateIndex|tallies[c.0].clone();
         self.continuing_candidates_sorted_by_tally.sort_by_key(key);
     }
 
-    /// quota = round_down(first_preferences/(1+num_to_elect))+1
+    /// quota = round_down(first_preferences/(1+num_to_elect))+1... usually. But Rules::compute_quota_formula may be overridden.
     pub fn compute_quota(&mut self,total_first_preferences:Rules::Tally) {
         if Rules::has_quota() {
             let total_first_preferences = BallotPaperCount(Rules::convert_tally_to_rational(total_first_preferences.clone()).to_integer().to_usize().unwrap()); // usually trivial and valid, unless there are papers with TV other than 1, in which case rounded down.
-            self.quota = Rules::Tally::from(BallotPaperCount(total_first_preferences.0/(1+self.candidates_to_be_elected.0)+1));
+            self.quota = Rules::compute_quota_formula(total_first_preferences,Rules::Tally::zero(),self.candidates_to_be_elected);
             self.transcript.quota = Some(QuotaInfo{
                 papers: total_first_preferences,
                 vacancies: self.candidates_to_be_elected,
                 quota: self.quota.clone(),
+                exhausted: None,
             });
             if self.print_progress_to_stdout { println!("Quota = {}", self.quota); }
         } else {
@@ -678,6 +838,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                     ReasonForCount::FirstPreferenceCount => true,
                     ReasonForCount::ExcessDistribution(_) => !self.has_distributable_surplus(),
                     ReasonForCount::Elimination(_) => reason_completed,
+                    ReasonForCount::MeekIteration => true,
                 },
             _ => true,
         };
@@ -700,6 +861,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             ReasonForCount::FirstPreferenceCount => reason_completed, // don't check in the middle of the first preference count.
             ReasonForCount::ExcessDistribution(_) => Rules::check_elected_if_in_middle_of_surplus_distribution(),
             ReasonForCount::Elimination(_) => Rules::check_elected_if_in_middle_of_exclusion(),
+            ReasonForCount::MeekIteration => true,
         };
         if should_check_elected {
             self.check_elected(&reason,reason_completed);
@@ -775,8 +937,11 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                         set_aside: Some(self.set_aside_list_of_votes.clone()),
                     })
                 } else {None},
+                meek_vote_sources: self.include_list_of_meek_vote_sources_in_transcript.take(),
+                keep_values: self.keep_values.iter().map(|v|v.to_string()).collect(),
             },
             count_name,
+            quota : self.recomputed_quota.take(),
         });
         self.current_count=CountIndex(self.current_count.0+1);
         if reason_completed || (Rules::major_count_if_someone_elected() && !self.in_this_count.elected.is_empty()) { self.current_major_count=CountIndex(self.current_major_count.0+1); self.current_minor_count=CountIndex(1); }
@@ -804,6 +969,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
              ReasonForCount::ExcessDistribution(_) => true,
              ReasonForCount::Elimination(_) => bonus,
              ReasonForCount::FirstPreferenceCount => false,
+             ReasonForCount::MeekIteration => panic!("Should not have meek iteration in nsw last parcel"),
         };
         let mut res = count_elected;
         if should_do_lookback {
@@ -1334,7 +1500,43 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
     }
 
+    fn meek_step(&mut self) {
+        let mut candidates_to_exclude = vec![];
+        // see if someone should be eliminated.
+        if self.current_count.0>0 { // don't exclude on step 2.
+            let mut total_surplus = Rules::Tally::zero(); // clause 14
+            for c in 0..self.num_candidates {
+                if self.tallys[c]>self.quota.clone() {
+                    total_surplus+=self.tallys[c].clone()-self.quota.clone();
+                }
+            }
+            // NZ rule
+            // Exclude the hopeful candidate with the least votes if the sum of his or her votes and the total surplus is less than the votes of any other hopeful candidate or if the total surplus is less than 0.0001.
+            // NZ rule 13
+            if let Some(lowest) = self.continuing_candidates_sorted_by_tally.get(0) {
+                if Rules::should_exclude_lowest_candidate_meek_method(total_surplus,self.tallys[lowest.0].clone(),self.continuing_candidates_sorted_by_tally.get(1).map(|c|self.tallys[c.0].clone())) {
+                    candidates_to_exclude = self.find_lowest_candidate();
+                }
+            }
+        }
+        for &candidate in &candidates_to_exclude {
+            // println!("Excluding {}",self.data.metadata.candidate(candidate).name);
+            self.no_longer_continuing(candidate,false);
+        }
+        self.recompute_keep_values(); // NZ rules 7-9
+        let non_transferable_votes = self.recompute_tallies_given_keep_values(); // NZ rule 10
+        // recompute quota
+        self.tally_exhausted = non_transferable_votes.clone();
+        self.quota = Rules::compute_quota_formula(self.transcript.quota.as_ref().unwrap().papers,non_transferable_votes.clone(),self.candidates_to_be_elected); // NZ rule 11
+        self.recomputed_quota = Some(QuotaInfo{
+            papers: self.transcript.quota.as_ref().unwrap().papers,
+            vacancies: self.candidates_to_be_elected,
+            quota: self.quota.clone(),
+            exhausted: Some(non_transferable_votes),
+        });
+        self.end_of_count_step(if candidates_to_exclude.is_empty() {ReasonForCount::MeekIteration} else {ReasonForCount::Elimination(candidates_to_exclude)},PortionOfReasonBeingDoneThisCount::default(),true); // NZ rule 12, and
 
+    }
     pub fn exclude_lowest(&mut self) {
         let candidates_to_exclude : Vec<CandidateIndex> =
             if Rules::should_eliminate_multiple_candidates_federal_rule_13a() { self.find_candidates_for_multiple_elimination_federal_rule_13a().unwrap_or_else(||self.find_lowest_candidate()) }
@@ -1360,7 +1562,9 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         if self.print_progress_to_stdout { self.print_candidates_names(); }
         self.distribute_first_preferences();
         while (self.remaining_to_elect()>NumberOfCandidates(0) && self.continuing_candidates.len()>0 &&!(Rules::declare_election_over_if_2_tied_candidates_remain() && self.continuing_candidates.len()==2)) || (Rules::finish_all_surplus_distributions_when_all_elected() && (!self.continuing_candidates_sorted_by_tally.is_empty()) && !self.pending_surplus_distribution.is_empty()) {
-            if self.should_defer_surplus() {
+            if Rules::is_meek_method() {
+                self.meek_step();
+            } else if self.should_defer_surplus() {
                 self.exclude_lowest();
             } else {
                 if let Some(candidate) = self.pending_surplus_distribution.pop_front() {
