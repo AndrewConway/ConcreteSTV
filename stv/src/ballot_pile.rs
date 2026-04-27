@@ -383,8 +383,8 @@ impl <'a> DistributedVotes<'a> {
     }
 }
 
-
 /// Different jurisdictions split up parcels of shares by their provenence in different ways. This abstracts that.
+/// Note that after this split, there is always a split by transfer value (which may be redundant).
 pub trait HowSplitByCountNumber {
     type KeyToDivide : Eq+Hash+Clone+Ord+Debug;
     fn key(count_index:CountIndex,when_tv_created:Option<CountIndex>) -> Self::KeyToDivide;

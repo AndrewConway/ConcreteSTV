@@ -57,9 +57,15 @@ pub enum WhenToDoElectCandidateClauseChecking {
 }
 
 #[derive(Copy,Clone,Serialize,Deserialize,Debug)]
+/// Determines whether exhausted ballots are removed from the denominator when calculating the transfer value.
+/// Note this is separate from the question of whether the transfer value is weighted or unweighted
+/// --- see SurplusTransferMethod for that.
 pub enum TransferValueMethod {
+    /// Denominator includes all ballots.
     SurplusOverBallots, // Used by Federal
+    /// Denominator includes only continuing ballots.
     SurplusOverContinuingBallots,
+    /// Like SurplusOverContinuingBallots but with a ceiling equal to the prior value.
     SurplusOverContinuingBallotsLimitedToPriorTransferValue, // Used by ACT
 }
 
@@ -92,6 +98,7 @@ pub enum CountNamingMethod {
 
 
 /// What general algorithm to use to do surplus transfers.
+/// Note this is different from how to calculate the transfer value --- see TransferValueMethod for that.
 #[derive(Copy,Clone,Serialize,Deserialize,Eq, PartialEq)]
 pub enum SurplusTransferMethod {
     JustOneTransferValue, // Bunch votes together and do a single transfer. E.g. Federal.
@@ -191,7 +198,7 @@ pub trait PreferenceDistributionRules {
     fn how_to_name_counts() -> CountNamingMethod { CountNamingMethod::SimpleNumber }
 
     /// whether exhausted votes in count 1 (first preferences) count towards the quota calculation.
-    /// (this happens in the case of candidates ruled ineligible).
+    /// (this happens in the case of candidates ruled ineligible - blank votes never count).
     fn should_exhausted_votes_count_for_quota_computation() -> bool { false }
 
     /// If someone is elected in the middle of an exclusion or surplus, should we start a new major count?

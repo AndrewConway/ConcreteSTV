@@ -8,19 +8,21 @@
 use stv::ballot_pile::{BallotPaperCount, DoNotSplitByCountNumber};
 use stv::preference_distribution::{BigRational, CountNamingMethod, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
 use stv::tie_resolution::MethodOfTieResolution;
-use stv::transfer_value::{convert_usize_to_rational, round_rational_down_to_usize, TransferValue};
+use stv::transfer_value::{TransferValue};
 use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 
-pub mod parse_minimal;
-
-
-/// My guess at what the legislation means.
-/// Appropriate legislation is the "Electoral Act 1907", Schedule 1, "Counting of votes at Legislative Council elections"
-/// from which comments below are drawn.
-pub struct Minimal {
+/// A best-effort set of simple STV rules, to match the inferences in the STV margin paper by
+/// Blom, Ek, Stuckey, Teague and Vukcevic.
+/// These rules include
+/// - transfer by WIGM, with BigRational weights and transfer values,
+/// - minimal count splitting,
+/// - completing all surplus distributions and exclusions before checking whether any candidate is over quota.
+/// There is no parser associated with this rule set, because this is an idealised STV version
+/// not taken from any actual jurisdiction.
+pub struct beSTV {
 }
 
-impl PreferenceDistributionRules for Minimal {
+impl PreferenceDistributionRules for beSTV {
     type Tally = FixedPrecisionDecimal<6>;
 
     // ???
@@ -70,7 +72,7 @@ impl PreferenceDistributionRules for Minimal {
     /// No such clause
     fn should_eliminate_multiple_candidates_federal_rule_13a() -> bool { false }
 
-    fn name() -> String { "Minimal".to_string() }
+    fn name() -> String { "BESTV".to_string() }
     fn how_to_name_counts() -> CountNamingMethod { CountNamingMethod::MajorMinor }
 
     fn major_count_if_someone_elected() -> bool { true }
