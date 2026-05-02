@@ -1,0 +1,1905 @@
+{
+  "metadata": {
+    "name": {
+      "year": "2004",
+      "authority": "New Zealand",
+      "name": "Simple Example for Meek",
+      "electorate": "Cargill Ward",
+      "comment": "This is a reconstruction of a set of votes that _could_ produce the results in https://www.prsa.org.au/2004-10-09_meek_stv_dunedin_cargill_ward.docx."
+    },
+    "candidates": [
+      {
+        "name": "Jo GALER"
+      },
+      {
+        "name": "Michael GUEST"
+      },
+      {
+        "name": "Douglas Wayne HALL"
+      },
+      {
+        "name": "Nicola HOLMAN"
+      },
+      {
+        "name": "Paul Richard HUDSON"
+      },
+      {
+        "name": "Alan MCDONALD"
+      },
+      {
+        "name": "Paul John Michael McMULLAN"
+      },
+      {
+        "name": "Calvin OATEN"
+      },
+      {
+        "name": "Teresa STEVENSON"
+      },
+      {
+        "name": "Steve YOUNG"
+      }
+    ],
+    "results": [
+      8,
+      4,
+      1
+    ],
+    "vacancies": 3
+  },
+  "transcript": {
+    "rules": "NZMeek",
+    "quota": {
+      "papers": 5210,
+      "vacancies": 3,
+      "quota": "1302.500000001"
+    },
+    "counts": [
+      {
+        "reason": "FirstPreferenceCount",
+        "portion": {
+          "transfer_value": "1",
+          "when_tv_created": null,
+          "papers_came_from_counts": []
+        },
+        "reason_completed": true,
+        "elected": [],
+        "not_continuing": [],
+        "created_transfer_value": null,
+        "decisions": [],
+        "status": {
+          "tallies": {
+            "candidate": [
+              "385",
+              "726",
+              "660",
+              "447",
+              "948",
+              "197",
+              "115",
+              "142",
+              "1266",
+              "324"
+            ],
+            "exhausted": "0",
+            "rounding": "0",
+            "set_aside": null
+          },
+          "papers": {
+            "candidate": [
+              385,
+              726,
+              660,
+              447,
+              948,
+              197,
+              115,
+              142,
+              1266,
+              324
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "atl_papers": {
+            "candidate": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "keep_values": [
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1"
+          ]
+        }
+      },
+      {
+        "reason": {
+          "Elimination": [
+            6
+          ]
+        },
+        "portion": {
+          "transfer_value": null,
+          "when_tv_created": null,
+          "papers_came_from_counts": []
+        },
+        "reason_completed": true,
+        "elected": [
+          {
+            "who": 8,
+            "why": "ReachedQuota"
+          }
+        ],
+        "not_continuing": [
+          6
+        ],
+        "created_transfer_value": null,
+        "decisions": [],
+        "status": {
+          "tallies": {
+            "candidate": [
+              "391",
+              "735",
+              "675",
+              "449",
+              "953",
+              "201",
+              "0",
+              "143",
+              "1313",
+              "332"
+            ],
+            "exhausted": "18",
+            "rounding": "0",
+            "set_aside": null
+          },
+          "papers": {
+            "candidate": [
+              385,
+              726,
+              660,
+              447,
+              948,
+              197,
+              115,
+              142,
+              1266,
+              324
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "atl_papers": {
+            "candidate": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "meek_vote_sources": {
+            "candidate": [
+              [
+                {
+                  "count": 391,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 735,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 675,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 449,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 953,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 201,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [],
+              [
+                {
+                  "count": 143,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 1313,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 332,
+                  "weight": "1",
+                  "route": []
+                }
+              ]
+            ],
+            "exhausted": [
+              {
+                "count": 18,
+                "weight": "1",
+                "route": []
+              }
+            ],
+            "rounding": "",
+            "set_aside": null
+          },
+          "keep_values": [
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "1",
+            "1",
+            "1"
+          ]
+        },
+        "quota": {
+          "papers": 5210,
+          "vacancies": 3,
+          "quota": "1298.000000001",
+          "exhausted": "18"
+        }
+      },
+      {
+        "reason": {
+          "Elimination": [
+            7
+          ]
+        },
+        "portion": {
+          "transfer_value": null,
+          "when_tv_created": null,
+          "papers_came_from_counts": []
+        },
+        "reason_completed": true,
+        "elected": [],
+        "not_continuing": [
+          8,
+          7
+        ],
+        "created_transfer_value": null,
+        "decisions": [],
+        "status": {
+          "tallies": {
+            "candidate": [
+              "409.307692238",
+              "749.873571916",
+              "711.930693011",
+              "466.2848438",
+              "965.239146924",
+              "210.188118776",
+              "0",
+              "0",
+              "1316.782940292",
+              "347.782178164"
+            ],
+            "exhausted": "32.610814879",
+            "rounding": "0",
+            "set_aside": null
+          },
+          "papers": {
+            "candidate": [
+              385,
+              726,
+              660,
+              447,
+              948,
+              197,
+              115,
+              142,
+              1266,
+              324
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "atl_papers": {
+            "candidate": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "meek_vote_sources": {
+            "candidate": [
+              [
+                {
+                  "count": 202,
+                  "weight": "0.011424219",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 407,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 164,
+                  "weight": "0.011424219",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 748,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 169,
+                  "weight": "0.011424219",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 710,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 200,
+                  "weight": "0.011424219",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 464,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 196,
+                  "weight": "0.011424219",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 963,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 104,
+                  "weight": "0.011424219",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 209,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [],
+              [],
+              [
+                {
+                  "count": 1332,
+                  "weight": "0.988575781",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 156,
+                  "weight": "0.011424219",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 346,
+                  "weight": "1",
+                  "route": []
+                }
+              ]
+            ],
+            "exhausted": [
+              {
+                "count": 31,
+                "weight": "1",
+                "route": []
+              },
+              {
+                "count": 141,
+                "weight": "0.011424219",
+                "route": [
+                  8
+                ]
+              }
+            ],
+            "rounding": "",
+            "set_aside": null
+          },
+          "keep_values": [
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0.988575781",
+            "1"
+          ]
+        },
+        "quota": {
+          "papers": 5210,
+          "vacancies": 3,
+          "quota": "1294.347296281",
+          "exhausted": "32.610814879"
+        }
+      },
+      {
+        "reason": {
+          "Elimination": [
+            5
+          ]
+        },
+        "portion": {
+          "transfer_value": null,
+          "when_tv_created": null,
+          "papers_came_from_counts": []
+        },
+        "reason_completed": true,
+        "elected": [],
+        "not_continuing": [
+          5
+        ],
+        "created_transfer_value": null,
+        "decisions": [],
+        "status": {
+          "tallies": {
+            "candidate": [
+              "429.2189149",
+              "777.173006485",
+              "749.512220025",
+              "487.10584372",
+              "998.2189149",
+              "0",
+              "0",
+              "0",
+              "1327.38619203",
+              "372.86206074"
+            ],
+            "exhausted": "68.5228472",
+            "rounding": "0",
+            "set_aside": null
+          },
+          "papers": {
+            "candidate": [
+              385,
+              726,
+              660,
+              447,
+              948,
+              197,
+              115,
+              142,
+              1266,
+              324
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "atl_papers": {
+            "candidate": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "meek_vote_sources": {
+            "candidate": [
+              [
+                {
+                  "count": 220,
+                  "weight": "0.028267795",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 423,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 183,
+                  "weight": "0.028267795",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 772,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 195,
+                  "weight": "0.028267795",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 744,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 216,
+                  "weight": "0.028267795",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 481,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 220,
+                  "weight": "0.028267795",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 992,
+                  "weight": "1",
+                  "route": []
+                }
+              ],
+              [],
+              [],
+              [],
+              [
+                {
+                  "count": 1366,
+                  "weight": "0.971732205",
+                  "route": []
+                }
+              ],
+              [
+                {
+                  "count": 172,
+                  "weight": "0.028267795",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 368,
+                  "weight": "1",
+                  "route": []
+                }
+              ]
+            ],
+            "exhausted": [
+              {
+                "count": 64,
+                "weight": "1",
+                "route": []
+              },
+              {
+                "count": 160,
+                "weight": "0.028267795",
+                "route": [
+                  8
+                ]
+              }
+            ],
+            "rounding": "",
+            "set_aside": null
+          },
+          "keep_values": [
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0.971732205",
+            "1"
+          ]
+        },
+        "quota": {
+          "papers": 5210,
+          "vacancies": 3,
+          "quota": "1285.369288201",
+          "exhausted": "68.5228472"
+        }
+      },
+      {
+        "reason": {
+          "Elimination": [
+            9
+          ]
+        },
+        "portion": {
+          "transfer_value": null,
+          "when_tv_created": null,
+          "papers_came_from_counts": []
+        },
+        "reason_completed": true,
+        "elected": [],
+        "not_continuing": [
+          9
+        ],
+        "created_transfer_value": null,
+        "decisions": [],
+        "status": {
+          "tallies": {
+            "candidate": [
+              "484.287960625",
+              "840.10396625",
+              "814.04839625",
+              "534.52061125",
+              "1067.697691875",
+              "0",
+              "0",
+              "0",
+              "1360.64713875",
+              "0"
+            ],
+            "exhausted": "108.694235",
+            "rounding": "0",
+            "set_aside": null
+          },
+          "papers": {
+            "candidate": [
+              385,
+              726,
+              660,
+              447,
+              948,
+              197,
+              115,
+              142,
+              1266,
+              324
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "atl_papers": {
+            "candidate": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "meek_vote_sources": {
+            "candidate": [
+              [
+                {
+                  "count": 469,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 259,
+                  "weight": "0.059026875",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 827,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 222,
+                  "weight": "0.059026875",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 800,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 238,
+                  "weight": "0.059026875",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 520,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 246,
+                  "weight": "0.059026875",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 1053,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 249,
+                  "weight": "0.059026875",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [],
+              [],
+              [],
+              [
+                {
+                  "count": 1446,
+                  "weight": "0.940973125",
+                  "route": []
+                }
+              ],
+              []
+            ],
+            "exhausted": [
+              {
+                "count": 232,
+                "weight": "0.059026875",
+                "route": [
+                  8
+                ]
+              },
+              {
+                "count": 95,
+                "weight": "1",
+                "route": []
+              }
+            ],
+            "rounding": "",
+            "set_aside": null
+          },
+          "keep_values": [
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0.940973125",
+            "0"
+          ]
+        },
+        "quota": {
+          "papers": 5210,
+          "vacancies": 3,
+          "quota": "1275.326441251",
+          "exhausted": "108.694235"
+        }
+      },
+      {
+        "reason": "MeekIteration",
+        "portion": {
+          "transfer_value": null,
+          "when_tv_created": null,
+          "papers_came_from_counts": []
+        },
+        "reason_completed": true,
+        "elected": [],
+        "not_continuing": [],
+        "created_transfer_value": null,
+        "decisions": [],
+        "status": {
+          "tallies": {
+            "candidate": [
+              "499.570160054",
+              "853.202994332",
+              "828.091498428",
+              "549.035750476",
+              "1082.389844994",
+              "0",
+              "0",
+              "0",
+              "1275.326442324",
+              "0"
+            ],
+            "exhausted": "122.383309392",
+            "rounding": "0",
+            "set_aside": null
+          },
+          "papers": {
+            "candidate": [
+              385,
+              726,
+              660,
+              447,
+              948,
+              197,
+              115,
+              142,
+              1266,
+              324
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "atl_papers": {
+            "candidate": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "meek_vote_sources": {
+            "candidate": [
+              [
+                {
+                  "count": 469,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 259,
+                  "weight": "0.118031506",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 827,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 222,
+                  "weight": "0.118031506",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 800,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 238,
+                  "weight": "0.118031506",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 520,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 246,
+                  "weight": "0.118031506",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 1053,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 249,
+                  "weight": "0.118031506",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [],
+              [],
+              [],
+              [
+                {
+                  "count": 1446,
+                  "weight": "0.881968494",
+                  "route": []
+                }
+              ],
+              []
+            ],
+            "exhausted": [
+              {
+                "count": 232,
+                "weight": "0.118031506",
+                "route": [
+                  8
+                ]
+              },
+              {
+                "count": 95,
+                "weight": "1",
+                "route": []
+              }
+            ],
+            "rounding": "",
+            "set_aside": null
+          },
+          "keep_values": [
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0.881968494",
+            "0"
+          ]
+        },
+        "quota": {
+          "papers": 5210,
+          "vacancies": 3,
+          "quota": "1271.904172653",
+          "exhausted": "122.383309392"
+        }
+      },
+      {
+        "reason": {
+          "Elimination": [
+            0
+          ]
+        },
+        "portion": {
+          "transfer_value": null,
+          "when_tv_created": null,
+          "papers_came_from_counts": []
+        },
+        "reason_completed": true,
+        "elected": [],
+        "not_continuing": [
+          0
+        ],
+        "created_transfer_value": null,
+        "decisions": [],
+        "status": {
+          "tallies": {
+            "candidate": [
+              "0",
+              "929.1095105",
+              "907.39707668",
+              "682.7413681",
+              "1141.75827134",
+              "0",
+              "0",
+              "0",
+              "1367.7807679",
+              "0"
+            ],
+            "exhausted": "181.21300548",
+            "rounding": "0",
+            "set_aside": null
+          },
+          "papers": {
+            "candidate": [
+              385,
+              726,
+              660,
+              447,
+              948,
+              197,
+              115,
+              142,
+              1266,
+              324
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "atl_papers": {
+            "candidate": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "meek_vote_sources": {
+            "candidate": [
+              [],
+              [
+                {
+                  "count": 896,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 275,
+                  "weight": "0.12039822",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 872,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 294,
+                  "weight": "0.12039822",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 640,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 355,
+                  "weight": "0.12039822",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 1106,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 297,
+                  "weight": "0.12039822",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [],
+              [],
+              [],
+              [
+                {
+                  "count": 1555,
+                  "weight": "0.87960178",
+                  "route": []
+                }
+              ],
+              []
+            ],
+            "exhausted": [
+              {
+                "count": 334,
+                "weight": "0.12039822",
+                "route": [
+                  8
+                ]
+              },
+              {
+                "count": 141,
+                "weight": "1",
+                "route": []
+              }
+            ],
+            "rounding": "",
+            "set_aside": null
+          },
+          "keep_values": [
+            "0",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0.87960178",
+            "0"
+          ]
+        },
+        "quota": {
+          "papers": 5210,
+          "vacancies": 3,
+          "quota": "1257.196748631",
+          "exhausted": "181.21300548"
+        }
+      },
+      {
+        "reason": {
+          "Elimination": [
+            3
+          ]
+        },
+        "portion": {
+          "transfer_value": null,
+          "when_tv_created": null,
+          "papers_came_from_counts": []
+        },
+        "reason_completed": true,
+        "elected": [
+          {
+            "who": 4,
+            "why": "ReachedQuota"
+          }
+        ],
+        "not_continuing": [
+          3
+        ],
+        "created_transfer_value": null,
+        "decisions": [],
+        "status": {
+          "tallies": {
+            "candidate": [
+              "0",
+              "1103.115664128",
+              "1028.285397248",
+              "0",
+              "1283.285397248",
+              "0",
+              "0",
+              "0",
+              "1411.617701376",
+              "0"
+            ],
+            "exhausted": "383.69584",
+            "rounding": "0",
+            "set_aside": null
+          },
+          "papers": {
+            "candidate": [
+              385,
+              726,
+              660,
+              447,
+              948,
+              197,
+              115,
+              142,
+              1266,
+              324
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "atl_papers": {
+            "candidate": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "meek_vote_sources": {
+            "candidate": [
+              [],
+              [
+                {
+                  "count": 1029,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 387,
+                  "weight": "0.191513344",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 958,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 367,
+                  "weight": "0.191513344",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [],
+              [
+                {
+                  "count": 1213,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 367,
+                  "weight": "0.191513344",
+                  "route": [
+                    8
+                  ]
+                }
+              ],
+              [],
+              [],
+              [],
+              [
+                {
+                  "count": 1746,
+                  "weight": "0.808486656",
+                  "route": []
+                }
+              ],
+              []
+            ],
+            "exhausted": [
+              {
+                "count": 264,
+                "weight": "1",
+                "route": []
+              },
+              {
+                "count": 625,
+                "weight": "0.191513344",
+                "route": [
+                  8
+                ]
+              }
+            ],
+            "rounding": "",
+            "set_aside": null
+          },
+          "keep_values": [
+            "0",
+            "1",
+            "1",
+            "0",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0.808486656",
+            "0"
+          ]
+        },
+        "quota": {
+          "papers": 5210,
+          "vacancies": 3,
+          "quota": "1206.576040001",
+          "exhausted": "383.69584"
+        }
+      },
+      {
+        "reason": "MeekIteration",
+        "portion": {
+          "transfer_value": null,
+          "when_tv_created": null,
+          "papers_came_from_counts": []
+        },
+        "reason_completed": true,
+        "elected": [],
+        "not_continuing": [
+          4
+        ],
+        "created_transfer_value": null,
+        "decisions": [],
+        "status": {
+          "tallies": {
+            "candidate": [
+              "0",
+              "1168.176831147",
+              "1089.215287815",
+              "0",
+              "1247.098461827",
+              "0",
+              "0",
+              "0",
+              "1223.140601751",
+              "0"
+            ],
+            "exhausted": "482.36881746",
+            "rounding": "0",
+            "set_aside": null
+          },
+          "papers": {
+            "candidate": [
+              385,
+              726,
+              660,
+              447,
+              948,
+              197,
+              115,
+              142,
+              1266,
+              324
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "atl_papers": {
+            "candidate": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "meek_vote_sources": {
+            "candidate": [
+              [],
+              [
+                {
+                  "count": 387,
+                  "weight": "0.30894843",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 1029,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 159,
+                  "weight": "0.018467626",
+                  "route": [
+                    4,
+                    8
+                  ]
+                },
+                {
+                  "count": 279,
+                  "weight": "0.059775757",
+                  "route": [
+                    4
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 367,
+                  "weight": "0.30894843",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 958,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 179,
+                  "weight": "0.018467626",
+                  "route": [
+                    4,
+                    8
+                  ]
+                },
+                {
+                  "count": 243,
+                  "weight": "0.059775757",
+                  "route": [
+                    4
+                  ]
+                }
+              ],
+              [],
+              [
+                {
+                  "count": 367,
+                  "weight": "0.290480804",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 1213,
+                  "weight": "0.940224243",
+                  "route": []
+                }
+              ],
+              [],
+              [],
+              [],
+              [
+                {
+                  "count": 401,
+                  "weight": "0.041308131",
+                  "route": [
+                    4
+                  ]
+                },
+                {
+                  "count": 1746,
+                  "weight": "0.69105157",
+                  "route": []
+                }
+              ],
+              []
+            ],
+            "exhausted": [
+              {
+                "count": 264,
+                "weight": "1",
+                "route": []
+              },
+              {
+                "count": 367,
+                "weight": "0.018467626",
+                "route": [
+                  8,
+                  4
+                ]
+              },
+              {
+                "count": 290,
+                "weight": "0.059775757",
+                "route": [
+                  4
+                ]
+              },
+              {
+                "count": 625,
+                "weight": "0.30894843",
+                "route": [
+                  8
+                ]
+              },
+              {
+                "count": 63,
+                "weight": "0.018467626",
+                "route": [
+                  4,
+                  8
+                ]
+              }
+            ],
+            "rounding": "",
+            "set_aside": null
+          },
+          "keep_values": [
+            "0",
+            "1",
+            "1",
+            "0",
+            "0.940224243",
+            "0",
+            "0",
+            "0",
+            "0.69105157",
+            "0"
+          ]
+        },
+        "quota": {
+          "papers": 5210,
+          "vacancies": 3,
+          "quota": "1181.907795636",
+          "exhausted": "482.36881746"
+        }
+      },
+      {
+        "reason": "MeekIteration",
+        "portion": {
+          "transfer_value": null,
+          "when_tv_created": null,
+          "papers_came_from_counts": []
+        },
+        "reason_completed": true,
+        "elected": [
+          {
+            "who": 1,
+            "why": "ReachedQuota"
+          }
+        ],
+        "not_continuing": [],
+        "created_transfer_value": null,
+        "decisions": [],
+        "status": {
+          "tallies": {
+            "candidate": [
+              "0",
+              "1193.722713168",
+              "1112.880325624",
+              "0",
+              "1189.526083194",
+              "0",
+              "0",
+              "0",
+              "1195.068471724",
+              "0"
+            ],
+            "exhausted": "518.80240629",
+            "rounding": "0",
+            "set_aside": null
+          },
+          "papers": {
+            "candidate": [
+              385,
+              726,
+              660,
+              447,
+              948,
+              197,
+              115,
+              142,
+              1266,
+              324
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "atl_papers": {
+            "candidate": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "exhausted": 0,
+            "rounding": "0",
+            "set_aside": null
+          },
+          "meek_vote_sources": {
+            "candidate": [
+              [],
+              [
+                {
+                  "count": 387,
+                  "weight": "0.332244194",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 1029,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 279,
+                  "weight": "0.108924919",
+                  "route": [
+                    4
+                  ]
+                },
+                {
+                  "count": 159,
+                  "weight": "0.036189671",
+                  "route": [
+                    4,
+                    8
+                  ]
+                }
+              ],
+              [
+                {
+                  "count": 367,
+                  "weight": "0.332244194",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 958,
+                  "weight": "1",
+                  "route": []
+                },
+                {
+                  "count": 243,
+                  "weight": "0.108924919",
+                  "route": [
+                    4
+                  ]
+                },
+                {
+                  "count": 179,
+                  "weight": "0.036189671",
+                  "route": [
+                    4,
+                    8
+                  ]
+                }
+              ],
+              [],
+              [
+                {
+                  "count": 367,
+                  "weight": "0.296054523",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 1213,
+                  "weight": "0.891075081",
+                  "route": []
+                }
+              ],
+              [],
+              [],
+              [],
+              [
+                {
+                  "count": 1746,
+                  "weight": "0.667755806",
+                  "route": []
+                },
+                {
+                  "count": 401,
+                  "weight": "0.072735248",
+                  "route": [
+                    4
+                  ]
+                }
+              ],
+              []
+            ],
+            "exhausted": [
+              {
+                "count": 264,
+                "weight": "1",
+                "route": []
+              },
+              {
+                "count": 625,
+                "weight": "0.332244194",
+                "route": [
+                  8
+                ]
+              },
+              {
+                "count": 367,
+                "weight": "0.036189671",
+                "route": [
+                  8,
+                  4
+                ]
+              },
+              {
+                "count": 290,
+                "weight": "0.108924919",
+                "route": [
+                  4
+                ]
+              },
+              {
+                "count": 63,
+                "weight": "0.036189671",
+                "route": [
+                  4,
+                  8
+                ]
+              }
+            ],
+            "rounding": "",
+            "set_aside": null
+          },
+          "keep_values": [
+            "0",
+            "1",
+            "1",
+            "0",
+            "0.891075081",
+            "0",
+            "0",
+            "0",
+            "0.667755806",
+            "0"
+          ]
+        },
+        "quota": {
+          "papers": 5210,
+          "vacancies": 3,
+          "quota": "1172.799398428",
+          "exhausted": "518.80240629"
+        }
+      }
+    ],
+    "elected": [
+      8,
+      4,
+      1
+    ]
+  }
+}
