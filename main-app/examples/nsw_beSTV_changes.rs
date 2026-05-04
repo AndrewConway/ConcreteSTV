@@ -4,17 +4,19 @@
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
-/// Based on nsw2021_ivote_changes.rs, but with only the simple parts and with **beSTV not the NSW LGE rules**.
+/// Based on nsw2021_ivote_changes.rs but with only the simple parts.
+/// This file iterates through all of one year's NSW LGE data and finds small changes that change
+/// the outcome based on **beSTV not the NSW LGE rules**.
 /// Edit YEAR to choose a different year of NSW local govt election data (currently we have 2012,
-/// 2016, 2017, 2021, 2024) and find small changes that can lead to a different election outcome.
-/// You can then use these outputs as upper bounds in https://github.com/michelleblom/pymarginstv.
+/// 2016, 2017, 2021, 2024).
+/// You can then use summary.csv as upper bounds in https://github.com/michelleblom/pymarginstv,
+/// specifically run_NSW_LGE_experiments.py.
 use std::collections::HashSet;
 use std::fs::{create_dir_all, File};
 use std::io::Write;
 use BESTV::beSTV;
 use margin::choose_votes::ChooseVotesOptions;
 use margin::find_outcome_changes::find_outcome_changes;
-use margin::record_changes::ElectionChanges;
 use nsw::parse_lge::{NSWLGEDataSource};
 use stv::ballot_metadata::NumberOfCandidates;
 use stv::datasource_description::ElectionDataSource;
@@ -47,19 +49,8 @@ fn main() -> anyhow::Result <()> {
     writeln!(summary,"Electorate,Votes,Vacancies,Candidates,Min Manipulation")?;
     for electorate in &electorates {
         println!("Electorate: {}", electorate);
-        let (data,old_min_add,old_min_manipulation,old_changes) = { // read in the published data, if available, to get the same order of votes, to make new results more directly comparable to old results.
-
-            if let Ok(existing_parsed_file) = File::open(format!("published/{}.vchange", electorate)) {
-                let old_changes : ElectionChanges<usize> = serde_json::from_reader(existing_parsed_file)?;
-                let old_min_add = old_changes.changes.iter().filter( |vc | !vc.requires.changed_ballots).map(|vc| vc.ballots.n).min();
-                let old_min_manipulation = old_changes.changes.iter().filter( |vc | vc.requires.changed_ballots).map(|vc| vc.ballots.n).min();
-                (old_changes.original,old_min_add,old_min_manipulation,old_changes.changes)
-            } else {
-                let data = loader.read_raw_data_best_quality(electorate)?;
-                (data,None,None,vec![])
-            }
-
-        };
+        // Consider adding a loop like that in nsw2021_ivote_changes that repeats the bound-finding
+        // a few times and take the best.
         let data = loader.read_raw_data_best_quality(electorate)?;
         println!("Electorate: {}, vacancies: {:?}, candidates: {}", electorate, &data.metadata.vacancies, &data.metadata.candidates.len());
         data.print_summary();
