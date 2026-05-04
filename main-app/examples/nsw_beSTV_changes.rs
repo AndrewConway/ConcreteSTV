@@ -8,7 +8,7 @@
 /// This file iterates through all of one year's NSW LGE data and finds small changes that change
 /// the outcome based on **beSTV not the NSW LGE rules**.
 /// Edit YEAR to choose a different year of NSW local govt election data (currently we have 2012,
-/// 2016, 2017, 2021, 2024).
+/// 2016, 2017, 2021, 2024). Not all years work, because there are sometimes inconsistencies with official results.
 /// You can then use summary.csv as upper bounds in https://github.com/michelleblom/pymarginstv,
 /// specifically run_NSW_LGE_experiments.py.
 use std::collections::HashSet;
@@ -25,7 +25,7 @@ use stv::parse_util::{FileFinder, RawDataSource};
 const CHANGES_DIR: &str = "changes";
 const STV_TALLY_DIR: &str = "tallies";
 const BESTV: &str = "BESTV_NSW_LGE";
-const YEAR: &str = "2024";
+const YEAR: &str = "2021";
 
 fn main() -> anyhow::Result <()> {
 
