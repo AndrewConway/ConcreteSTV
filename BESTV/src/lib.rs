@@ -1,4 +1,4 @@
-// Copyright 2023 Andrew Conway, Alexander Ek.
+// Copyright 2023 Andrew Conway, Alexander Ek, Vanessa Teague.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -11,14 +11,16 @@ use stv::tie_resolution::MethodOfTieResolution;
 use stv::transfer_value::{TransferValue};
 use stv::fixed_precision_decimal::FixedPrecisionDecimal;
 
-/// A best-effort set of simple STV rules, to match the inferences in the STV margin paper by
-/// Blom, Ek, Stuckey, Teague and Vukcevic.
+/// A best-effort set of simple STV rules, to match as closely as possible the rules assumed in
+/// the STV margin paper by Blom, Ek, Stuckey, Teague and Vukcevic
+/// and the corresponding lower-bound calculator at (https://github.com/michelleblom/pymarginstv).
 /// These rules include
-/// - transfer by WIGM, with BigRational weights and transfer values,
+/// - transfer by WIGM, with rational transfer values and fixed-precision (6 dp) tallies,
 /// - minimal count splitting,
 /// - completing all surplus distributions and exclusions before checking whether any candidate is over quota.
 /// There is no parser associated with this rule set, because this is an idealised STV version
 /// not taken from any actual jurisdiction.
+/// There are also no test cases, because there is no external independent count to match against.
 pub struct beSTV {
 }
 
@@ -32,7 +34,7 @@ impl PreferenceDistributionRules for beSTV {
     /// Do not exclude exhausted ballots in TV calculation. This is the 'I' in WIGM.
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverBallots }
 
-    /// Use fixed-precision tallies and transfer values
+    /// Use fixed-precision tallies with 6 decimal places, rounding down when needed.
     type Tally = FixedPrecisionDecimal<6>;
     fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { tally.to_rational() }
     fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { Self::Tally::from_rational_rounding_down(rational) }
@@ -42,6 +44,8 @@ impl PreferenceDistributionRules for beSTV {
     fn make_transfer_value(surplus: Self::Tally, ballots: BallotPaperCount) -> TransferValue {
         TransferValue::from_surplus(surplus.get_scaled_value() as usize,BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize)))
     }
+    /// Calculate the tallies using the exact (rational) transfer value, then round down to the nearest
+    /// fixed-precision decimal.
     fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> Self::Tally {
         Self::Tally::from_scaled_value(transfer_value.mul_rounding_down(BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize))) as u64)
     }
