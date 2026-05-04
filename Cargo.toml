@@ -10,7 +10,7 @@ members= [
     "nsw",
     "vic",
     "wa",
-    "minimal",
+    "BESTV",
     "sa",
     "examples",
     "statistics",
