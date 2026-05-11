@@ -58,8 +58,8 @@ impl PreferenceDistributionRules for NZMeek {
     /// #Evidence
     ///
     /// [https://www.dunedin.govt.nz/__data/assets/pdf_file/0009/1260459/Dunedin-City-Council-2025-Triennial-Elections-Final-STV-Result.pdf](Dunedin City Council 2025 Triennial Election),
-    /// Council - at large election,
-    /// In "Iteration 1", 2 candidates were elected with values well over quota.
+    /// Strath Tairi Community board,
+    /// In "Iteration 1", 3 candidates were elected with values well over quota.
     /// Every candidate had an integer number of votes incompatible with rules 7 to 10 having been applied.
     /// But still a candidate was excluded, presumably using clause 13.
     ///
