@@ -55,7 +55,11 @@
     },
     "counts": [
       {
-        "reason": "FirstPreferenceCount",
+        "reason": {
+          "Elimination": [
+            6
+          ]
+        },
         "portion": {
           "transfer_value": "1",
           "when_tv_created": null,
@@ -63,7 +67,9 @@
         },
         "reason_completed": true,
         "elected": [],
-        "not_continuing": [],
+        "not_continuing": [
+          6
+        ],
         "created_transfer_value": null,
         "decisions": [],
         "status": {
@@ -135,7 +141,7 @@
       {
         "reason": {
           "Elimination": [
-            6
+            7
           ]
         },
         "portion": {
@@ -151,7 +157,7 @@
           }
         ],
         "not_continuing": [
-          6
+          7
         ],
         "created_transfer_value": null,
         "decisions": [],
@@ -307,7 +313,7 @@
       {
         "reason": {
           "Elimination": [
-            7
+            5
           ]
         },
         "portion": {
@@ -319,7 +325,7 @@
         "elected": [],
         "not_continuing": [
           8,
-          7
+          5
         ],
         "created_transfer_value": null,
         "decisions": [],
@@ -487,16 +493,16 @@
             ],
             "exhausted": [
               {
-                "count": 31,
-                "weight": "1",
-                "route": []
-              },
-              {
                 "count": 141,
                 "weight": "0.011424219",
                 "route": [
                   8
                 ]
+              },
+              {
+                "count": 31,
+                "weight": "1",
+                "route": []
               }
             ],
             "rounding": "",
@@ -525,7 +531,7 @@
       {
         "reason": {
           "Elimination": [
-            5
+            9
           ]
         },
         "portion": {
@@ -536,7 +542,7 @@
         "reason_completed": true,
         "elected": [],
         "not_continuing": [
-          5
+          9
         ],
         "created_transfer_value": null,
         "decisions": [],
@@ -596,72 +602,72 @@
             "candidate": [
               [
                 {
+                  "count": 423,
+                  "weight": "1",
+                  "route": []
+                },
+                {
                   "count": 220,
                   "weight": "0.028267795",
                   "route": [
                     8
                   ]
-                },
-                {
-                  "count": 423,
-                  "weight": "1",
-                  "route": []
                 }
               ],
               [
+                {
+                  "count": 772,
+                  "weight": "1",
+                  "route": []
+                },
                 {
                   "count": 183,
                   "weight": "0.028267795",
                   "route": [
                     8
                   ]
-                },
-                {
-                  "count": 772,
-                  "weight": "1",
-                  "route": []
                 }
               ],
               [
+                {
+                  "count": 744,
+                  "weight": "1",
+                  "route": []
+                },
                 {
                   "count": 195,
                   "weight": "0.028267795",
                   "route": [
                     8
                   ]
-                },
-                {
-                  "count": 744,
-                  "weight": "1",
-                  "route": []
                 }
               ],
               [
+                {
+                  "count": 481,
+                  "weight": "1",
+                  "route": []
+                },
                 {
                   "count": 216,
                   "weight": "0.028267795",
                   "route": [
                     8
                   ]
-                },
-                {
-                  "count": 481,
-                  "weight": "1",
-                  "route": []
                 }
               ],
               [
+                {
+                  "count": 992,
+                  "weight": "1",
+                  "route": []
+                },
                 {
                   "count": 220,
                   "weight": "0.028267795",
                   "route": [
                     8
                   ]
-                },
-                {
-                  "count": 992,
-                  "weight": "1",
-                  "route": []
                 }
               ],
               [],
@@ -676,31 +682,31 @@
               ],
               [
                 {
+                  "count": 368,
+                  "weight": "1",
+                  "route": []
+                },
+                {
                   "count": 172,
                   "weight": "0.028267795",
                   "route": [
                     8
                   ]
-                },
-                {
-                  "count": 368,
-                  "weight": "1",
-                  "route": []
                 }
               ]
             ],
             "exhausted": [
-              {
-                "count": 64,
-                "weight": "1",
-                "route": []
-              },
               {
                 "count": 160,
                 "weight": "0.028267795",
                 "route": [
                   8
                 ]
+              },
+              {
+                "count": 64,
+                "weight": "1",
+                "route": []
               }
             ],
             "rounding": "",
@@ -727,11 +733,7 @@
         }
       },
       {
-        "reason": {
-          "Elimination": [
-            9
-          ]
-        },
+        "reason": "MeekIteration",
         "portion": {
           "transfer_value": null,
           "when_tv_created": null,
@@ -739,9 +741,7 @@
         },
         "reason_completed": true,
         "elected": [],
-        "not_continuing": [
-          9
-        ],
+        "not_continuing": [],
         "created_transfer_value": null,
         "decisions": [],
         "status": {
@@ -918,7 +918,11 @@
         }
       },
       {
-        "reason": "MeekIteration",
+        "reason": {
+          "Elimination": [
+            0
+          ]
+        },
         "portion": {
           "transfer_value": null,
           "when_tv_created": null,
@@ -926,7 +930,9 @@
         },
         "reason_completed": true,
         "elected": [],
-        "not_continuing": [],
+        "not_continuing": [
+          0
+        ],
         "created_transfer_value": null,
         "decisions": [],
         "status": {
@@ -1067,16 +1073,16 @@
             ],
             "exhausted": [
               {
+                "count": 95,
+                "weight": "1",
+                "route": []
+              },
+              {
                 "count": 232,
                 "weight": "0.118031506",
                 "route": [
                   8
                 ]
-              },
-              {
-                "count": 95,
-                "weight": "1",
-                "route": []
               }
             ],
             "rounding": "",
@@ -1105,7 +1111,7 @@
       {
         "reason": {
           "Elimination": [
-            0
+            3
           ]
         },
         "portion": {
@@ -1116,7 +1122,7 @@
         "reason_completed": true,
         "elected": [],
         "not_continuing": [
-          0
+          3
         ],
         "created_transfer_value": null,
         "decisions": [],
@@ -1245,16 +1251,16 @@
             ],
             "exhausted": [
               {
+                "count": 141,
+                "weight": "1",
+                "route": []
+              },
+              {
                 "count": 334,
                 "weight": "0.12039822",
                 "route": [
                   8
                 ]
-              },
-              {
-                "count": 141,
-                "weight": "1",
-                "route": []
               }
             ],
             "rounding": "",
@@ -1281,11 +1287,7 @@
         }
       },
       {
-        "reason": {
-          "Elimination": [
-            3
-          ]
-        },
+        "reason": "MeekIteration",
         "portion": {
           "transfer_value": null,
           "when_tv_created": null,
@@ -1298,9 +1300,7 @@
             "why": "ReachedQuota"
           }
         ],
-        "not_continuing": [
-          3
-        ],
+        "not_continuing": [],
         "created_transfer_value": null,
         "decisions": [],
         "status": {
@@ -1360,45 +1360,45 @@
               [],
               [
                 {
-                  "count": 1029,
-                  "weight": "1",
-                  "route": []
-                },
-                {
                   "count": 387,
                   "weight": "0.191513344",
                   "route": [
                     8
                   ]
+                },
+                {
+                  "count": 1029,
+                  "weight": "1",
+                  "route": []
                 }
               ],
               [
-                {
-                  "count": 958,
-                  "weight": "1",
-                  "route": []
-                },
                 {
                   "count": 367,
                   "weight": "0.191513344",
                   "route": [
                     8
                   ]
+                },
+                {
+                  "count": 958,
+                  "weight": "1",
+                  "route": []
                 }
               ],
               [],
               [
                 {
-                  "count": 1213,
-                  "weight": "1",
-                  "route": []
-                },
-                {
                   "count": 367,
                   "weight": "0.191513344",
                   "route": [
                     8
                   ]
+                },
+                {
+                  "count": 1213,
+                  "weight": "1",
+                  "route": []
                 }
               ],
               [],
@@ -1521,18 +1521,6 @@
               [],
               [
                 {
-                  "count": 387,
-                  "weight": "0.30894843",
-                  "route": [
-                    8
-                  ]
-                },
-                {
-                  "count": 1029,
-                  "weight": "1",
-                  "route": []
-                },
-                {
                   "count": 159,
                   "weight": "0.018467626",
                   "route": [
@@ -1546,21 +1534,21 @@
                   "route": [
                     4
                   ]
-                }
-              ],
-              [
+                },
                 {
-                  "count": 367,
+                  "count": 387,
                   "weight": "0.30894843",
                   "route": [
                     8
                   ]
                 },
                 {
-                  "count": 958,
+                  "count": 1029,
                   "weight": "1",
                   "route": []
-                },
+                }
+              ],
+              [
                 {
                   "count": 179,
                   "weight": "0.018467626",
@@ -1575,6 +1563,18 @@
                   "route": [
                     4
                   ]
+                },
+                {
+                  "count": 367,
+                  "weight": "0.30894843",
+                  "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 958,
+                  "weight": "1",
+                  "route": []
                 }
               ],
               [],
@@ -1613,16 +1613,10 @@
             ],
             "exhausted": [
               {
-                "count": 264,
-                "weight": "1",
-                "route": []
-              },
-              {
-                "count": 367,
-                "weight": "0.018467626",
+                "count": 625,
+                "weight": "0.30894843",
                 "route": [
-                  8,
-                  4
+                  8
                 ]
               },
               {
@@ -1633,11 +1627,17 @@
                 ]
               },
               {
-                "count": 625,
-                "weight": "0.30894843",
+                "count": 367,
+                "weight": "0.018467626",
                 "route": [
-                  8
+                  8,
+                  4
                 ]
+              },
+              {
+                "count": 264,
+                "weight": "1",
+                "route": []
               },
               {
                 "count": 63,
@@ -1752,6 +1752,14 @@
                   ]
                 },
                 {
+                  "count": 159,
+                  "weight": "0.036189671",
+                  "route": [
+                    4,
+                    8
+                  ]
+                },
+                {
                   "count": 1029,
                   "weight": "1",
                   "route": []
@@ -1762,14 +1770,6 @@
                   "route": [
                     4
                   ]
-                },
-                {
-                  "count": 159,
-                  "weight": "0.036189671",
-                  "route": [
-                    4,
-                    8
-                  ]
                 }
               ],
               [
@@ -1777,6 +1777,14 @@
                   "count": 367,
                   "weight": "0.332244194",
                   "route": [
+                    8
+                  ]
+                },
+                {
+                  "count": 179,
+                  "weight": "0.036189671",
+                  "route": [
+                    4,
                     8
                   ]
                 },
@@ -1790,14 +1798,6 @@
                   "weight": "0.108924919",
                   "route": [
                     4
-                  ]
-                },
-                {
-                  "count": 179,
-                  "weight": "0.036189671",
-                  "route": [
-                    4,
-                    8
                   ]
                 }
               ],
@@ -1821,33 +1821,21 @@
               [],
               [
                 {
-                  "count": 1746,
-                  "weight": "0.667755806",
-                  "route": []
-                },
-                {
                   "count": 401,
                   "weight": "0.072735248",
                   "route": [
                     4
                   ]
+                },
+                {
+                  "count": 1746,
+                  "weight": "0.667755806",
+                  "route": []
                 }
               ],
               []
             ],
             "exhausted": [
-              {
-                "count": 264,
-                "weight": "1",
-                "route": []
-              },
-              {
-                "count": 625,
-                "weight": "0.332244194",
-                "route": [
-                  8
-                ]
-              },
               {
                 "count": 367,
                 "weight": "0.036189671",
@@ -1857,11 +1845,23 @@
                 ]
               },
               {
+                "count": 625,
+                "weight": "0.332244194",
+                "route": [
+                  8
+                ]
+              },
+              {
                 "count": 290,
                 "weight": "0.108924919",
                 "route": [
                   4
                 ]
+              },
+              {
+                "count": 264,
+                "weight": "1",
+                "route": []
               },
               {
                 "count": 63,

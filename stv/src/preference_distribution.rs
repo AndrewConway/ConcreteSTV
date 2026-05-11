@@ -183,11 +183,10 @@ impl Display for KeepValuesNotUsed {
 }
 impl <T> KeepValue<T> for KeepValuesNotUsed {
     fn compute_keep_value(_quota: T, _tally: T, _existing_keep_value:Self) -> Self { panic!("KeepValuesNotUsed should never be actually used") }
-    fn zero() -> Self { panic!("KeepValuesNotUsed should never be actually used") }
-    fn one() -> Self { panic!("KeepValuesNotUsed should never be actually used") }
-    //fn is_one(&self) -> bool { panic!("KeepValuesNotUsed should never be actually used") }
-
     fn use_keep_value(_incoming_keep_value:Self,_keep_value_for_candidate:Self,_ballot_paper_count: BallotPaperCount) -> (T,Self,Option<Self>) { panic!("KeepValuesNotUsed should never be actually used") }
+    fn zero() -> Self { panic!("KeepValuesNotUsed should never be actually used") }
+    //fn is_one(&self) -> bool { panic!("KeepValuesNotUsed should never be actually used") }
+    fn one() -> Self { panic!("KeepValuesNotUsed should never be actually used") }
 }
 
 
@@ -238,6 +237,7 @@ pub trait PreferenceDistributionRules {
     fn finish_all_surplus_distributions_when_all_elected() -> bool;
 
     fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking;
+    /// mostly as it says, but also affects quota computation if the idiosyncratic NSW random sampling option WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapersOrQuotaButOnlyIfContinuingCandidatesEqualsUnfilledVacanciesAndNotAfterSurplusIfMoreSurplusesAvailable is chosen.
     fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking;
     /// if there are V vacancies, and the candidate ranked V highest has more votes than all lower put together plus undistributed surpluses, then elect V highest.
     fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking;
@@ -314,6 +314,12 @@ pub trait PreferenceDistributionRules {
 
     /// If the method used is actually the Meek method rather than a traditional STV.
     fn is_meek_method() -> bool { false }
+    /// whether one may do exclusion on the first count (first preferences)
+    fn may_do_meek_exclusion_round_0() -> bool { false }
+    /// whether Meek exclusion is done at the start of a count step
+    fn do_meek_exclusion_at_start_of_count_step() -> bool { false }
+    /// whether Meek exclusion is done at the end of a count step (as it is in New Zealand)
+    fn do_meek_exclusion_just_after_quota_determination() -> bool { true }
 
     /// At what point the candidate with the lowest tally should be excluded, if doing Meek style
     /// iteration. This is irrelevant if not doing Meek style STV.
@@ -339,6 +345,7 @@ pub struct PreferenceDistributor<'a,Rules:PreferenceDistributionRules> {
     original_votes:&'a Vec<(TransferValue,Vec<PartiallyDistributedVote<'a>>)>,
     num_candidates : usize,
     candidates_to_be_elected : NumberOfCandidates,
+    number_of_valid_votes : BallotPaperCount,
     recomputed_quota : Option<QuotaInfo<Rules::Tally>>,
     quota : Rules::Tally,
     /// The tally, by candidate.
@@ -396,6 +403,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             original_votes,
             num_candidates,
             candidates_to_be_elected,
+            number_of_valid_votes: original_votes.iter().flat_map(|(_,vs)|vs).map(|v|v.n).sum(),
             recomputed_quota: None,
             quota : Rules::Tally::zero(), // dummy until computed.
             tallys,
@@ -489,6 +497,24 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                 Rules::KeepValueType::compute_keep_value(self.quota.clone(), self.tallys[c].clone(), self.keep_values[c].clone()) // elected candidates are most complex
             } else {Rules::KeepValueType::zero()}; // excluded
         }
+    }
+
+    /// See if the tallies are exactly the same as they were last round.
+    /// This is evidence that further Meek iteration will not accomplish anything.
+    ///
+    /// This is used for implementing the scary NZ rule clause 23: Stable State
+    ///
+    /// 23. This clause applies if the operations in clauses 5 to 22 result in a state where any number of iterations would not
+    ///     result in further candidates becoming excluded or successful.
+    ///     If this clause applies, the candidate with the lowest total votes becomes excluded.
+    ///     Recommence counting at the step following the step at which the stable state occurred.
+    pub fn tallies_unchanged_since_last_round(&self,is_at_start_of_round:bool) -> bool {
+        if let Some(last_round) = if is_at_start_of_round {self.transcript.counts.len().checked_sub(2).map(|i|&self.transcript.counts[i])} else {self.transcript.counts.last()} {
+            for c in 0..self.num_candidates {
+                if self.tallys[c]!=last_round.status.tallies.candidate[c] { return false; }
+            }
+            true // all the candidates had the same tally. Nothing happened.
+        } else { false } // if this is the first round, then it is different to the non-existent past. By dint of existing.
     }
 
     /// Recompute the tallies using keep values (only applies to Meek method).
@@ -703,7 +729,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
                     TieResolutionGranularityNeeded::LowestSeparated(n) if n<=differs && n>i  => Some(TieResolutionGranularityNeeded::LowestSeparated(n-i)),
                     _ => None, // no resolution needed as all in or all not in.
                 } {
-                    for (still_tied,remaining_granularity) in how.resolve(tied,&self.transcript,sub_granularity) {
+                    for (still_tied,remaining_granularity) in how.resolve(tied,&self.transcript,sub_granularity,NumberOfCandidates(self.num_candidates),self.candidates_to_be_elected,self.number_of_valid_votes) {
                         let solved_by_oracle = if let Some(oracle) = &mut self.oracle {
                             if let Some(solution) = oracle.resolve_tie_resolution(self.current_count,remaining_granularity,still_tied) {
                                 let resolutions = TieResolutionsMadeByEC{ tie_resolutions: vec![solution] };
@@ -831,10 +857,10 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             WhenToDoElectCandidateClauseChecking::WhenOnly2CandidatesAreContinuing => self.continuing_candidates_sorted_by_tally.len()==2,
         }
     }
-    pub fn check_elected(&mut self,reason : &ReasonForCount,reason_completed : bool) {
-        let check_quota = match Rules::when_to_check_if_all_remaining_should_get_elected() {
+    pub fn check_elected(&mut self,reason : ReasonForCount,reason_completed : bool) -> ReasonForCount{
+        let check_quota = match Rules::when_to_check_if_all_remaining_should_get_elected() { // In the generally idiosyncratic NSW random sampling variant, this can affect quota computation.
             WhenToDoElectCandidateClauseChecking::AfterDeterminingWhoToExcludeButBeforeTransferringAnyPapersOrQuotaButOnlyIfContinuingCandidatesEqualsUnfilledVacanciesAndNotAfterSurplusIfMoreSurplusesAvailable =>
-                match reason {
+                match &reason {
                     ReasonForCount::FirstPreferenceCount => true,
                     ReasonForCount::ExcessDistribution(_) => !self.has_distributable_surplus(),
                     ReasonForCount::Elimination(_) => reason_completed,
@@ -843,15 +869,20 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             _ => true,
         };
         if check_quota  { self.check_elected_by_quota(); }
-        if self.should_check(Rules::when_to_check_if_just_two_standing_for_shortcut_election(),reason,reason_completed) {
+        let reason = if Rules::do_meek_exclusion_just_after_quota_determination() && (Rules::may_do_meek_exclusion_round_0() || reason!=ReasonForCount::FirstPreferenceCount) {
+            let candidates_to_exclude = self.meek_exclusion(false);
+            if candidates_to_exclude.is_empty() {reason} else { ReasonForCount::Elimination(candidates_to_exclude) }
+        } else { reason };
+        if self.should_check(Rules::when_to_check_if_just_two_standing_for_shortcut_election(),&reason,reason_completed) {
             self.check_elected_by_highest_of_remaining_2_when_1_needed_no_tie_resolution();
         }
-        if self.should_check(Rules::when_to_check_if_all_remaining_should_get_elected(),reason,reason_completed) {
+        if self.should_check(Rules::when_to_check_if_all_remaining_should_get_elected(),&reason,reason_completed) {
             self.check_if_should_elect_all_remaining();
         }
-        if self.should_check(Rules::when_to_check_if_top_few_have_overwhelming_votes(),reason,reason_completed) {
+        if self.should_check(Rules::when_to_check_if_top_few_have_overwhelming_votes(),&reason,reason_completed) {
             self.check_if_top_few_have_overwhelming_votes();
         }
+        reason
     }
 
 
@@ -863,9 +894,9 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             ReasonForCount::Elimination(_) => Rules::check_elected_if_in_middle_of_exclusion(),
             ReasonForCount::MeekIteration => true,
         };
-        if should_check_elected {
-            self.check_elected(&reason,reason_completed);
-        }
+        let reason = if should_check_elected {
+            self.check_elected(reason,reason_completed)
+        } else { reason };
         if self.print_progress_to_stdout { self.print_tallys(); }
         let count_name : Option<String> = match Rules::how_to_name_counts() {
             CountNamingMethod::SimpleNumber => None,
@@ -1500,10 +1531,12 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
         }
     }
 
-    fn meek_step(&mut self) {
+    /// Do a meek exclusion, returning the candidates to exclude (if any).
+    /// is_at_start_of_round is needed for the stable state check.
+    fn meek_exclusion(&mut self,is_at_start_of_round:bool) -> Vec<CandidateIndex> {
         let mut candidates_to_exclude = vec![];
         // see if someone should be eliminated.
-        if self.current_count.0>0 { // don't exclude on step 2.
+        if Rules::may_do_meek_exclusion_round_0() || self.current_count.0>0 { // don't exclude on step 0 unless allowed.
             let mut total_surplus = Rules::Tally::zero(); // clause 14
             for c in 0..self.num_candidates {
                 if self.tallys[c]>self.quota.clone() {
@@ -1514,7 +1547,7 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             // Exclude the hopeful candidate with the least votes if the sum of his or her votes and the total surplus is less than the votes of any other hopeful candidate or if the total surplus is less than 0.0001.
             // NZ rule 13
             if let Some(lowest) = self.continuing_candidates_sorted_by_tally.get(0) {
-                if Rules::should_exclude_lowest_candidate_meek_method(total_surplus,self.tallys[lowest.0].clone(),self.continuing_candidates_sorted_by_tally.get(1).map(|c|self.tallys[c.0].clone())) {
+                if Rules::should_exclude_lowest_candidate_meek_method(total_surplus,self.tallys[lowest.0].clone(),self.continuing_candidates_sorted_by_tally.get(1).map(|c|self.tallys[c.0].clone()))||self.tallies_unchanged_since_last_round(is_at_start_of_round) {
                     candidates_to_exclude = self.find_lowest_candidate();
                 }
             }
@@ -1523,6 +1556,10 @@ impl <'a,Rules:PreferenceDistributionRules> PreferenceDistributor<'a,Rules>
             // println!("Excluding {}",self.data.metadata.candidate(candidate).name);
             self.no_longer_continuing(candidate,false);
         }
+        candidates_to_exclude
+    }
+    fn meek_step(&mut self) {
+        let candidates_to_exclude = if Rules::do_meek_exclusion_at_start_of_count_step()  { self.meek_exclusion(true) } else { vec![]};
         self.recompute_keep_values(); // NZ rules 7-9
         let non_transferable_votes = self.recompute_tallies_given_keep_values(); // NZ rule 10
         // recompute quota

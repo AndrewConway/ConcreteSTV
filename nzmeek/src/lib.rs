@@ -14,16 +14,23 @@ use stv::transfer_value::TransferValue;
 /// This is a preliminary attempt at the New Zealand Meek STV algorithm.
 /// See  [Schedule 1A (New  Zealand method of counting single transferable votes), Local Electoral Regulations 2001, (SR 2001/145), Version as at 1 July 2025](https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2001/145/en/latest/#DLM57125)
 ///
-/// It still does not implement many significant features of the NZ system but
-/// is a placeholder for architectural changes allowing Meek style algorithms.
+/// This ties to match what is actually used rather than the legislation. Differences are:
+/// * Rounding in clause 10 is different: each multiplication is rounded down, other than the last which is rounded up. (actually better in many ways than the legislation)
+/// * Clause 13 (exclusion) is inserted at the end of step 1, just after clause 6 (probably harmless other than affecting tie resolution)
 ///
-/// A.K.A. NOT SUITABLE FOR USE FOR CHECKING ELECTION RESULTS!
+/// There are some ambiguities I have not resolved, particularly in tie resolution
+/// * Clause 23 seems to use an Oracle and I don't understand the timing.
+/// * Is clause 43 an action (do this now) and/or a prescription (this is how you do it when referenced in clause 44,46,47)? That is, after doing 43 and 44 have you discarded 4 or 5 values?
+///
+/// I have found no real data to be able to work out what was done in practice for these ambiguities.
+///
+/// A.K.A. NOT YET SUITABLE FOR USE FOR CHECKING ELECTION RESULTS!
 pub struct NZMeek {
 }
 
 impl PreferenceDistributionRules for NZMeek {
     type Tally = FixedPrecisionDecimal<9>;
-    type KeepValueType = FixedPrecisionDecimal<9>; // TODO Note that this does not handle the requirement to always round up in the legislation for multiplication. Instead I have implemented a (IMO more sensible) approach that seems to have been used in the one instance I know of.
+    type KeepValueType = FixedPrecisionDecimal<9>;
 
     type SplitByNumber = DoNotSplitByCountNumber;
 
@@ -45,6 +52,33 @@ impl PreferenceDistributionRules for NZMeek {
     }
     fn is_meek_method() -> bool { true }
 
+    /// This is not done in the legislation (otherwise clause 13 would occur just after clause 6).
+    /// However, this appears to happen in practice.
+    ///
+    /// #Evidence
+    ///
+    /// [https://www.dunedin.govt.nz/__data/assets/pdf_file/0009/1260459/Dunedin-City-Council-2025-Triennial-Elections-Final-STV-Result.pdf](Dunedin City Council 2025 Triennial Election),
+    /// Council - at large election,
+    /// In "Iteration 1", 2 candidates were elected with values well over quota.
+    /// Every candidate had an integer number of votes incompatible with rules 7 to 10 having been applied.
+    /// But still a candidate was excluded, presumably using clause 13.
+    ///
+    /// Extract from calculator commentary:
+    /// ```text
+    /// THOMAS, elected at iteration 1, reason: Candidate received 47.000000000 votes and quota was 41.000000001
+    /// BAIN, elected at iteration 1, reason: Candidate received 45.000000000 votes and quota was 41.000000001
+    /// THOMAS, elected at iteration 1, reason: Candidate received 42.000000000 votes and quota was 41.000000001
+    /// RAMSAY, excluded at iteration 1, reason: Candidate received the lowest vote count 8.000000000, less than the
+    /// second lowest by more than total surplus (10.999999997)
+    /// ```
+    ///
+    /// I don't think this will change who is elected *unless tie resolution is used* in which case it will
+    /// affect the count backs and the iteration number (which affects PRNs by clause 48).
+    fn may_do_meek_exclusion_round_0() -> bool { true }
+    /// whether Meek exclusion is done at the start of a count step
+    fn do_meek_exclusion_at_start_of_count_step() -> bool { false }
+    /// whether Meek exclusion is done at the end of a count step (as it is in New Zealand)
+    fn do_meek_exclusion_just_after_quota_determination() -> bool { true }
     /// At what point the candidate with the lowest tally should be excluded, if doing Meek style
     /// iteration. This is irrelevant if not doing Meek style STV.
     /// * total_surplus is the sum of the surplus of each of the successful candidates.
@@ -57,36 +91,71 @@ impl PreferenceDistributionRules for NZMeek {
         if let Some(second_lowest_tally) = second_lowest_tally && lowest_tally+total_surplus<second_lowest_tally { return true}
         total_surplus<Self::Tally::from_scaled_value(100000)
     }
-
-    /// FIXME have not checked the things below at all.
-    /// FIXME deal with NZ surplus ordering
-    /// FIXME deal with NZ PRNG
+    
+    /// Not Applicable for Meek.
     fn use_last_parcel_for_surplus_distribution() -> LastParcelUse { LastParcelUse::No }
+    /// Not Applicable for Meek.
     fn transfer_value_method() -> TransferValueMethod { TransferValueMethod::SurplusOverContinuingBallotsLimitedToPriorTransferValue }
-    fn make_transfer_value(surplus: Self::Tally, ballots: BallotPaperCount) -> TransferValue {
-        TransferValue::from_surplus(surplus.get_scaled_value() as usize,BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize)))
-    }
+    /// Not Applicable for Meek.
+    fn make_transfer_value(_surplus: Self::Tally, _ballots: BallotPaperCount) -> TransferValue { panic!("Should not make transfer values in Meek"); }
     fn convert_tally_to_rational(tally: Self::Tally) -> BigRational { tally.to_rational()  }
+    /// Not Applicable for Meek.
     fn convert_rational_to_tally_after_applying_transfer_value(rational: BigRational) -> Self::Tally { Self::Tally::from_rational_rounding_down(rational) }
 
+    /// Not Applicable for Meek. Well, is used in first preference count, with TV 1.
     fn use_transfer_value(transfer_value: &TransferValue, ballots: BallotPaperCount) -> Self::Tally {
-        Self::Tally::from_scaled_value(transfer_value.mul_rounding_down(BallotPaperCount(ballots.0*(Self::Tally::SCALE as usize))) as u64)
+        assert!(transfer_value.is_one());
+        ballots.into()
     }
-    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true } // not applicable as distribute_surplus_all_with_same_transfer_value.
+    /// Not Applicable for Meek.
+    fn check_elected_if_in_middle_of_surplus_distribution() -> bool { true }
+    /// Not Applicable for Meek.
     fn check_elected_if_in_middle_of_exclusion() -> bool { true }
+    /// Not Applicable for Meek.
     fn surplus_distribution_subdivisions() -> SurplusTransferMethod { SurplusTransferMethod::JustOneTransferValue }
+    /// Not Applicable for Meek.
     fn sort_exclusions_by_transfer_value() -> bool { true }
 
-    // all below same as ACTpre2020.
+    /// when_to_check_if_just_two_standing_for_shortcut_election not used. No such rule needed or even really appropriate.
     fn resolve_ties_elected_one_of_last_two() -> MethodOfTieResolution { MethodOfTieResolution::None }
-    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
-    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
-    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminator }
+    /// No rules about order of election.
+    fn resolve_ties_elected_by_quota() -> MethodOfTieResolution { MethodOfTieResolution::None }
+    /// No rules about order of election.
+    fn resolve_ties_elected_all_remaining() -> MethodOfTieResolution { MethodOfTieResolution::None }
+    /// ```
+    /// ### Ties
+    /// 19. This clause applies if a candidate with the lowest number of votes is to be excluded but 2 or more candidates share the lowest number of votes.
+    /// If this clause applies, exclude the candidate identified by the AAFD method as the candidate to exclude.
+    /// If the AAFD method does not identify a single candidate to exclude, exclude the candidate with the lowest PRN.
+    /// ```
+    /// The AAFD method is defined
+    /// ```
+    /// ### Ahead at first difference method (AAFD method)
+    /// 40. To use the Ahead At First Difference Method determine which tied candidate, or candidates, 
+    /// did not have more votes than another tied candidate at the earliest step at which the candidates had different numbers of votes. 
+    /// If one candidate is identified, exclude him or her.
+    /// ```
+    /// This is not entirely clear. Do all candidates need to have different numbers? Presumably not or the
+    /// phrase "or candidates" would not be necessary, and it would just say "determine which candidate had the fewest votes".
+    /// So we want the MethodOfTieResolution::AnyDifferenceIsADiscriminatorGiveUpIfNotFullSolution, plus the NZ Meek PRN.
+    ///
+    /// Note that my implementation of this is not reliable. The legislation is (to me) ambiguous, and I could not find any useful data to test.
+    fn resolve_ties_choose_lowest_candidate_for_exclusion() -> MethodOfTieResolution { MethodOfTieResolution::AnyDifferenceIsADiscriminatorUseNZPRNsIfNotFullSolution }
+    /// Not Applicable for Meek.
     fn finish_all_counts_in_elimination_when_all_elected() -> bool { false }
+    /// Not Applicable for Meek.
     fn finish_all_surplus_distributions_when_all_elected() -> bool { false }
+    /// Not Done.
     fn when_to_check_if_just_two_standing_for_shortcut_election() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
-    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuotaIfNoUndistributedSurplusExistsAndExclusionNotOngoing }
+    /// Paragraph 3 (extract)
+    /// ```
+    /// Counting is also complete when the number of successful candidates and hopeful candidates is equal to the number of vacancies. 
+    /// In this case, the hopeful candidates become successful candidates.
+    /// ```
+    fn when_to_check_if_all_remaining_should_get_elected() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::AfterCheckingQuota }
+    /// Not Applicable for Meek.
     fn count_set_aside_due_to_transfer_value_limit_as_rounding() -> bool { true }
+    /// No Such Rule
     fn when_to_check_if_top_few_have_overwhelming_votes() -> WhenToDoElectCandidateClauseChecking { WhenToDoElectCandidateClauseChecking::Never }
 
     fn name() -> String { "NZMeek".to_string() }
