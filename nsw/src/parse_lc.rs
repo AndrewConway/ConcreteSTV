@@ -369,6 +369,7 @@ pub fn read_official_dop_transcript_html_index_page_then_one_html_page_per_count
                     vacancies,
                     quota,
                     exhausted: None,
+                    gained_from_rounding: None,
                 })
             } else { None }
         } else { None }

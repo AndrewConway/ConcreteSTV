@@ -335,9 +335,13 @@ pub struct QuotaInfo<Tally:Debug> {
     pub papers : BallotPaperCount,
     pub vacancies : NumberOfCandidates,
     pub quota : Tally,
-    /// If the number of exhausted votes contributes to the tally.
+    /// If the number of exhausted votes contributes to the quota.
     #[serde(skip_serializing_if = "Option::is_none",default="produce_none")] // can't just have default as there is no default on Tally, which is needed for some reason.
-    pub exhausted : Option<Tally>
+    pub exhausted : Option<Tally>,
+    /// If the number of votes gained from rounding contributes to the quota. 
+    #[serde(skip_serializing_if = "Option::is_none",default="produce_none")] // can't just have default as there is no default on Tally, which is needed for some reason.
+    pub gained_from_rounding : Option<Tally>,
+    
 }
 
 impl <Tally:Display+Debug> Display for QuotaInfo<Tally> {

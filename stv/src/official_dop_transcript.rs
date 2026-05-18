@@ -169,6 +169,7 @@ impl <Tally:PartialEq+Clone+Display+FromStr+Debug+CanConvertToF64PossiblyLossily
             vacancies: q.vacancies,
             quota: q.quota.convert_to_f64(),
             exhausted: q.exhausted.map(|q| q.convert_to_f64()),
+            gained_from_rounding: q.gained_from_rounding.map(|q| q.convert_to_f64()),
         });
         let mut all_elected : HashSet<CandidateIndex> = HashSet::new();
         let counts = transcript.counts.into_iter().map(|c|OfficialDOPForOneCount{

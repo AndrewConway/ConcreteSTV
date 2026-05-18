@@ -1,4 +1,4 @@
-// Copyright 2021-2024 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -65,12 +65,12 @@ impl <const DIGITS:usize> FixedPrecisionDecimal<DIGITS> {
 
 impl <const DIGITS:usize> From<FixedPrecisionDecimal<DIGITS>> for f64 {
     fn from(v: FixedPrecisionDecimal<DIGITS>) -> Self {
-        v.scaled_value as f64/((FixedPrecisionDecimal::<DIGITS>::SCALE) as f64)
+        v.scaled_value as f64/(FixedPrecisionDecimal::<DIGITS>::SCALE as f64)
     }
 }
 impl <const DIGITS:usize> CanConvertToF64PossiblyLossily for FixedPrecisionDecimal<DIGITS> {
     fn convert_to_f64(&self) -> f64 {
-        self.scaled_value as f64/((FixedPrecisionDecimal::<DIGITS>::SCALE) as f64)
+        self.scaled_value as f64/(FixedPrecisionDecimal::<DIGITS>::SCALE as f64)
     }
 }
 
@@ -213,13 +213,17 @@ impl <const DIGITS:usize> KeepValue<FixedPrecisionDecimal<DIGITS>> for FixedPrec
 
     fn zero() -> Self { Self{scaled_value:0} }
     fn one() -> Self { Self{scaled_value:Self::SCALE} }
-    fn use_keep_value(incoming_keep_value: Self, keep_value_for_candidate: Self, ballot_paper_count: BallotPaperCount) -> (FixedPrecisionDecimal<DIGITS>, Self,Option<Self>) {
-        let per_paper_value = incoming_keep_value.multiply_rounding_up(keep_value_for_candidate);
-        let continued = if keep_value_for_candidate.scaled_value == Self::SCALE { None} else
-        // TODO resolve this line follows legislation, but doesn't match what was done, and is a bad idea as it probably could lead to too many candidates going over quota. { Some(incoming_keep_value.multiply_rounding_up(Self::one()-keep_value_for_candidate)) };
-        { Some(incoming_keep_value-per_paper_value) }; // This line matches the test data but not the legislation. It makes more sense and makes the definition of **non-transferable votes** unambiguous.
-        (per_paper_value*ballot_paper_count.0,per_paper_value, continued)
+
+    fn multiply_rounding_up(self, tally: FixedPrecisionDecimal<DIGITS>) -> FixedPrecisionDecimal<DIGITS> {
+        FixedPrecisionDecimal::multiply_rounding_up(self,tally)
     }
+
+    fn multiply_one_minus_self_rounding_up(self, tally: FixedPrecisionDecimal<DIGITS>) -> FixedPrecisionDecimal<DIGITS> {
+        FixedPrecisionDecimal::multiply_rounding_up(Self::one()-self,tally)
+    }
+
+    fn multiply_papers(tally: FixedPrecisionDecimal<DIGITS>, count: BallotPaperCount) -> FixedPrecisionDecimal<DIGITS> { tally*count.0 }
+    fn is_one(&self) -> bool { self.scaled_value == Self::SCALE }
 }
 #[cfg(test)]
 mod tests {

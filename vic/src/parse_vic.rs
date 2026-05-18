@@ -760,6 +760,7 @@ impl DOPFileFormat {
                         vacancies: NumberOfCandidates(5),
                         quota: quota_size.ok_or_else(||anyhow!("No quota heading found"))?,
                         exhausted: None,
+                        gained_from_rounding: None,
                     };
                     return Ok(DOPFileFormat{
                         quota,

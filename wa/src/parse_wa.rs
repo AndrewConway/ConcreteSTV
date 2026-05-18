@@ -228,6 +228,7 @@ fn parse_dop_excel_file(sheet:&calamine::Range<calamine::Data>,metadata:&Electio
             vacancies: NumberOfCandidates(captures[2].parse::<usize>()?),
             quota: captures[3].parse::<f64>()?,
             exhausted: None,
+            gained_from_rounding: None,
         })
     } else { None };
     let col_who_caused_count : u32 = 0;

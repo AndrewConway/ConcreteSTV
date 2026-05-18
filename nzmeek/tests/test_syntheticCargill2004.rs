@@ -15,7 +15,7 @@ mod tests {
     use stv::tie_resolution::TieResolutionsMadeByEC;
     use stv::distribution_of_preferences_transcript::TranscriptWithMetadata;
     use std::fs::File;
-    use nzmeek::NZMeek;
+    use nzmeek::{NZMeek, PossiblyUsed};
     use stv::compare_transcripts::{DeltasInCandidateLists, DifferentCandidateLists};
     use stv::election_data::ElectionData;
     use stv::fixed_precision_decimal::FixedPrecisionDecimal;
@@ -31,7 +31,7 @@ mod tests {
     fn test_synthetic() {
         let data = load_synthetic();
         data.print_summary();
-        let transcript = distribute_preferences::<NZMeek>(&data, data.metadata.vacancies.unwrap(), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote);
+        let transcript = distribute_preferences::<NZMeek<PossiblyUsed>>(&data, data.metadata.vacancies.unwrap(), &HashSet::default(), &TieResolutionsMadeByEC::default(),None,true,&mut Randomness::ReverseDonkeyVote);
         let transcript = TranscriptWithMetadata{ metadata: data.metadata, transcript };
         std::fs::create_dir_all("test_transcripts").unwrap();
         let file = File::create("test_transcripts/synthetic_Cargill2004.json").unwrap();
@@ -41,7 +41,7 @@ mod tests {
             println!("Official elected differs from computed : {}",lists.pretty_print(&transcript.metadata));
         }
         // test against transcript. This is not perfect as it doesn't check keep values nor is infinitely precise.
-        let expected_transcript : TranscriptWithMetadata<<NZMeek as PreferenceDistributionRules>::Tally> = serde_json::from_str(include_str!("synthetic_Cargill2004_expected_transcript.json")).unwrap();
+        let expected_transcript : TranscriptWithMetadata<<NZMeek<PossiblyUsed> as PreferenceDistributionRules>::Tally> = serde_json::from_str(include_str!("synthetic_Cargill2004_expected_transcript.json")).unwrap();
         let expected_transcript : OfficialDistributionOfPreferencesTranscript = expected_transcript.transcript.into();
         assert_eq!(Ok(None),expected_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript.transcript,true));
         // test values not tested by official DoP code. This is Meek specific stuff and full precision stuff.

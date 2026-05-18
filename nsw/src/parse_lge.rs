@@ -482,6 +482,7 @@ impl NSWLGEDataLoader {
             vacancies: NumberOfCandidates(remove_comma(&table[2][2]).parse::<usize>()?),
             quota: remove_comma(&table[3][2]).parse::<f64>()?,
             exhausted: None,
+            gained_from_rounding: None,
         });
         assert_eq!(col_result+1,expected_number_columns);
         let mut counts = vec![];

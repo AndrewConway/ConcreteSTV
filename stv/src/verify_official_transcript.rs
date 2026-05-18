@@ -100,6 +100,7 @@ impl <'a,Rules:PreferenceDistributionRules> VerifyOfficialDopTranscript<'a,Rules
                     vacancies: candidates_to_be_elected,
                     quota,
                     exhausted: None,
+                    gained_from_rounding: None,
                 }))
             }
         }

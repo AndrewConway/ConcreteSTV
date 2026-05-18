@@ -471,6 +471,7 @@ fn read_official_dop_transcript_work<R:Read>(file : ZipFile<'_,R>,metadata : &El
                 vacancies : NumberOfCandidates(record.vacancies),
                 quota: record.quota as f64,
                 exhausted: None,
+                gained_from_rounding: None,
             });
         }
         if record.count!=last_count {

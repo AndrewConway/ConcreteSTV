@@ -49,6 +49,13 @@ pub enum MethodOfTieResolution {
     /// * How does the timing of clause 23 actually work?
     /// * It appears that in practice and extra copy of clause 13 is inserted immediately after clause 6, which upsets the timing of everthing thereafter, which matters because of the PRNs inverting each iteration.
     AnyDifferenceIsADiscriminatorUseNZPRNsIfNotFullSolution,
+    /// Like AnyDifferenceIsADiscriminatorUseNZPRNsIfNotFullSolution but include a variety of changes to the
+    /// algorithm signposted in https://github.com/Conservatory/openstv/blob/master/openstv/MethodPlugins/MeekNZSTV.py
+    /// as probably being used in the official software (although I can't check without access or sufficient examples).
+    /// * Line 77: clause 42 has the 1000 in the formula for z replaced by 10,000.
+    /// * Line 90: an extra mod 10,000 is inserted into the rc computation in clause 43. Seems plausible otherwise why have the 10,000 in the inversion?
+    /// * Line 92: an extra inversion is done. (this could be the 4 vs 5 debate ambiguity listed above)
+    AnyDifferenceIsADiscriminatorUseApocryphalNZPRNsIfNotFullSolution,
     /// This is an even better version of AnyDifferenceIsADiscriminatorGiveUpIfNotFullSolution. The difference is that if AnyDifferenceIsADiscriminatorGiveUpIfNotFullSolution fails
     /// to solve everything, then a draw is done as if the countback was totally nullified. However,
     /// AnyDifferenceIsADiscriminator only does a draw amongst the candidates that AnyDifferenceIsADiscriminator could not distinguish.
@@ -105,10 +112,14 @@ impl MethodOfTieResolution {
             MethodOfTieResolution::AnyDifferenceIsADiscriminatorUseNZPRNsIfNotFullSolution => {
                 let solved_by_aafd = resolve_ties_any_different_give_up_if_cant_do_everything(tied_candidates, transcript, granularity, false);
                 if !solved_by_aafd { // attempt to solve using NZ PRN method
-                    let mut prng = NZPRNG::new(number_of_candidates,number_of_vacancies,valid_papers);
-                    let prns = prng.get_all_prns(number_of_candidates); // gets a sufficient number of PRNs.
-                    tied_candidates.sort_by_key(|c|prns[c.0]);
-                    if transcript.counts.len()%2==1 { tied_candidates.reverse()} // reverse the order of PRNs each count.
+                    resolve_using_NZPRN(tied_candidates,transcript,number_of_candidates,number_of_vacancies,valid_papers,false);
+                }
+                true
+            }
+            MethodOfTieResolution::AnyDifferenceIsADiscriminatorUseApocryphalNZPRNsIfNotFullSolution => {
+                let solved_by_aafd = resolve_ties_any_different_give_up_if_cant_do_everything(tied_candidates, transcript, granularity, false);
+                if !solved_by_aafd { // attempt to solve using NZ PRN method
+                    resolve_using_NZPRN(tied_candidates,transcript,number_of_candidates,number_of_vacancies,valid_papers,true);
                 }
                 true
             }
@@ -122,6 +133,19 @@ impl MethodOfTieResolution {
     }
 }
 
+/// Resolve ties using the NZ PRNG, either the legislated or apocryphal versions. See 
+/// MethodOfTieResolution::AnyDifferenceIsADiscriminatorUseApocryphalNZPRNsIfNotFullSolution for
+/// what apocryphal means in this context.
+/// 
+/// Always succeeds. Unless there are too many candidates (10,001 is definitely too many for
+/// apocryphal. Note that the NZ legislation will fail in this case as clause 46 would be impossible to fulfil. 
+#[allow(non_snake_case)] // allow NZPRN acronym.
+fn resolve_using_NZPRN<Tally: Clone + Hash + Ord + Display + FromStr + Debug>(tied_candidates: &mut [CandidateIndex], transcript:  &Transcript<Tally>, number_of_candidates: NumberOfCandidates, number_of_vacancies:NumberOfCandidates, valid_papers:BallotPaperCount, apocryphal:bool) {
+    let mut prng = NZPRNG::new(number_of_candidates,number_of_vacancies,valid_papers,apocryphal);
+    let prns = prng.get_all_prns(number_of_candidates,apocryphal); // gets a sufficient number of PRNs.
+    tied_candidates.sort_by_key(|c|prns[c.0]);
+    if transcript.counts.len()%2==1 { tied_candidates.reverse()} // reverse the order of PRNs each count.
+}
 /// In order to perfectly match the results of an Electoral Commission, it is necessary to have
 /// the identical decisions made. These are handled by providing an explicit list.
 ///
@@ -520,11 +544,11 @@ fn resolve_ties_require_unique_minimum_granularity<Tally:Clone+Eq+Hash+Ord+Displ
 /// 41. Allocate a unique pseudo-random whole number (a PRN number) for each candidate at each stage of the counting.
 /// 42. To generate PRNs, calculate x, y, and z using the following formulae:
 ///
-///         x = c+5
-///         y = n
-///         z = (v + 1 000 (v rem 10)) rem 30 323
+///   x = c+5
+///   y = n
+///   z = (v + 1 000 (v rem 10)) rem 30 323
 ///
-///     where—
+///   where—
 ///     - **c** is the number of candidates
 ///     - **n** is the number of vacancies
 ///     - **v** is the total number of valid voting documents
@@ -532,13 +556,12 @@ fn resolve_ties_require_unique_minimum_granularity<Tally:Clone+Eq+Hash+Ord+Displ
 ///
 /// 43. Generate a random whole number rc using the following formulae:
 ///
-///         x = (171x) rem 30 269
-///         y = (172y) rem 30 307
-///         z = (170z) rem 30 323
-///         rc = (10 000x) div 30 269 + (10 000y) div 30 307 + (10 000z) div 30 323
+///    x = (171x) rem 30 269
+///    y = (172y) rem 30 307
+///    z = (170z) rem 30 323
+///    rc = (10 000x) div 30 269 + (10 000y) div 30 307 + (10 000z) div 30 323
 ///
-///     where—
-///
+/// where—
 ///     - **rc** is a pseudo-random number
 ///     - **div** is the integer division operator such that a div b gives the whole number quotient of dividing whole number a by whole number b.
 ///
@@ -558,30 +581,31 @@ impl NZPRNG {
     /// - **number_of_candidates** is the number of candidates
     /// - **number_of_vacancies** is the number of vacancies
     /// - **valid** is the total number of valid voting documents
-    fn new(number_of_candidates: NumberOfCandidates,number_of_vacancies:NumberOfCandidates,valid:BallotPaperCount) -> Self {
+    fn new(number_of_candidates: NumberOfCandidates,number_of_vacancies:NumberOfCandidates,valid:BallotPaperCount,apocryphal:bool) -> Self {
         let x = (number_of_candidates.0+5) as u32;
         let y = number_of_vacancies.0 as u32;
-        let z = (valid.0+1000*(valid.0%10)) as u32;
+        let z = (valid.0+(if apocryphal {10000} else {1000})*(valid.0%10)) as u32;
         Self { x, y, z }
     }
 
     /// Get a new rc using rule 43
-    fn get_next_rc(&mut self) -> u32 {
+    fn get_next_rc(&mut self,apocryphal:bool) -> u32 {
         self.x = (self.x*171) % 30269;
         self.y = (self.y*172) % 30307;
         self.z = (self.z*170) % 30323;
-        ((10000*self.x)%30269)+((10000*self.y)%30307)+((10000*self.z)%30323)
+        let rc = ((10000*self.x)%30269)+((10000*self.y)%30307)+((10000*self.z)%30323);
+        if apocryphal {10000-(rc%10000)} else {rc}
     }
 
     /// Get PRNs for all candidates using rules 44 to 47.
-    fn get_all_prns(&mut self,number_of_candidates: NumberOfCandidates) -> Vec<u32> {
+    fn get_all_prns(&mut self,number_of_candidates: NumberOfCandidates,apocryphal:bool) -> Vec<u32> {
         // Note that it is not entirely clear whether rule 43 should be applied after rule 42 and before rule 43, or if 43 is just definitional for rules 44 to 46. I interpret it as the latter but this is just my guess.
-        for _ in 0..4 { self.get_next_rc(); }  // 44. Repeat the step in clause 43 four times, discarding the first 4 values of rc.
+        for _ in 0..4 { self.get_next_rc(apocryphal); }  // 44. Repeat the step in clause 43 four times, discarding the first 4 values of rc.
         let mut res = vec![];
         let mut set = HashSet::new();
         for _ in 0..number_of_candidates.0 {
-            let mut rc = self.get_next_rc();
-            while set.contains(&rc) { rc=self.get_next_rc(); }
+            let mut rc = self.get_next_rc(apocryphal);
+            while set.contains(&rc) { rc=self.get_next_rc(apocryphal); }
             res.push(rc);
             set.insert(rc);
         }
