@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -19,7 +19,7 @@ use stv::random_util::Randomness;
 /// those used by various electoral commissions on various elections.
 struct Opts {
     /// The counting rules to use.
-    /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021, NSWECRandomLGE2012, NSWECRandomLGE2016, NSWECRandomLGE2017, NSWECRandomLC2015, NSWECRandomLC2019, Vic2018, WA2008
+    /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021, NSWECRandomLGE2012, NSWECRandomLGE2016, NSWECRandomLGE2017, NSWECRandomLC2015, NSWECRandomLC2019, Vic2018, WA2008, NZMeekLegislation, NZMeekApocryphal
     rules : Rules,
 
     /// The name of the .stv (or .vchange) file to get votes from
