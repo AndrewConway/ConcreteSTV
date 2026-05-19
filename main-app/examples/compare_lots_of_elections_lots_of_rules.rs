@@ -46,7 +46,7 @@ fn main()  -> anyhow::Result<()> {
             let loader = source.get_loader_for_year(&year,&FileFinder::find_ec_data_repository())?;
             for electorate in loader.all_electorates() {
                 let votes = loader.load_cached_data(&electorate)?;
-                let path = format!("compare_lots_of_rules/{}_{}_{}.json",votes.metadata.name.authority,votes.metadata.name.year,votes.metadata.name.electorate);
+                let path = format!("compare_lots_of_rules/{}_{}_{}.json",votes.metadata.name.authority,votes.metadata.name.year,votes.metadata.name.electorate.replace('/'," "));
                 let comparison : RulesComparisonGroups = match load_existing(&path) {
                     Ok(res) => res,
                     Err(_) => {
