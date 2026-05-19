@@ -1,4 +1,4 @@
-// Copyright 2021-2025 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -480,7 +480,9 @@ impl NSWLGEDataLoader {
         let quota = Some(QuotaInfo{
             papers: BallotPaperCount(remove_comma(&table[1][2]).parse::<usize>()?-remove_comma(&table[7][col_exhausted_bps]).parse::<usize>()?),
             vacancies: NumberOfCandidates(remove_comma(&table[2][2]).parse::<usize>()?),
-            quota: remove_comma(&table[3][2]).parse::<f64>()?
+            quota: remove_comma(&table[3][2]).parse::<f64>()?,
+            exhausted: None,
+            gained_from_rounding: None,
         });
         assert_eq!(col_result+1,expected_number_columns);
         let mut counts = vec![];

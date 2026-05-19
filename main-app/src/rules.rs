@@ -22,6 +22,7 @@ use federal::parse_house_reps::{FederalHouseRepresentativesIRV, FederalHouseRepr
 use margin::record_changes::ElectionChanges;
 use nsw::{NSWECLocalGov2021, NSWECLocalGov2021Literal, NSWLocalCouncilLegislation2021MyGuessAtHighlyAmbiguousLegislation, SimpleIRVAnyDifferenceBreaksTies};
 use nsw::nsw_random_rules::{NSWECRandomLC2015, NSWECRandomLC2019, NSWECRandomLGE2012, NSWECRandomLGE2016, NSWECRandomLGE2017};
+use nzmeek::NZMeek;
 use stv::compare_transcripts::{compare_transcripts, DifferenceBetweenTranscripts};
 use stv::extract_votes_in_pile::ExtractionRequest;
 use stv::random_util::Randomness;
@@ -54,6 +55,8 @@ pub enum Rules {
     AEC_IRV,
     FederalIRV,
     IRV,
+    NZMeekLegislation,
+    NZMeekApocryphal,
 }
 
 impl FromStr for Rules {
@@ -83,6 +86,8 @@ impl FromStr for Rules {
             "AEC_IRV" => Ok(Rules::AEC_IRV),
             "FederalIRV" => Ok(Rules::FederalIRV),
             "IRV" => Ok(Rules::IRV),
+            "NZMeekLegislation" => Ok(Rules::NZMeekLegislation),
+            "NZMeekApocryphal" => Ok(Rules::NZMeekApocryphal),
             _ => Err("No such rule supported")
         }
     }
@@ -113,6 +118,8 @@ impl Display for Rules {
             Rules::AEC_IRV => "AEC_IRV",
             Rules::FederalIRV => "FederalIRV",
             Rules::IRV => "IRV",
+            Rules::NZMeekLegislation => "NZMeekLegislation",
+            Rules::NZMeekApocryphal => "NZMeekApocryphal",
         };
         f.write_str(s)
     }
@@ -149,6 +156,14 @@ impl Rules {
             Rules::AEC_IRV => distribute_preferences_with_extractors::<FederalHouseRepresentativesIRVAlwaysSimpleIRVToTwoCandidates>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
             Rules::FederalIRV => distribute_preferences_with_extractors::<FederalHouseRepresentativesIRV>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
             Rules::IRV => distribute_preferences_with_extractors::<SimpleIRVAnyDifferenceBreaksTies>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
+            Rules::NZMeekLegislation | Rules::NZMeekApocryphal => { // 9 digit transcript
+                let transcript = match self {
+                    Rules::NZMeekLegislation => distribute_preferences_with_extractors::<NZMeek<nzmeek::Legislation>>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
+                    Rules::NZMeekApocryphal => distribute_preferences_with_extractors::<NZMeek<nzmeek::PossiblyUsed>>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
+                    _ => panic!("Case not handled.")
+                };
+                return PossibleTranscripts::NineDigitDecimals(TranscriptWithMetadata{ metadata: data.metadata.clone(), transcript })
+            }
             _ => { // handle 6 digit transcripts.
                 let transcript = match self {
                     Rules::ACT2020 => distribute_preferences_with_extractors::<ACT2020>(data,candidates_to_be_elected,excluded_candidates,ec_resolutions,vote_types,print_progress_to_stdout,randomness,extractors,include_list_of_votes_in_transcript),
@@ -185,6 +200,8 @@ impl Rules {
             Rules::NSWECRandomLGE2017 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLGE2017>(data, verbose)?),
             Rules::NSWECRandomLC2015 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLC2015>(data,verbose)?),
             Rules::NSWECRandomLC2019 => PossibleChanges::Integers(options.find_changes::<NSWECRandomLC2019>(data,verbose)?),
+            Rules::NZMeekLegislation => PossibleChanges::SixDigitDecimals(options.find_changes::<ACT2021>(data,verbose)?),
+            Rules::NZMeekApocryphal => PossibleChanges::SixDigitDecimals(options.find_changes::<ACT2021>(data,verbose)?),
         })
     }
 
@@ -219,6 +236,8 @@ impl RulesDetails {
             RulesDetails{ name: "Vic2018".to_string(), description: "My interpretation of the rules that should have been used by the VEC since the 2018 modification to 114A(28)(c) of the Electoral Act 2002, and a plausible if not literal interpretation of the rules prior to that.".to_string() },
             RulesDetails{ name: "WA2018".to_string(), description: "My interpretation of the Western Australian Legislative Council rules consistent with the 2008 published official distribution of preferences.".to_string() },
             RulesDetails{ name: "IRV".to_string(), description: "IRV with tie resolution by count backs with any non-equality breaking ties where possible.".to_string() },
+            RulesDetails{ name: "NZMeekLegislation".to_string(), description: "My interpretation of the New Zealand Meek Legislation (using its strange rounding). Preliminary".to_string() },
+            RulesDetails{ name: "NZMeekApocryphal".to_string(), description: "My guess of what is used in practice in the New Zealand Meek counting. I have little evidence for this. Preliminary.".to_string() },
         ]
     }
 }
@@ -230,6 +249,7 @@ pub enum PossibleChanges {
     Integers(ElectionChanges<usize>),
     SignedIntegers(ElectionChanges<isize>),
     SixDigitDecimals(ElectionChanges<FixedPrecisionDecimal<6>>),
+    NineDigitDecimals(ElectionChanges<FixedPrecisionDecimal<6>>),
 }
 
 
@@ -240,6 +260,7 @@ pub enum PossibleTranscripts {
     Integers(TranscriptWithMetadata<usize>),
     SignedIntegers(TranscriptWithMetadata<isize>),
     SixDigitDecimals(TranscriptWithMetadata<FixedPrecisionDecimal<6>>),
+    NineDigitDecimals(TranscriptWithMetadata<FixedPrecisionDecimal<9>>),
 }
 
 impl PossibleTranscripts {
@@ -248,6 +269,7 @@ impl PossibleTranscripts {
             PossibleTranscripts::Integers(t) => {&t.transcript.elected}
             PossibleTranscripts::SignedIntegers(t) => {&t.transcript.elected}
             PossibleTranscripts::SixDigitDecimals(t) => {&t.transcript.elected}
+            PossibleTranscripts::NineDigitDecimals(t) => {&t.transcript.elected}
         }
     }
 
@@ -256,12 +278,19 @@ impl PossibleTranscripts {
             (PossibleTranscripts::Integers(t1), PossibleTranscripts::Integers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
             (PossibleTranscripts::Integers(t1), PossibleTranscripts::SignedIntegers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
             (PossibleTranscripts::Integers(t1), PossibleTranscripts::SixDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::Integers(t1), PossibleTranscripts::NineDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
             (PossibleTranscripts::SignedIntegers(t1), PossibleTranscripts::Integers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
             (PossibleTranscripts::SignedIntegers(t1), PossibleTranscripts::SignedIntegers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
             (PossibleTranscripts::SignedIntegers(t1), PossibleTranscripts::SixDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::SignedIntegers(t1), PossibleTranscripts::NineDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
             (PossibleTranscripts::SixDigitDecimals(t1), PossibleTranscripts::Integers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
             (PossibleTranscripts::SixDigitDecimals(t1), PossibleTranscripts::SignedIntegers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
             (PossibleTranscripts::SixDigitDecimals(t1), PossibleTranscripts::SixDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::SixDigitDecimals(t1), PossibleTranscripts::NineDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::NineDigitDecimals(t1), PossibleTranscripts::Integers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::NineDigitDecimals(t1), PossibleTranscripts::SignedIntegers(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::NineDigitDecimals(t1), PossibleTranscripts::SixDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
+            (PossibleTranscripts::NineDigitDecimals(t1), PossibleTranscripts::NineDigitDecimals(t2)) => compare_transcripts(&t1.transcript,&t2.transcript),
         }
     }
 }

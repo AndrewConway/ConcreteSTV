@@ -1,4 +1,4 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -13,7 +13,7 @@ use std::convert::TryFrom;
 use std::hash::Hash;
 use std::str::FromStr;
 use num::rational::{ParseRatioError, Ratio};
-use crate::ballot_metadata::CandidateIndex;
+use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use crate::distribution_of_preferences_transcript::{CountIndex, Transcript};
 use crate::random_util::Randomness;
 use crate::tie_resolution::{MethodOfTieResolution, TieResolutionExplicitDecision, TieResolutionGranularityNeeded, TieResolutionsMadeByEC, TieResolutionUsage};
@@ -207,7 +207,7 @@ impl TransferValue {
                     while end_tied_index_exclusive<compute_transferred.len() && compute_transferred[extra_to_distribute].distributed==compute_transferred[end_tied_index_exclusive].distributed { end_tied_index_exclusive+=1; }
                     let mut tied_candidates : Vec<CandidateIndex> = compute_transferred[start_tied_index..end_tied_index_exclusive].iter().map(|v|v.candidate).collect();
                     let num_missing_out_on_rounding_up = end_tied_index_exclusive-extra_to_distribute;
-                    for (remaining_tied,remaining_granularity) in MethodOfTieResolution::AnyDifferenceIsADiscriminator.resolve(&mut tied_candidates, transcript, TieResolutionGranularityNeeded::LowestSeparated(num_missing_out_on_rounding_up)) {
+                    for (remaining_tied,remaining_granularity) in MethodOfTieResolution::AnyDifferenceIsADiscriminator.resolve(&mut tied_candidates, transcript, TieResolutionGranularityNeeded::LowestSeparated(num_missing_out_on_rounding_up),NumberOfCandidates(0),NumberOfCandidates(0),BallotPaperCount(0)) { // note the last 3 parameters are never needed with AnyDifferenceIsADiscriminator.
                         let decision = ec_resolutions.resolve(remaining_tied,remaining_granularity,TieResolutionUsage::RoundingUp,current_count,randomness);
                         ec_decision.push(decision);
                     };

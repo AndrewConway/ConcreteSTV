@@ -8,7 +8,8 @@
 use crate::distribution_of_preferences_transcript::{CountIndex, PerCandidate, QuotaInfo, ReasonForCount, Transcript, TranscriptWithMetadata};
 use crate::ballot_metadata::{CandidateIndex, ElectionMetadata, NumberOfCandidates};
 use std::cmp::min;
-use num::{abs, Zero};
+use std::collections::HashSet;
+use num::{abs, ToPrimitive, Zero};
 use std::ops::Sub;
 use std::fmt::{Debug, Display, Formatter};
 use std::fs::File;
@@ -58,7 +59,7 @@ pub enum DifferenceBetweenOfficialDoPAndComputedOnParticularCount<Tally:Display+
     #[error("The excluded candidates (ballot paper order) are {0:?} in the official DoP and {1:?} in the ConcreteSTV case.")]
     ExcludedCandidatesUnordered(Vec<CandidateIndex>,Vec<CandidateIndex>),
     //#[error("In the official list candidate {0} ceased to be a continuing candidate for the first time this count, but not in the ConcreteSTV case.")]
-    //CandidateNotContinuingInOfficalCount(CandidateIndex),
+    //CandidateNotContinuingInOfficialCount(CandidateIndex),
     //#[error("In the official list candidate {0} ceased to be a continuing candidate for the first time this count, but not in the ConcreteSTV case. There was an EC decision involving {1:?} but none were excluded by ConcreteSTV.")]
     //CandidateNotContinuingInOfficialCountWithPointlessDecision(CandidateIndex, Vec<CandidateIndex>),
     #[error("The affected ballots in this count came from counts {0:?} (0 based) in the official DoP and {1:?} in ConcreteSTV.")]
@@ -141,7 +142,7 @@ pub struct OfficialDOPForOneCount {
     pub paper_total : Option<PerCandidate<usize>>, // an isize::MAX means unknown
     pub vote_delta : Option<PerCandidate<f64>>, // A NaN means unknown.
     pub paper_delta : Option<PerCandidate<isize>>, // an isize::MAX means unknown.
-    pub paper_set_aside_for_quota: Option<PerCandidate<usize>>, // an usize::MAX means unknown. This is rarely used (possibly only in the NSW randomized algorithm for legislative council and LGE prior to 2021)
+    pub paper_set_aside_for_quota: Option<PerCandidate<usize>>, // a usize::MAX means unknown. This is rarely used (possibly only in the NSW randomized algorithm for legislative council and LGE prior to 2021)
     pub count_name : Option<String>,
     pub papers_came_from_counts : Option<Vec<CountIndex>>, // if present, which were the source for the counts. Should be in ascending order.
 }
@@ -161,6 +162,38 @@ pub struct OfficialDistributionOfPreferencesTranscript {
     pub negative_values_in_surplus_distributions_and_rounding_may_be_off : bool,
 }
 
+impl <Tally:PartialEq+Clone+Display+FromStr+Debug+CanConvertToF64PossiblyLossily> From<Transcript<Tally>> for OfficialDistributionOfPreferencesTranscript {
+    fn from(transcript: Transcript<Tally>) -> Self {
+        let quota = transcript.quota.map(|q| QuotaInfo{
+            papers: q.papers,
+            vacancies: q.vacancies,
+            quota: q.quota.convert_to_f64(),
+            exhausted: q.exhausted.map(|q| q.convert_to_f64()),
+            gained_from_rounding: q.gained_from_rounding.map(|q| q.convert_to_f64()),
+        });
+        let mut all_elected : HashSet<CandidateIndex> = HashSet::new();
+        let counts = transcript.counts.into_iter().map(|c|OfficialDOPForOneCount{
+            transfer_value: c.created_transfer_value.as_ref().map(|c|c.transfer_value.0.to_f64().unwrap()),
+            elected: c.elected.iter().map(|c|{all_elected.insert(c.who); c.who}).collect(),
+            excluded: c.not_continuing.iter().copied().filter(|c|!all_elected.contains(c)).collect(),
+            vote_total: Some(c.status.tallies.map(|t|t.convert_to_f64())),
+            paper_total: Some(c.status.papers.map(|t|t.0)),
+            vote_delta: None,
+            paper_delta: None,
+            paper_set_aside_for_quota: None,
+            count_name: c.count_name,
+            papers_came_from_counts: Some(c.portion.papers_came_from_counts),
+        }).collect();
+        OfficialDistributionOfPreferencesTranscript{
+            quota,
+            counts,
+            missing_negatives_in_papers_delta: false,
+            elected_candidates_are_in_order: true,
+            all_exhausted_go_to_rounding: false,
+            negative_values_in_surplus_distributions_and_rounding_may_be_off: false,
+        }
+    }
+}
 impl OfficialDistributionOfPreferencesTranscript {
     pub fn print_table(&self,metadata:&ElectionMetadata) {
         if let Some(quota) = &self.quota {
@@ -409,7 +442,7 @@ pub fn test_official_dop_without_actual_votes<Rules:PreferenceDistributionRules,
     let loader = source.get_loader_for_year(year,&FileFinder::find_ec_data_repository())?;
     let metadata = loader.read_raw_metadata(state)?;
     let official_transcript = loader.read_official_dop_transcript(&metadata)?;
-    //veryify_official_dop_transcript::<Rules>(&official_transcript,&metadata)?;
+    //verify_official_dop_transcript::<Rules>(&official_transcript,&metadata)?;
     let transcript = distribute_preferences_using_official_results::<Rules>(&official_transcript,&metadata)?;
     let result = Ok(official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript,false));
     if save_transcripts {

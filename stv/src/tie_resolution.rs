@@ -1,11 +1,11 @@
-// Copyright 2021-2023 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License along with ConcreteSTV.  If not, see <https://www.gnu.org/licenses/>.
 
 
-use crate::ballot_metadata::CandidateIndex;
+use crate::ballot_metadata::{CandidateIndex, NumberOfCandidates};
 use crate::distribution_of_preferences_transcript::{CountIndex, Transcript};
 use std::collections::{HashSet, HashMap};
 use std::hash::Hash;
@@ -13,6 +13,7 @@ use serde::{Serialize,Deserialize};
 use anyhow::anyhow;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
+use crate::ballot_pile::BallotPaperCount;
 use crate::compare_transcripts::DeltasInCandidateLists;
 use crate::random_util::Randomness;
 
@@ -39,6 +40,22 @@ pub enum MethodOfTieResolution {
     /// This is equivalent to always sorting by tally, and actually seems the most reasonable choice as far as I am concerned.
     /// Of course, that is not necessarily what is legislated.
     AnyDifferenceIsADiscriminatorGiveUpIfNotFullSolution,
+    /// Like AnyDifferenceIsADiscriminatorGiveUpIfNotFullSolution, except instead of giving up if not a full solution,
+    /// use the NZ PRNs. See clauses 41 to 48 of
+    /// [Schedule 1A (New  Zealand method of counting single transferable votes), Local Electoral Regulations 2001, (SR 2001/145), Version as at 1 July 2025](https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2001/145/en/latest/#DLM57125)
+    ///
+    /// Note that I am not confident of my implementation as I consider the legislation to be ambiguous in a few places:
+    /// * Between clause 43 and 44 are there 4 or 5 values discarded?
+    /// * How does the timing of clause 23 actually work?
+    /// * It appears that in practice and extra copy of clause 13 is inserted immediately after clause 6, which upsets the timing of everthing thereafter, which matters because of the PRNs inverting each iteration.
+    AnyDifferenceIsADiscriminatorUseNZPRNsIfNotFullSolution,
+    /// Like AnyDifferenceIsADiscriminatorUseNZPRNsIfNotFullSolution but include a variety of changes to the
+    /// algorithm signposted in https://github.com/Conservatory/openstv/blob/master/openstv/MethodPlugins/MeekNZSTV.py
+    /// as probably being used in the official software (although I can't check without access or sufficient examples).
+    /// * Line 77: clause 42 has the 1000 in the formula for z replaced by 10,000.
+    /// * Line 90: an extra mod 10,000 is inserted into the rc computation in clause 43. Seems plausible otherwise why have the 10,000 in the inversion?
+    /// * Line 92: an extra inversion is done. (this could be the 4 vs 5 debate ambiguity listed above)
+    AnyDifferenceIsADiscriminatorUseApocryphalNZPRNsIfNotFullSolution,
     /// This is an even better version of AnyDifferenceIsADiscriminatorGiveUpIfNotFullSolution. The difference is that if AnyDifferenceIsADiscriminatorGiveUpIfNotFullSolution fails
     /// to solve everything, then a draw is done as if the countback was totally nullified. However,
     /// AnyDifferenceIsADiscriminator only does a draw amongst the candidates that AnyDifferenceIsADiscriminator could not distinguish.
@@ -87,11 +104,25 @@ pub enum TieResolutionGranularityNeeded {
 impl MethodOfTieResolution {
     /// sort tied_candidates low to high based upon the given method of tie resolution.
     /// If the method does not resolve it, return a DecisionMadeByEC object.
-    pub fn resolve<'a,Tally:Clone+Hash+Ord+Display+FromStr+Debug>(self,tied_candidates: &'a mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded) -> Vec<(&'a mut [CandidateIndex],TieResolutionGranularityNeeded)> {
+    pub fn resolve<'a,Tally:Clone+Hash+Ord+Display+FromStr+Debug>(self,tied_candidates: &'a mut [CandidateIndex],transcript:  &Transcript<Tally>,granularity:TieResolutionGranularityNeeded,number_of_candidates: NumberOfCandidates,number_of_vacancies:NumberOfCandidates,valid_papers:BallotPaperCount) -> Vec<(&'a mut [CandidateIndex],TieResolutionGranularityNeeded)> {
         let resolved = match self {
             MethodOfTieResolution::None => false,
             MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferent => resolve_ties_require_all_different(tied_candidates,transcript,false),
             MethodOfTieResolution::AnyDifferenceIsADiscriminatorGiveUpIfNotFullSolution => resolve_ties_any_different_give_up_if_cant_do_everything(tied_candidates, transcript, granularity, false),
+            MethodOfTieResolution::AnyDifferenceIsADiscriminatorUseNZPRNsIfNotFullSolution => {
+                let solved_by_aafd = resolve_ties_any_different_give_up_if_cant_do_everything(tied_candidates, transcript, granularity, false);
+                if !solved_by_aafd { // attempt to solve using NZ PRN method
+                    resolve_using_NZPRN(tied_candidates,transcript,number_of_candidates,number_of_vacancies,valid_papers,false);
+                }
+                true
+            }
+            MethodOfTieResolution::AnyDifferenceIsADiscriminatorUseApocryphalNZPRNsIfNotFullSolution => {
+                let solved_by_aafd = resolve_ties_any_different_give_up_if_cant_do_everything(tied_candidates, transcript, granularity, false);
+                if !solved_by_aafd { // attempt to solve using NZ PRN method
+                    resolve_using_NZPRN(tied_candidates,transcript,number_of_candidates,number_of_vacancies,valid_papers,true);
+                }
+                true
+            }
             MethodOfTieResolution::AnyDifferenceIsADiscriminator => return resolve_ties_any_different(tied_candidates, transcript, granularity, false),
             MethodOfTieResolution::RequireHistoricalCountsToBeAllDifferentOnlyConsideringCountsWhereAnActionIsFinished => resolve_ties_require_all_different(tied_candidates,transcript,true),
             MethodOfTieResolution::AnyDifferenceIsADiscriminatorOnlyConsideringCountsWhereAnActionIsFinishedGiveUpIfNotFullSolution => resolve_ties_any_different_give_up_if_cant_do_everything(tied_candidates, transcript, granularity, true),
@@ -102,6 +133,19 @@ impl MethodOfTieResolution {
     }
 }
 
+/// Resolve ties using the NZ PRNG, either the legislated or apocryphal versions. See 
+/// MethodOfTieResolution::AnyDifferenceIsADiscriminatorUseApocryphalNZPRNsIfNotFullSolution for
+/// what apocryphal means in this context.
+/// 
+/// Always succeeds. Unless there are too many candidates (10,001 is definitely too many for
+/// apocryphal. Note that the NZ legislation will fail in this case as clause 46 would be impossible to fulfil. 
+#[allow(non_snake_case)] // allow NZPRN acronym.
+fn resolve_using_NZPRN<Tally: Clone + Hash + Ord + Display + FromStr + Debug>(tied_candidates: &mut [CandidateIndex], transcript:  &Transcript<Tally>, number_of_candidates: NumberOfCandidates, number_of_vacancies:NumberOfCandidates, valid_papers:BallotPaperCount, apocryphal:bool) {
+    let mut prng = NZPRNG::new(number_of_candidates,number_of_vacancies,valid_papers,apocryphal);
+    let prns = prng.get_all_prns(number_of_candidates,apocryphal); // gets a sufficient number of PRNs.
+    tied_candidates.sort_by_key(|c|prns[c.0]);
+    if transcript.counts.len()%2==1 { tied_candidates.reverse()} // reverse the order of PRNs each count.
+}
 /// In order to perfectly match the results of an Electoral Commission, it is necessary to have
 /// the identical decisions made. These are handled by providing an explicit list.
 ///
@@ -493,3 +537,78 @@ fn resolve_ties_require_unique_minimum_granularity<Tally:Clone+Eq+Hash+Ord+Displ
     false
 }
 
+/// New Zealand PRNG method.
+/// This structure is the generator for rcs for the following legislation:
+///
+/// ### PRNG method
+/// 41. Allocate a unique pseudo-random whole number (a PRN number) for each candidate at each stage of the counting.
+/// 42. To generate PRNs, calculate x, y, and z using the following formulae:
+///
+///   x = c+5
+///   y = n
+///   z = (v + 1 000 (v rem 10)) rem 30 323
+///
+///   where—
+///     - **c** is the number of candidates
+///     - **n** is the number of vacancies
+///     - **v** is the total number of valid voting documents
+///     - **rem** is the remainder operator such that a rem b gives the remainder of dividing whole number a by whole number b.
+///
+/// 43. Generate a random whole number rc using the following formulae:
+///
+///    x = (171x) rem 30 269
+///    y = (172y) rem 30 307
+///    z = (170z) rem 30 323
+///    rc = (10 000x) div 30 269 + (10 000y) div 30 307 + (10 000z) div 30 323
+///
+/// where—
+///     - **rc** is a pseudo-random number
+///     - **div** is the integer division operator such that a div b gives the whole number quotient of dividing whole number a by whole number b.
+///
+/// 44. Repeat the step in clause 43 four times, discarding the first 4 values of rc.
+/// 45. Assign the current value of rc to the first candidate.
+/// 46. Repeat the step in clause 43 until a pseudo-random number r results that is distinct from all previous pseudo random numbers assigned to candidates. Assign rc to the next candidate.
+/// 47. Repeat the step in clause 43 until all candidates have been assigned a pseudo-random number.
+/// 48. For the second and subsequent steps, replace the pseudo-random number for each candidate with the candidate’s PRN at the previous step subtracted from 10 000.
+struct NZPRNG {
+    x : u32,
+    y : u32,
+    z : u32,
+}
+
+impl NZPRNG {
+    /// initialize a new PRNG using paragraph 42.
+    /// - **number_of_candidates** is the number of candidates
+    /// - **number_of_vacancies** is the number of vacancies
+    /// - **valid** is the total number of valid voting documents
+    fn new(number_of_candidates: NumberOfCandidates,number_of_vacancies:NumberOfCandidates,valid:BallotPaperCount,apocryphal:bool) -> Self {
+        let x = (number_of_candidates.0+5) as u32;
+        let y = number_of_vacancies.0 as u32;
+        let z = (valid.0+(if apocryphal {10000} else {1000})*(valid.0%10)) as u32;
+        Self { x, y, z }
+    }
+
+    /// Get a new rc using rule 43
+    fn get_next_rc(&mut self,apocryphal:bool) -> u32 {
+        self.x = (self.x*171) % 30269;
+        self.y = (self.y*172) % 30307;
+        self.z = (self.z*170) % 30323;
+        let rc = ((10000*self.x)%30269)+((10000*self.y)%30307)+((10000*self.z)%30323);
+        if apocryphal {10000-(rc%10000)} else {rc}
+    }
+
+    /// Get PRNs for all candidates using rules 44 to 47.
+    fn get_all_prns(&mut self,number_of_candidates: NumberOfCandidates,apocryphal:bool) -> Vec<u32> {
+        // Note that it is not entirely clear whether rule 43 should be applied after rule 42 and before rule 43, or if 43 is just definitional for rules 44 to 46. I interpret it as the latter but this is just my guess.
+        for _ in 0..4 { self.get_next_rc(apocryphal); }  // 44. Repeat the step in clause 43 four times, discarding the first 4 values of rc.
+        let mut res = vec![];
+        let mut set = HashSet::new();
+        for _ in 0..number_of_candidates.0 {
+            let mut rc = self.get_next_rc(apocryphal);
+            while set.contains(&rc) { rc=self.get_next_rc(apocryphal); }
+            res.push(rc);
+            set.insert(rc);
+        }
+        res
+    }
+}

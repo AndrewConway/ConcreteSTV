@@ -1,4 +1,4 @@
-// Copyright 2021-2024 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -16,6 +16,7 @@ use std::fmt::{Debug, Display, Formatter};
 use crate::preference_distribution::TransferValueMethod;
 use crate::signed_version::SignedVersion;
 use std::str::FromStr;
+use crate::list_of_meek_vote_sources::ListOfMeekVoteSources;
 use crate::official_dop_transcript::CanConvertToF64PossiblyLossily;
 use crate::simple_list_of_votes::ListOfVotes;
 use crate::tie_resolution::TieResolutionExplicitDecision;
@@ -71,6 +72,21 @@ impl <X:Default+PartialEq+Clone+Display+FromStr> PerCandidate<X> {
     }
 }
 
+impl <X:PartialEq+Clone+Display+FromStr> PerCandidate<X> {
+    /// convert from one tally type to another.
+    pub fn map<Y:PartialEq+Clone+Display+FromStr>(&self,f:impl FnMut(X)->Y) -> PerCandidate<Y> {
+        let mut f = f;
+        let exhausted = f(self.exhausted.clone());
+        let rounding = SignedVersion{ negative: self.rounding.negative, value: f(self.rounding.value.clone())  };
+        let set_aside = self.set_aside.as_ref().map(|v|f(v.clone()));
+        PerCandidate{
+            candidate: self.candidate.iter().cloned().map(f).collect(),
+            exhausted,
+            rounding,
+            set_aside,
+        }
+    }
+}
 
 impl <Tally:PartialEq+Clone+Display+FromStr+CanConvertToF64PossiblyLossily> PerCandidate<Tally> {
     /// Like equals, but for potentially different tally types
@@ -189,6 +205,12 @@ pub struct EndCountStatus<Tally:PartialEq+Clone+Display+FromStr> {
     /// usually not present list of all votes' positions.
     #[serde(default,skip_serializing_if = "Option::is_none")]
     pub list_of_votes: Option<PerCandidate<ListOfVotes>>,
+    /// usually not present (but common with Meek) summary of the different weight votes that went into the computation.
+    #[serde(default,skip_serializing_if = "Option::is_none")]
+    pub meek_vote_sources: Option<PerCandidate<ListOfMeekVoteSources>>,
+    /// only present for Meek, keep values for each candidate.
+    #[serde(default,skip_serializing_if = "Vec::is_empty")]
+    pub keep_values: Vec<String>,
 }
 
 impl <Tally:PartialEq+Clone+Display+FromStr+CanConvertToF64PossiblyLossily> EndCountStatus<Tally> {
@@ -203,6 +225,7 @@ pub enum ReasonForCount {
     FirstPreferenceCount,
     ExcessDistribution(CandidateIndex),
     Elimination(Vec<CandidateIndex>),  // usually just one candidate, but federal rules allow multiple elimination
+    MeekIteration,
 }
 
 impl ReasonForCount {
@@ -234,7 +257,7 @@ pub struct CandidateElected {
     pub why : ElectionReason,
 }
 
-#[derive(Clone,Serialize,Deserialize,Debug)]
+#[derive(Clone,Serialize,Deserialize,Debug,Default)]
 pub struct PortionOfReasonBeingDoneThisCount {
     pub transfer_value : Option<TransferValue>,
     pub when_tv_created: Option<CountIndex>,
@@ -279,7 +302,7 @@ impl Display for DecisionMadeByEC {
 
 
 #[derive(Clone,Serialize,Deserialize,Debug)]
-pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
+pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr+Debug> {
     /// The action that is being done in said count
     pub reason : ReasonForCount,
     /// If only a sub portion of that reason is done in that count, why will be in here. Other info could also be in here (like which counts papers came from) even if it doesn't restrict things for this set of STV rules.
@@ -302,6 +325,9 @@ pub struct SingleCount<Tally:PartialEq+Clone+Display+FromStr> {
     /// A special name for the count, if not 1,2,3,... Mainly used so that each exclusion or surplus distribution is a single "major" count with possibly minor counts included.
     #[serde(skip_serializing_if = "Option::is_none",default)]
     pub count_name : Option<String>,
+    /// If the quota is recomputed for each step.
+    #[serde(skip_serializing_if = "Option::is_none",default="produce_none")] // can't just have default as there is no default on Tally, which is needed for some reason.
+    pub quota : Option<QuotaInfo<Tally>>,
 }
 
 #[derive(Clone,Serialize,Deserialize,Debug)]
@@ -309,6 +335,13 @@ pub struct QuotaInfo<Tally:Debug> {
     pub papers : BallotPaperCount,
     pub vacancies : NumberOfCandidates,
     pub quota : Tally,
+    /// If the number of exhausted votes contributes to the quota.
+    #[serde(skip_serializing_if = "Option::is_none",default="produce_none")] // can't just have default as there is no default on Tally, which is needed for some reason.
+    pub exhausted : Option<Tally>,
+    /// If the number of votes gained from rounding contributes to the quota. 
+    #[serde(skip_serializing_if = "Option::is_none",default="produce_none")] // can't just have default as there is no default on Tally, which is needed for some reason.
+    pub gained_from_rounding : Option<Tally>,
+    
 }
 
 impl <Tally:Display+Debug> Display for QuotaInfo<Tally> {

@@ -107,6 +107,7 @@ fn print_transcript<T:Copy+ToString+Eq+Ord+Sub<Output=T>+Clone+Display+FromStr+Z
             ReasonForCount::FirstPreferenceCount => "First Preferences".to_string(),
             ReasonForCount::ExcessDistribution(c) => format!("Surplus {}",metadata.candidate(*c).name),
             ReasonForCount::Elimination(cs) => format!("Exclude {}",cs.iter().map(|c|metadata.candidate(*c).name.clone()).collect::<Vec<_>>().join(", ")),
+            ReasonForCount::MeekIteration => panic!("Meek Iteration currently not supported"), // FIXME
         };
 
         if use_deltas {

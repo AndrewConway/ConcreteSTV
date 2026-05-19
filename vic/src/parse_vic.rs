@@ -1,4 +1,4 @@
-// Copyright 2022-2025 Andrew Conway.
+// Copyright 2022-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -758,7 +758,9 @@ impl DOPFileFormat {
                     let quota = QuotaInfo{
                         papers: formal_ballots.ok_or_else(||anyhow!("No formal ballots heading found"))?,
                         vacancies: NumberOfCandidates(5),
-                        quota: quota_size.ok_or_else(||anyhow!("No quota heading found"))?
+                        quota: quota_size.ok_or_else(||anyhow!("No quota heading found"))?,
+                        exhausted: None,
+                        gained_from_rounding: None,
                     };
                     return Ok(DOPFileFormat{
                         quota,

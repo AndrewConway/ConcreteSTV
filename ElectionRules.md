@@ -200,5 +200,81 @@ sufficiently detailed to be able to check most of the ambiguities.
 
 - **WA2008** My interpretation of the Western Australian Legislative Council rules consistent with the 2008 published official distribution of preferences.  
 
+## New Zealand local government Meek legislation
+
+New Zealand has a variation of STV based on the widely acclaimed Meek algorithm for 
+optional use in local government elections. The rules are in
+[Schedule 1A (New  Zealand method of counting single transferable votes), Local Electoral Regulations 2001, (SR 2001/145), Version as at 1 July 2025](https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2001/145/en/latest/#DLM57125).
+I believe in 2004 this was moved from legislation to regulation; please accept my 
+sloppy use of the word legislation in the rest of this section which may refer to regulations.
+
+The following versions are provided with their differences described below:
+- **NZMeekLegislation** My interpretation of the legislation/regulations.
+- **NZMeekApocryphal** My guess as to what is actually done.
+
+Note that Apocryphal is not intended to be imply that it is bad; it is intended to imply that it
+is not supported by the legislation, and it contains several choices that I only have very weak, often second
+hand evidence are actually used. Indeed **NZMeekApocryphal** is my favourite of all the STV algorithms implemented
+by ConcreteSTV at the time of writing.
+
+The algorithm is excellent, my favourite of the ones implemented for ConcreteSTV. The legislation
+is mostly well written and unambiguous, with a few notable exceptions.
+
+The most serious issue is clause 10. This has a fairly obviously missing ellipsis in the formula which
+is critical to any sane interpretation. More subtle is the rounding description, which is simple,
+explicit, unambiguous, complete, and rather bizarre. Rounding effects caused by this and the most
+obvious interpretation of the non-transferable votes could lead to more than the desired number of
+candidates going over quota. Adding the votes gained by rounding into the quota computation avoids
+this issue and is done in the ConcreteSTV implementation **NZMeekLegislation**, 
+although it is not clear whether this is justified by the legislation. 
+
+There is a very simple fix to clause that is far superior both conceptually and practically: replace the rounding up of 
+each multiplication by `each multiplication is rounded down, other than the last which is rounded up`. As this
+is both the obvious way to do this calculation, and, unlike the legislation, consistent with the published results,
+I expect this is what is actually used. This is used in the ConcreteSTV implementation **NZMeekApocryphal**. 
+
+I am working on writing a detailed description of these rounding issues.
+
+The legislation has a novel PRNG method for tie resolution that unambiguously resolves each tie. 
+This has the wonderful property that it avoids
+the election counter from having to transparently and impartially resolve ties. 
+There is an ambiguity in the description of the PRNG that undermine this:
+* Is clause 43 an action (do this now, like the preceding and subsequent clauses) and/or a prescription (this is how you do it when referenced in clause 44,46,47)? That is, after doing 43 and 44 have you discarded 4 or 5 values?
+
+I have interpreted it as a prescription rather than an action.
+
+There are also a variety of differences that are convincingly rumoured between the PRNG described in the
+legislation and the PRNG used in the implementation.
+A different implementation [https://github.com/Conservatory/openstv/blob/master/openstv/MethodPlugins/MeekNZSTV.py](of the NZ Meek algorithm)
+signposts the following changes as probably being used in the official software (although like the author of the above software I can't check without access or sufficient examples).
+* Line 77: clause 42 has the 1000 in the formula for z replaced by 10,000.
+* Line 90: an extra mod 10,000 is inserted into the rc computation in clause 43. Seems plausible otherwise why have the 10,000 in the inversion?
+* Line 92: an extra inversion is done. (this could be the 4 vs 5 debate ambiguity listed above)
+
+These suspected differences are used in **NZMeekApocryphal** whereas **NZMeekLegislation** uses the legislation PRNG.
+
+The legislation does not seem to allow exclusions to occur on the first count step (the exclusion clause, 13, is in step 2),
+whereas the given published information often has such an exclusion. **NZMeekApocryphal** allows exclusions on the first
+count whereas **NZMeekLegislation** does not. This is unlikely to change the outcome of the election, although it has a big effect
+on tie resolution due to clause 48, or possibly through the timing of passing the 0.0001 threshold in clause 13.
+
+Clause 23 detects a stable state in the Meek iteration steps. It is written generally, but I do not understand
+what timing is expected. I have implemented it to take effect at the point that a stable state is obvious
+(such as repeating a prior count), although a literal interpretation would imply an infinitely wise oracle who
+could predict such states and act earlier. Like the first count exclusion this is unlikely
+to change the outcome of the election, although it has a big effect
+on tie resolution due to clause 48, or possibly through the timing of passing the 0.0001 threshold in clause 13.
+
+The implementations are for the case of two or more vacancies; the simpler one vacancy case has some special
+legislation that is not implemented. It is basically IRV with some tie resolution, but is slightly different from
+the multi-vacancy regulations applied with just one vacancy.
+
+# What would I recommend?
+
+I think the fairest and simplest conceptually STV method is the Meek method. The New Zealand legislation
+is pretty good (other than the issues mentioned above, particularly the clause 10 rounding). 
+I would recommend the **NZMeekApocryphal** choice over **NZMeekLegislation** due to the rounding
+issue.
+
 
 

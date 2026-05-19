@@ -15,7 +15,8 @@ members= [
     "statistics",
     "preflib",
     "main-app",
-    "webserver"
+    "webserver",
+    "nzmeek"
 ]
 resolver = "2"
 

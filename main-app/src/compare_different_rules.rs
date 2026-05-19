@@ -1,4 +1,4 @@
-// Copyright 2024 Andrew Conway.
+// Copyright 2024-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -19,12 +19,14 @@ use stv::election_data::ElectionData;
 use stv::random_util::Randomness;
 use crate::rules::{PossibleTranscripts, Rules};
 
+fn produce_none<T>() -> Option<T> { None }
+
 #[derive(Debug,Clone,Serialize,Deserialize)]
 /// A comparison of different rules for a particular dataset.
 ///
 /// For displaying, the precision affects the method of display:
 /// * 1 precision means only care about who is elected
-/// * 2 precision means only care aboue who is elected or the order thereof
+/// * 2 precision means only care about who is elected or the order thereof
 /// * 3 precision (default) means care about everything.
 ///
 pub struct RulesComparisonGroups {
@@ -44,7 +46,8 @@ pub struct SameOrderElected {
 }
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct SameTranscript {
-    transcript : PossibleTranscripts, // a sample transcript
+    #[serde(skip_serializing_if = "Option::is_none",default="produce_none")] // can't just have default as there is no default on Tally, which is needed for some reason.
+    transcript : Option<PossibleTranscripts>, // a sample transcript
     pub rules : Vec<String>
 }
 
@@ -90,7 +93,7 @@ impl fmt::Display for RulesComparisonGroups {
 }
 
 impl RulesComparisonGroups {
-    pub fn create(data:&ElectionData,rules:&[Rules]) -> anyhow::Result<Self> {
+    pub fn create(data:&ElectionData,rules:&[Rules],include_transcript:bool) -> anyhow::Result<Self> {
         let mut res = RulesComparisonGroups { metadata: data.metadata.clone(), groups: vec![] };
         for rule in rules {
             let transcript = rule.count_simple(data,false,&mut Randomness::ReverseDonkeyVote,&[],false)?;
@@ -110,12 +113,21 @@ impl RulesComparisonGroups {
                 }
             };
             let same_transcript = {
-                match same_candidates_order.subgroups.iter_mut().find(|g|g.transcript.compare_transcripts(&transcript)==DifferenceBetweenTranscripts::Same) {
+                match same_candidates_order.subgroups.iter_mut().find(|g|g.transcript.as_ref().unwrap().compare_transcripts(&transcript)==DifferenceBetweenTranscripts::Same) {
                     Some(existing) => existing,
-                    None => { same_candidates_order.subgroups.push(SameTranscript{ transcript, rules: vec![] }); same_candidates_order.subgroups.last_mut().unwrap() }
+                    None => { same_candidates_order.subgroups.push(SameTranscript{ transcript : Some(transcript), rules: vec![] }); same_candidates_order.subgroups.last_mut().unwrap() }
                 }
             };
             same_transcript.rules.push(rule.to_string());
+        }
+        if !include_transcript { // needed the transcripts for group generation.
+            for group in res.groups.iter_mut() {
+                for subgroup in group.subgroups.iter_mut() {
+                    for s in subgroup.subgroups.iter_mut() {
+                        s.transcript=None;
+                    }
+                }
+            }
         }
         Ok(res)
     }

@@ -1,4 +1,4 @@
-// Copyright 2022-2025 Andrew Conway.
+// Copyright 2022-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -8,15 +8,69 @@
 //! This tests how the official transcripts compare to the rules, with no knowledge of the actual votes.
 
 use std::collections::HashSet;
+use std::fmt::{Debug, Display};
 use std::fs::File;
+use std::str::FromStr;
+use serde::{Deserialize, Serialize};
 use federal::parse_house_reps::{parse_HouseDopByDivisionDownload, FederalHouseRepresentativesIRV, FederalHouseRepresentativesIRVAlwaysSimpleIRVToTwoCandidates};
-use stv::ballot_metadata::CandidateIndex;
-use stv::distribution_of_preferences_transcript::{CountIndex, TranscriptWithMetadata};
+use stv::ballot_metadata::{CandidateIndex, NumberOfCandidates};
+use stv::ballot_pile::BallotPaperCount;
+use stv::distribution_of_preferences_transcript::{CountIndex, ReasonForCount, TranscriptWithMetadata};
 use stv::official_dop_transcript::{DifferenceBetweenOfficialDoPAndComputed, DifferenceBetweenOfficialDoPAndComputedOnParticularCount, ECTally};
 use stv::parse_util::FileFinder;
 use stv::preference_distribution::PreferenceDistributionRules;
 use stv::verify_official_transcript::distribute_preferences_using_official_results;
 
+#[derive(Debug,Serialize,Deserialize,Clone)]
+struct MichelleFormat {
+    name : String,
+    region : String,
+    seats : NumberOfCandidates,
+    candidates: Vec<MichelleCandidate>,
+    winners : Vec<CandidateIndex>,
+    first_preferences : Vec<BallotPaperCount>,
+    total_votes : BallotPaperCount,
+    rounds : Vec<MichelleRound>
+}
+
+impl MichelleFormat {
+    fn new<Tally:PartialEq+Clone+Display+FromStr+Debug>(transcript: &TranscriptWithMetadata<Tally>) -> MichelleFormat {
+        let first_preferences = transcript.transcript.counts[0].status.papers.candidate.clone();
+        let total_votes = first_preferences.iter().copied().sum::<BallotPaperCount>();
+        let mut rounds : Vec<MichelleRound> = Vec::new();
+        for i in 1..transcript.transcript.counts.len() {
+            let count = &transcript.transcript.counts[i];
+            let previous_count = &transcript.transcript.counts[i-1];
+            rounds.push(MichelleRound{
+                candidate: if let ReasonForCount::Elimination(ci) = &count.reason && ci.len()==1 { ci[0] } else {panic!("Expecting an elimination of 1 candidate, got {:?}",count.reason)},
+                status: 0,
+                delta: count.status.papers.candidate.iter().zip(previous_count.status.papers.candidate.iter()).map(|(&c2,&c1)|if c2>c1 {c2-c1} else {BallotPaperCount(0)}).collect(),
+            });
+        }
+        let (name,region) = transcript.metadata.name.electorate.trim_end_matches(')').split_once('(').expect("name expected to be Electorate (State)");
+        MichelleFormat {
+            name: name.trim().to_string(),
+            region: region.trim().to_string(),
+            seats: NumberOfCandidates(1),
+            candidates: transcript.metadata.candidates.iter().map(|c|MichelleCandidate{name:c.name.clone(),party:c.party.map(|p|transcript.metadata.parties[p.0].name.clone()).unwrap_or_else(||"".to_string())}).collect(),
+            winners: transcript.metadata.results.clone().unwrap(),
+            first_preferences,
+            total_votes,
+            rounds,
+        }
+    }
+}
+#[derive(Debug,Serialize,Deserialize,Clone)]
+struct MichelleRound {
+    candidate : CandidateIndex,
+    status : usize,
+    delta : Vec<BallotPaperCount>,
+}
+#[derive(Debug,Serialize,Deserialize,Clone)]
+struct MichelleCandidate {
+    name:String,
+    party:String,
+}
 /// Test the AEC counts for the given year.
 fn test<Rules:PreferenceDistributionRules>(year:&str,ec_code:&str,just_division:Option<&str>,ignore:HashSet<&str>) -> Result<(),DifferenceBetweenOfficialDoPAndComputed<Rules::Tally>> where <Rules as PreferenceDistributionRules>::Tally: Send+Sync+'static {
     let finder = FileFinder::find_ec_data_repository();
@@ -25,6 +79,7 @@ fn test<Rules:PreferenceDistributionRules>(year:&str,ec_code:&str,just_division:
     let source_url = format!("https://results.aec.gov.au/31496/Website/HouseDownloadsMenu-31496-Csv.htm");
     let path = finder.find_raw_data_file(&filename,&archive_location,&source_url).unwrap();
     let divisions = parse_HouseDopByDivisionDownload(&path,year,&source_url).unwrap();
+    let mut michelle_format : Vec<MichelleFormat> = vec![];
     for division in divisions {
         if just_division.as_ref().is_some_and(|s|*s!=division.metadata.name.electorate) {continue;}
         if ignore.contains(division.metadata.name.electorate.as_str()) {continue;}
@@ -37,6 +92,7 @@ fn test<Rules:PreferenceDistributionRules>(year:&str,ec_code:&str,just_division:
         let result = official_transcript.compare_with_transcript_checking_for_ec_decisions(&transcript,false);
         if SAVE_TRANSCRIPTS {
             let transcript = TranscriptWithMetadata{ metadata, transcript };
+            if result.is_ok() {michelle_format.push(MichelleFormat::new(&transcript)); } // don't do if multiple elimination etc.
             std::fs::create_dir_all(format!("test_house_rep_transcripts/{year}")).unwrap();
             let file = File::create(format!("test_house_rep_transcripts/{year}/transcript_{}.json",transcript.metadata.name.electorate)).unwrap();
             serde_json::to_writer_pretty(file,&transcript).unwrap();
@@ -46,6 +102,11 @@ fn test<Rules:PreferenceDistributionRules>(year:&str,ec_code:&str,just_division:
             Err(e) => println!("{}",e),
         }
         result?;
+    }
+    if SAVE_TRANSCRIPTS {
+        michelle_format.sort_by_key(|m|m.name.clone());
+        let file = File::create(format!("test_house_rep_transcripts/MichelleIRV{year}.json")).unwrap();
+        serde_json::to_writer_pretty(file,&michelle_format).unwrap();
     }
     Ok(())
 }

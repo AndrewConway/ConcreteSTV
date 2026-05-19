@@ -6,7 +6,7 @@
 
 
 use stv::ballot_pile::{BallotPaperCount, FullySplitByCountNumber};
-use stv::preference_distribution::{BigRational, CountNamingMethod, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
+use stv::preference_distribution::{BigRational, CountNamingMethod, KeepValuesNotUsed, LastParcelUse, PreferenceDistributionRules, SurplusTransferMethod, TransferValueMethod, WhenToDoElectCandidateClauseChecking};
 use stv::tie_resolution::MethodOfTieResolution;
 use stv::transfer_value::{convert_usize_to_rational, round_rational_down_to_usize, TransferValue};
 
@@ -21,7 +21,8 @@ pub struct WALegislativeCouncil {
 
 impl PreferenceDistributionRules for WALegislativeCouncil {
     type Tally = usize;
-
+    type KeepValueType = KeepValuesNotUsed;
+    
     /// 8(b)
     /// ```text
     /// (b) the total number (if any) of other votes obtained by the

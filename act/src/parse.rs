@@ -1,4 +1,4 @@
-// Copyright 2021-2025 Andrew Conway.
+// Copyright 2021-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -56,7 +56,7 @@ impl ElectionDataSource for ACTDataSource {
     fn name(&self) -> Cow<'static, str> { "ACT Legislative Assembly".into() }
     fn ec_name(&self) -> Cow<'static, str> { "Elections ACT".into() }
     fn ec_url(&self) -> Cow<'static, str> { "https://www.elections.act.gov.au/".into() }
-    fn years(&self) -> Vec<String> { vec!["2008".to_string(),"2012".to_string(),"2016".to_string(),"2020".to_string()] } // 2020.0 means the original DoP not the fixed result posted in 2021.
+    fn years(&self) -> Vec<String> { vec!["2008".to_string(),"2012".to_string(),"2016".to_string(),"2020".to_string(),"2024".to_string()] } // 2020.0 means the original DoP not the fixed result posted in 2021.
     fn get_loader_for_year(&self,year: &str,finder:&FileFinder) -> anyhow::Result<Box<dyn RawDataSource+Send+Sync>> {
         match year {
             "2008" => Ok(Box::new(get_act_data_loader_2008(finder)?)),
