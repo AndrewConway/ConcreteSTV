@@ -1,4 +1,4 @@
-// Copyright 2024 Andrew Conway.
+// Copyright 2024-2026 Andrew Conway.
 // This file is part of ConcreteSTV.
 // ConcreteSTV is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 // ConcreteSTV is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
@@ -15,12 +15,6 @@ use main_app::rules::Rules;
 #[clap(version = "0.3", author = "Andrew Conway", name="ConcreteSTV")]
 /// Count STV elections using a variety of rules and compare the results
 struct Opts {
-    /*
-    /// The counting rules to use.
-    /// Currently supported AEC2013, AEC2016, AEC2019, FederalPre2021, FederalPost2021, FederalPost2021Manual, ACTPre2020, ACT2020, ACT2021, NSWLocalGov2021, NSWECLocalGov2021, NSWECRandomLGE2012, NSWECRandomLGE2016, NSWECRandomLGE2017, NSWECRandomLC2015, NSWECRandomLC2019, Vic2018, WA2008
-    rules : Rules,
-*/
-
     /// The name of the .stv (or .vchange) file to get votes from
     #[clap(value_parser)]
     votes : PathBuf,
@@ -47,8 +41,10 @@ fn main() -> anyhow::Result<()> {
         Rules::ACTPre2020,Rules::ACT2020,Rules::ACT2021,
         Rules::NSWLocalGov2021,Rules::NSWECLocalGov2021,
         Rules::Vic2018,
-        Rules::WA2008];
-    let comparison = RulesComparisonGroups::create(&votes,&rules)?;
+        Rules::WA2008,
+        Rules::NZMeekLegislation,
+        Rules::NZMeekApocryphal,];
+    let comparison = RulesComparisonGroups::create(&votes,&rules,false)?;
     if opt.json { println!("{}",serde_json::to_string(&comparison)?) }
     else { println!("{:.*}",opt.detail.unwrap_or(3),comparison)}
     Ok(())
