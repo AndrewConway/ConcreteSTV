@@ -222,7 +222,9 @@ pub fn read_raw_data_checking_against_official_transcript_to_deduce_ec_resolutio
     // let mut tie_resolutions = TieResolutionsMadeByEC::default();
     let official_transcript = loader.read_official_dop_transcript(&data.metadata)?;
     // let mut initial_ec_decisions = data.metadata.tie_resolutions.clone(); // should be empty, unless we set it up some way else.
-    data.metadata.tie_resolutions=TieResolutionsMadeByEC::default(); // Get rid of less fine grained decisions that may be entered.
+    if !(data.metadata.name.electorate=="Upper Lachlan Shire" && data.metadata.name.year=="2024" && data.metadata.name.authority=="NSW Electoral Commission") { // there is a tie on count 1 for election order which is not dealt with well below, and has the decision hard coded by the loader.
+        data.metadata.tie_resolutions=TieResolutionsMadeByEC::default(); // Get rid of less fine grained decisions that may be entered.
+    }
     loop {
         println!("Looping...");
         let transcript = data.distribute_preferences::<Rules>(&mut Randomness::ReverseDonkeyVote);

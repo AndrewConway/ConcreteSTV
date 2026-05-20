@@ -42,7 +42,7 @@ fn main()  -> anyhow::Result<()> {
     for source in get_all_elections() {
         std::fs::create_dir_all("compare_lots_of_rules")?;
         for year in source.years() {
-            println!("Trying {} {}",source.name(),&year);
+            println!("\n\n\n## Trying {} {}\n",source.name(),&year);
             let loader = source.get_loader_for_year(&year,&FileFinder::find_ec_data_repository())?;
             for electorate in loader.all_electorates() {
                 let votes = loader.load_cached_data(&electorate)?;
@@ -58,7 +58,7 @@ fn main()  -> anyhow::Result<()> {
                     }
                 };
                 if comparison.has_different_winners() { println!("Different winners for {} : {}",electorate,comparison)}
-                else if comparison.has_different_orders() { println!("Different order for {} : {}",electorate,comparison)}
+                else if comparison.has_different_orders() { println!("Same winners, different order for {}",electorate)}
                 else { println!("Same winners for {}",electorate)}
             }
         }
