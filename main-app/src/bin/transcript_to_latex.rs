@@ -107,7 +107,7 @@ fn print_transcript<T:Copy+ToString+Eq+Ord+Sub<Output=T>+Clone+Display+FromStr+Z
             ReasonForCount::FirstPreferenceCount => "First Preferences".to_string(),
             ReasonForCount::ExcessDistribution(c) => format!("Surplus {}",metadata.candidate(*c).name),
             ReasonForCount::Elimination(cs) => format!("Exclude {}",cs.iter().map(|c|metadata.candidate(*c).name.clone()).collect::<Vec<_>>().join(", ")),
-            ReasonForCount::MeekIteration => panic!("Meek Iteration currently not supported"), // FIXME
+            ReasonForCount::MeekIteration => "".to_string(),
         };
 
         if use_deltas {
@@ -211,7 +211,7 @@ fn print_transcript<T:Copy+ToString+Eq+Ord+Sub<Output=T>+Clone+Display+FromStr+Z
             let candidate = CandidateIndex(i);
             if use_candidate(candidate) {
                 line+=" & ";
-                if is_elected.contains(&candidate) { line+=r"{\color{RoyalPurple} "; }
+                if is_elected.contains(&candidate) { line+=r"{\color{violet} "; }
                 // else if count.not_continuing.contains(&candidate) && !use_deltas { line+=r"$\downarrow$ " }
                 let mut entry = possibly_blank(status.tallies.candidate[i]);
                 if entry.is_empty() {
@@ -245,7 +245,7 @@ fn print_transcript<T:Copy+ToString+Eq+Ord+Sub<Output=T>+Clone+Display+FromStr+Z
     }
     let mut caption = format!("Elected : {}.",elected_names.join(", "));
     caption+=&format!(" Rules used : {}.",transcript.transcript.rules);
-    caption+=" Elected candidates are colored purple once they have a quota.";
+    caption+=" Elected candidates are colored violet once they have a quota.";
     if ever_used_papers_line { caption+=" Lines in green are papers rather than votes.";}
     if ever_used_superscript { caption+=" Superscripts are the number of papers corresponding to the given number of votes."}
     println!("{}",r"\hline");
@@ -273,7 +273,7 @@ fn main() -> anyhow::Result<()> {
         // we have some votes, make a latex table out of it.
     } else if let Ok(transcript) = { let file = File::open(&opt.file)?; serde_json::from_reader::<_,TranscriptWithMetadata<usize>>(file) } {
         print_transcript(transcript,&opt);
-    } else if let Ok(transcript) = { let file = File::open(&opt.file)?; serde_json::from_reader::<_,TranscriptWithMetadata<FixedPrecisionDecimal<6>>>(file) } {
+    } else if let Ok(transcript) = { let file = File::open(&opt.file)?; serde_json::from_reader::<_,TranscriptWithMetadata<FixedPrecisionDecimal<9>>>(file) } {
         print_transcript(transcript,&opt);
     } else {
         println!("The input file was neither a valid .stv nor .transcript file, so I'm giving up and going to a corner to sulk.");
