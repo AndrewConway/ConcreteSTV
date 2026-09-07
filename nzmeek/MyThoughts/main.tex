@@ -1,0 +1,442 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\title{The Meek STV algorithm, Rounding, and New Zealand rules}
+\author{Andrew Conway}
+\date{May 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Meek in theory}
+
+The Meek algorithm\cite{meek_nouvelle_1969,meek_1969_en,meek_1970_en} is simpler conceptually than more conventional STV algorithms
+as there are fewer issues of timing etc.
+
+Let there be $C$ candidates, $S$ seats and $T$ voters who completed valid ballots.
+
+As with most STV algorithms, a quota $Q$ is determined as a value just high enough to
+ensure that no more than $S$ candidates can exceed it if the $T$ votes are divided
+between them, using the following formula, where $\epsilon$ is a small value:
+\begin{equation} \label{eq:quota_original}
+    Q = {{T}\over{S+1}} + \epsilon
+\end{equation}
+
+The algorithm then consists of some number of steps, each step distributing the 
+votes between the candidates. If at any point a candidate gets more than $Q$, that
+candidate is elected. Once $C$ candidates are elected, the count is done.
+
+Each candidate is assigned a keep value, $0\leq k_i\leq 1$ where $i$ indicates the candidate.
+Consider a ballot $b$ to have first preference for candidate $b_1$, second preference
+for candidate $b_2$, etc. The vote starts off with value $1$, which gets passed to
+candidate $b_1$. This candidate keeps $k_{b_1}$ of this value - it is added to that
+candidate's tally, and passes on the remaining $1-k_{b_1}$ value to $b_2$.
+Candidate $b_2$ then keeps $k_{b_2}$ of this $1-k_{b_1}$ value and passes the
+remaining $(1-k_{b_1})(1-k_{b_2})$ value on to $b_3$. This continues until the
+ballot is exhausted, and the remaining $(1-k_{b_1})(1-k_{b_2})...$ value (if any)
+is counted as exhausted. That is, the value of a vote on ballot $b$ for candidate $m$
+is
+\begin{equation} \label{eq:vm}
+    v_m = (1-k_{b_1})(1-k_{b_2})...(1-k_{b_{j-1}})k_{b_j=m}
+\end{equation}
+and the number of exhausted votes is
+\begin{equation} \label{eq:exhaust}
+    (1-k_{b_1})(1-k_{b_2})...
+\end{equation}
+Unlike most STV algorithms, the quota is then updated,
+subtracting the number of exhausted votes $E$ from $T$:
+\begin{equation} \label{eq:quota}
+    Q = {{T-E}\over{S+1}} + \epsilon
+\end{equation}
+
+
+The keep values are determined by the following process:
+\begin{itemize}
+    \item All keep values start off at 1.
+    \item Elected candidates (with a tally $\geq Q$) have their keep value reduced such that the candidates each end up with a tally of $Q$ after recounting with the new keep values.
+    \item If an insufficient number of candidates have been elected by the prior steps,
+    the candidate with the lowest tally is excluded: their keep value is set permanently
+    to zero, and the tallies are recomputed.
+\end{itemize}
+This process continues until $S$ candidates are elected.
+
+Determining which keep values are appropriate to make the elected candidates have a tally
+of $Q$ each is not an obvious task: this involves solving a set of nonlinear
+simultaneous equations. Fortunately there is a simple iterative step which
+can be continued to arbitrary accuracy:
+\begin{itemize}
+    \item For each elected candidate $i$ with a tally $t_i\geq Q$, with keep value $k_i$ compute
+    a new keep value $n_i$ via \begin{equation}\label{eq:new_keep_value}
+        n_i = k_i \times {Q\over t_i}.
+    \end{equation}Since $k_i>0$, $Q>0$, and $t_i\geq Q>0$, the new keep value satisfies $0<n_i\leq k_i\leq 1$.
+    \item Replace the old keep values $k_i$ by the new keep values $n_i$, and recompute
+    tallies. Recompute the quota as the number of exhausted votes may have increased.
+    \item Note that this will reduce each elected candidate's tally by $t_i-Q\geq 0$,
+    and redistribute the extra vote value $t_i-Q\geq 0$ amongst other candidates,
+    including possibly other elected candidates or exhausted votes. Extra votes going
+    to other elected candidates will raise their tallies above the quota; extra votes
+    going to the exhausted vote tally will lower the quota; both of these will mean
+    that there will be candidates with tallies higher than the quota. In this case,
+    repeat the prior two steps until the values converge to some required accuracy.
+\end{itemize}
+
+
+Note that there are some important invariants of the Meek process that are useful
+for guaranteeing convergence and some other purposes that will be discussed later:
+\newcounter{invariant}
+\newenvironment{invariant}[1][]{\refstepcounter{invariant}\par\medskip
+   \noindent\textbf{Invariant \theinvariant. #1} \rmfamily}{\medskip}
+
+\begin{invariant}\label{iv:nonnegative}
+    \emph{Tallies can't be negative.} Nothing in equations \ref{eq:vm} or \ref{eq:quota}
+    can be negative.
+\end{invariant}   
+
+\begin{invariant}\label{iv:const_sum}
+    \emph{The total tallies of candidates plus exhausted votes is constant.} The sum
+    over all candidates of equation \ref{eq:vm} plus exhausted value is exactly 1. Each
+    ballot will always provide total value 1.
+\end{invariant}   
+
+\begin{invariant}\label{iv:keep_never_inc}
+    \emph{Keep values never increase.} Keep values can only decrease by equation \ref{eq:new_keep_value} which is only applied when $t_i\geq Q$. Excluding candidates also
+    only decreases keep values.
+\end{invariant}   
+
+\begin{invariant}\label{iv:cant_decrease_others}
+    \emph{Reducing one candidate's keep value cannot decrease other candidate's tallies.}
+    The value a ballot has for a candidate (equation \ref{eq:vm}) 
+    is unaffected by the keep values of other
+    candidates with a lower position on the ballot and is proportional to one minus the
+    keep value for candidates higher on the ballot. This means it can increase but not
+    decrease.
+\end{invariant}   
+
+\begin{invariant}\label{iv:exhausted_monotonic}
+    \emph{The number of exhausted votes never decreases.} Reducing keep values can
+    transfer extra vote value into the exhausted category, but cannot decrease it.
+\end{invariant}   
+
+\begin{invariant}\label{iv:quota_monotonic}
+    \emph{The quota never increases.} The quota decreases as the exhausted votes increase.
+    As the exhausted votes never decreases (invariant \ref{iv:exhausted_monotonic}), the quota can't increase.
+\end{invariant}   
+
+\begin{invariant}\label{iv:elected_geq_quota}
+    \emph{Elected candidates never drop below quota.} Dropping a candidate's keep value
+    via equation \ref{eq:new_keep_value} means that their tally will drop to $Q$,
+    plus any new vote weight received from other candidates' keep value reduction.
+    This will be no less than the old quota (invariant \ref{iv:cant_decrease_others}). The new quota is no higher than the
+    old quota (invariant \ref{iv:quota_monotonic}), so the tally will remain higher than the quota.
+\end{invariant}   
+
+\begin{invariant}\label{iv:exhausted_not_loophole}
+    \emph{The extra votes released by a reduction in quota is fewer than the exhausted votes that caused it.} When the number of exhausted votes increases by some amount
+    $\delta>0$, this causes the quota to decrease by $\delta\over{(S+1)}$. Each elected
+    candidate is now $\delta\over{(S+1)}$ further over quota, so there are 
+    $\delta\over{(S+1)}$ more votes to distribute for each elected candidate. But
+    there are no more than $S$ candidates elected, so the total amount of extra votes
+    to distribute is no more than $\delta{S\over{(S+1)}}<\delta$.
+\end{invariant}   
+
+\begin{invariant}\label{iv:increase_leq_surplus}
+    \emph{Without exclusions, the total increase of any tally by infinite iterations of this process cannot be greater than the total surplus (sum of the excess of the tallies of elected candidates over the quota at any point).} The process will redistribute this excess over other candidates. The
+    maximum effect this can have on a particular candidate will be if all this value
+    goes to that candidate. If some goes to exhausted votes this will make more available
+    for redistribution, but less than it took away by being exhausted. If some goes to
+    some other candidate who then goes over quota, some of that can be distributed
+    back to the particular candidate, but the amount of this will be less than if
+    the value had gone directly to the particular candidate.
+\end{invariant}   
+
+\begin{invariant}\label{iv:dont_elect_too_many}
+    \emph{No more than $S$ candidates can reach quota.} By invariant \ref{iv:const_sum} The
+    total ballots remains at $T$, so the sum of candidate's tallies is $T-E$. As none
+    are negative (invariant \ref{iv:nonnegative}) this means that if $S+1$ of them were at
+    quota, their sum would be $(S+1)Q$ which by equation \ref{eq:quota} is $T-E+(S+1)\epsilon>T-E$.
+\end{invariant}   
+
+\begin{invariant}\label{iv:lowest_doomed}
+    \emph{If the lowest tally is smaller than the second lowest tally by more than
+    the total surplus (see invariant \ref{iv:increase_leq_surplus}), one can skip
+    further iterations and exclude the candidate with the lowest tally}. 
+    Invariant \ref{iv:increase_leq_surplus} says that, between exclusions, 
+    the lowest candidate cannot increase in tally by more than the total surplus.
+    Furthermore, invariant \ref{iv:cant_decrease_others} 
+    says that the other (unelected) candidates' tallies cannot decrease. So
+    the lowest candidate can never catch up. This allows a huge optimization in
+    the algorithm, skipping the iteration to convergence, and making the transcript
+    much shorter and therefore amenable to human scrutiny.
+\end{invariant}
+
+\subsection{Convergence issues}
+
+Convergence behaviour is generally fast and reliable \cite{meek_nouvelle_1969,meek_1969_en,meek_1970_en}, helped by the 
+monotonicity guarantees above, the structure of the updates, and the $S+1$
+factor in equation \ref{eq:quota}. However there is no obvious theoretical answer
+I am aware of to decide what the cutoff for detecting convergence should be.
+
+The cutoff matters, as it is conceivable that one could come up with a
+pathological case where different cutoffs lead to different candidates being
+elected. However a sufficiently small threshold (affecting well under a thousandth of a
+vote, for instance) makes this very unlikely and furthermore so close to a tie
+that its effect is hard to criticize as a failure of democracy. Of course, it is
+important to specify the cutoff before the election when it is non-partisan so
+that no candidate can reasonably complain to have been unfairly dealt with.
+
+So far time complexity has been largely ignored - for millions of votes, the
+running time on modern computers would be measured in seconds. The optimization
+suggested in invariant \ref{iv:lowest_doomed} makes this even faster, and makes
+the transcript of counts much more human readable. However, it does change the initial
+keep values for the next iteration step, changing the path to convergence, and,
+in the (necessary) presence of a finite cutoff for accepting sufficient convergence,
+may (although almost certainly not) result in a different candidate being excluded.
+Again, this is due to something that is within a tiny amount. Typically this would
+be vastly under one vote), so it is not a serious issue, as long as the 
+process used is specified carefully in advance to prevent partisan claims.
+
+\subsection{Finite precision arithmetic}
+
+The algorithm above is presented using mathematical, infinite precision, numbers.
+While all computations could in principle be done with exact rational arithmetic,
+a finite precision is usually easier to work with on computer. Most Australian STV
+algorithms round vote tallies to integers for ease (ACT rounds to six decimal places).
+Even for pedantic pompous purists (like the author) there is little to gain from
+exact rational tallies given an iterative algorithm that will not necessarily converge
+to rational numbers, and an associated convergence cutoff that implies finite
+precision.
+
+The big issue that rounding can bring in is that the above equations are no longer
+exact, and many of the mathematical invariants may not be true, depending on how
+the rounding is done. In particular, rounding may violate invariant \ref{iv:const_sum}
+and possibly \ref{iv:elected_geq_quota}. These invariants no longer holding can
+cause other invariants, such as invariant \ref{iv:dont_elect_too_many} to not hold, 
+which is disastrous for an election system.
+
+In Australian STV elections (which do not use the Meek algorithm), rounding is almost
+universally downwards. This prevents the creation of votes above the original
+$T$ and this prevents the rounding from allowing more than $S$ candidates to
+exceed quota.
+
+However, for Meek, always rounding down can be a problem, as rounding down can be 
+thought of as equivalent to using a lower value of a keep value than 
+one should. This would mean that \ref{iv:elected_geq_quota} does not necessarily
+hold, which could cause other cascading problems.
+
+Fortunately there is a reasonable rounding strategy for Meek.
+
+\newcounter{roundingrule}
+\newenvironment{roundingrule}[1][]{\refstepcounter{roundingrule}\par\medskip
+   \noindent\textbf{Rounding rule \theroundingrule. #1} \rmfamily}{\medskip}
+
+\begin{roundingrule} \label{rr:keep}
+    \emph{When computing equation \ref{eq:new_keep_value}, round up.}
+    Looking at equation \ref{eq:new_keep_value}, the ratio ${Q\over t_i}$ will never
+be greater than 1 or less than zero, regardless of rounding. 
+So if one rounds up\footnote{Either after doing all operations or first round up ${Q\over t_i}$ then round up the multiplication},
+we retain the properties that $0\leq n_i \leq k_i \leq 1$ and $n_i \times {t_i/k_i} \geq Q$.
+These properties maintain invariants \ref{iv:keep_never_inc} and \ref{iv:elected_geq_quota}.
+\end{roundingrule}
+
+\begin{roundingrule} \label{rr:vm}
+    \emph{When computing equation \ref{eq:vm}, 
+    round down all multiplications except the last, which should be rounded up.
+    Perform multiplications left to right.}
+    Looking at equation \ref{eq:vm}, we can think of this as the vote value passing
+through successive keep values, some staying with that candidate, and some getting
+passed on. In order to retain invariant \ref{iv:const_sum}, it is sufficient to 
+ensure that one of these is rounded down, and the other is rounded up. Rounding down
+the kept value is equivalent to reducing the keep value which could violate 
+\ref{iv:elected_geq_quota}. Rounding up the kept value is equivalent to having a slightly
+higher keep value. This appears to violate invariant \ref{iv:keep_never_inc}, however it
+is not as serious as it looks. In particular, the outgoing value of the multiplication
+will be no lower than the prior iteration, which maintains \ref{iv:cant_decrease_others}.\footnote{I would be happier if I had a formal proof that it could not cause any problems. But it seems much better than the alternatives.}
+\end{roundingrule}
+
+\begin{roundingrule}\label{rr:exhausted}
+    \emph{When computing equation \ref{eq:exhaust} for exhausted (non-transferrable) votes,  
+    $(1-k_{b_1})(1-k_{b_2})...$,
+    round down each multiplication and perform multiplications left to right.}
+    This is the logical extension of rounding rule \ref{rr:vm}, and maintains
+    invariants \ref{iv:const_sum} and \ref{iv:exhausted_monotonic}.
+\end{roundingrule}
+
+
+
+
+\section{New Zealand Meek rules}
+
+Meek's STV algorithm was greatly loved by voting geeks, but as far as I
+know, was unused for government elections 
+until New Zealand decided to use it for some local government
+elections. Bravo New Zealand! 
+
+The regulations\footnote{\href{https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2001/145/en/latest/\#DLM57125}{https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2001/145/en/latest/\#DLM57125}} are unusually well
+written, and are generally a good model that I would strongly recommend to 
+anyone thinking of setting up their own legislation. However there are a
+few ambiguities in the timing of clauses 23, 43 and 48 that should be 
+made explicit, and some serious problems with clause 10, which this document
+is primarily designed to describe.
+
+As background, keep values and tallies are both kept
+to nine decimal places, and the $\epsilon$
+in equation $\ref{eq:quota}$ is no more than a billionth of a vote (clauses 5 and 11). 
+The convergence requirement to perform an exclusion is either a total surplus
+less than 0.0001, the optimization in invariant \ref{iv:lowest_doomed} 
+(clauses 13 and 14), or a catch-all oracle (clause 23). This is sufficient
+precision that little would be gained by higher precision.
+
+
+Clause 10 says (with some minor formatting changes):
+\begin{quote}
+Allocate votes from each voting document according to the following scheme:
+
+      $v_m$ = (1 – $k_1$) × (1 – $k_2$) × (1 – $k_{m-1}$) × $k_m$
+
+where—
+
+$v_m$ is the votes to allocate to the mth preference candidate on the voting document
+
+$k_1$ is the keep value for the first preference candidate on the voting document
+
+$k_2$ is the keep value for the second preference candidate on the voting document
+
+$k_m$ is the keep value for the mth preference candidate on the voting document
+
+and the product of each multiplication on the right hand side of the equation must be calculated to 9 decimal digits after the point and rounded up if not exact and the multiplications must be calculated from left to right.
+\end{quote}
+
+This is exceedingly explicit, and seems unambiguous, both good properties 
+of legislation. 
+
+Comparing equation \ref{eq:vm} and the equation in the regulations,
+they are the same other than the missing ellipsis. Presumably the regulations
+did not mean to ignore the keep value of the third, fourth, etc. preference
+(doing so would mean it would be very easy for a huge number of candidates to
+go over quota - far more than the number of vacancies). I assume this is
+just a typo.
+
+More concerning, the rounding rule is explicit and unambiguous, and very
+similar but different from rounding rule \ref{rr:vm}.
+
+I believe that the actual rounding rule that is used in practice
+in the New Zealand elections is rounding rule \ref{rr:vm} rather than
+the rule specified in clause 10\footnote{Evidence: I can match the numbers
+given in transcripts if I use rounding rule \ref{rr:vm} but not if I
+use the rounding rules in clause 10.}. This note is not a 
+call to New Zealand to the change way they count, but rather to explain why
+I would recommend anyone writing similar legislation to use rounding rule
+\ref{rr:vm} rather than copying clause 10.
+
+\subsection{Is this rounding difference a problem?} 
+
+\label{sec:roundingproblem}
+
+Superficially it seems insignificant - a matter of less
+than a billionth of a vote seems tiny when I earlier dismissed without justification
+the vastly larger 0.0001 convergence cutoff as sufficiently accurate. 
+
+There are two main problems:
+\begin{itemize}
+    \item That rounding rule violates some of the invariants, which can
+    cause severe problems including potentially electing more than the desired number
+    of candidates
+    \item The definition in clause 2 of non-transferable votes becomes ambiguous:
+    \begin{quote}
+        \emph{non-transferable votes} means the votes remaining untransferred when a voting document becomes exhausted
+    \end{quote}    
+\end{itemize}
+
+There are two somewhat plausible interpretations in my mind (remember I am not a lawyer)
+of the above definition of non-transferable votes:
+\begin{itemize}
+\item \emph{Approach 1:} Extrapolate the definition of clause 10:
+      use equation \ref{eq:exhaust}, with the same rounding rule as clause 10.
+      This has the disadvantage that the total value of votes can easily be
+      greater than 1, which violates invariant \ref{iv:const_sum} and does not
+      feel like an intended property.
+\item \emph{Approach 2:} Maintain invariant \ref{iv:const_sum} and insist that
+      each vote has value 1, by stating that the value of a vote that is
+      untransferred is 1 minus the sum of all the $v_m$ values for that vote.
+      This has the disadvantage that for ballots that list all candidates - for
+      which one would expect there to be no untransferred votes - this number
+      will often be negative violating invariant \ref{iv:nonnegative}. 
+      This does not seem to be an intended property either.
+\end{itemize}
+
+Note that if rounding rule \ref{rr:vm} were used, these two approaches would produce the
+same value and violate neither invariant \ref{iv:nonnegative} nor \ref{iv:const_sum}.
+
+Both approaches violate foundational invariants used to justify various properties
+of the Meek system and cause cascading problems with other invariants.
+
+Approach 1 is a terrible idea in practice, as it can easily lead to invariant
+\ref{iv:dont_elect_too_many} to be violated, electing too many candidates.
+This is caused by the value of a vote being greater than 1 - by a few billionths,
+per vote. This few billionths gets multiplied by the number of votes,
+making the extra votes many billionths. These extra votes are easily enough to 
+exceed the $\epsilon$ in formula \ref{eq:quota} which in New Zealand is a billionth.
+A practical example of this problem is given in figure \ref{fig:too_many_elected}.
+
+Approach 2 is a bad idea in practice. While I cannot see how it could cause the
+election to fail as badly as approach 1, it ends up violating at least invariants \ref{iv:nonnegative},
+\ref{iv:exhausted_monotonic}, \ref{iv:quota_monotonic}, \ref{iv:elected_geq_quota},
+\ref{iv:increase_leq_surplus}, and \ref{iv:lowest_doomed}. It is not clear
+to me what problems this could cause.
+
+\begin{figure}
+{\footnotesize
+
+\begin{tabular}{r|rrrrr}
+Count & A & B & C & D & E \\ \hline
+1 & {\color{violet} 10} & {\color{violet} 10} & 0 & 0 & 0\\
+2  & {\color{violet} 6.40000002} & {\color{violet} 6.40000002} & {\color{violet} 7.19999998} & 0 & 0\\
+3  & {\color{violet} 4.375} & {\color{violet} 4.375} & {\color{violet} 6.25000004} & 2.49999999 & 2.49999999\\
+4  & {\color{violet} 4.0489796} & {\color{violet} 4.0489796} & {\color{violet} 4.23183676} & 3.83510204 & 3.83510204\\
+5  & {\color{violet} 4.00624351} & {\color{violet} 4.00624351} & {\color{violet} 4.02872522} & 3.9793939 & 3.9793939\\
+6  & {\color{violet} 4.0007934} & {\color{violet} 4.0007934} & {\color{violet} 4.0036372} & 3.99738802 & 3.99738802\\
+7  & {\color{violet} 4.0001008} & {\color{violet} 4.0001008} & {\color{violet} 4.00046182} & 3.99966831 & 3.99966831\\
+8 Exclude J & {\color{violet} 4.00001282} & {\color{violet} 4.00001282} & {\color{violet} 4.00005866} & 3.99995787 & 3.99995787\\
+9 Exclude G & {\color{violet} 4.00000164} & {\color{violet} 4.00000164} & {\color{violet} 4.00000746} & 3.99999465 & 3.99999465\\
+10 Exclude K & {\color{violet} 4.00000021} & {\color{violet} 4.00000021} & {\color{violet} 4.00000096} & 3.99999933 & 3.99999933\\
+11 Exclude H & {\color{violet} 4.00000004} & {\color{violet} 4.00000004} & {\color{violet} 4.00000012} & 3.99999992 & 3.99999992\\
+12 Exclude F & {\color{violet} 4.00000001} & {\color{violet} 4.00000001} & {\color{violet} 4.00000002} & 3.99999999 & 3.99999999\\
+13 Exclude I & {\color{violet} 4.00000001} & {\color{violet} 4.00000001} & {\color{violet} 4.00000002} & 4 & 4\\
+14  & {\color{violet} 4.00000001} & {\color{violet} 4.00000001} & {\color{violet} 4} & {\color{violet} 4.00000001} & {\color{violet} 4.00000001}\\
+\hline
+\end{tabular}
+}
+    % \includegraphics[width=0.5\linewidth]{}
+    \caption{An example of an election disaster using approach 1 in section \ref{sec:roundingproblem}.
+    There are 11 candidates, named A, B, C, ... K. There are 4 vacancies and 20 voters.
+    The quota remains at 4.000000001 as there are no non-transferrable votes.
+    Ten voters vote (in order) A,B,C,D,E,F,G,H,I,J,K. The other ten voters vote B,A,C,E,D,F,G,H,I,J,K.
+    There are no non-transferable votes as all voters list all candidates.
+    The table above show the tallies for candidates A to E, one per column. Candidates F to K are not
+    shown as they are all zero. Tallies are marked in purple once the candidate is elected due to exceeding quota. The rounding column shows votes gained through rounding. 
+    On the fourteenth iteration, candidates D and E both go over quota, causing
+    five candidates to be elected for the four vacancies. 
+    }
+    \label{fig:too_many_elected}
+\end{figure}
+
+\section{Conclusion}
+
+The New Zealand Meek regulations are generally excellent and I would recommend them to anyone considering STV algorithms. 
+
+I recommend changing clause 10 to add an ellipsis in the 
+formula, and change the rounding rule to:
+\begin{quote}
+and the product of each multiplication on the right hand side of the equation must be calculated to 9 decimal digits after the point and rounded down if not exact for all but the last, and up if not exact for the last and the multiplications must be calculated from left to right.
+\end{quote}
+
+I also recommend making timing more explicit in clauses 23, 43 and 48, or using a different tie resolution mechanism.
+
+
+\bibliographystyle{plain} % We choose the "plain" reference style
+\bibliography{meek} % Entries are in the refs.bib file
+
+\end{document}

@@ -233,7 +233,7 @@ each multiplication by `each multiplication is rounded down, other than the last
 is both the obvious way to do this calculation, and, unlike the legislation, consistent with the published results,
 I expect this is what is actually used. This is used in the ConcreteSTV implementation **NZMeekApocryphal**. 
 
-I am working on writing a detailed description of these rounding issues.
+I have a long [rant, I mean detailed description,](nzmeek/MyThoughts/RoundingAndMeek.pdf) of these rounding issues.
 
 The legislation has a novel PRNG method for tie resolution that unambiguously resolves each tie. 
 This has the wonderful property that it avoids
@@ -245,7 +245,7 @@ I have interpreted it as a prescription rather than an action.
 
 There are also a variety of differences that are convincingly rumoured between the PRNG described in the
 legislation and the PRNG used in the implementation.
-A different implementation [https://github.com/Conservatory/openstv/blob/master/openstv/MethodPlugins/MeekNZSTV.py](of the NZ Meek algorithm)
+A different implementation [of the NZ Meek algorithm](https://github.com/Conservatory/openstv/blob/master/openstv/MethodPlugins/MeekNZSTV.py)
 signposts the following changes as probably being used in the official software (although like the author of the above software I can't check without access or sufficient examples).
 * Line 77: clause 42 has the 1000 in the formula for z replaced by 10,000.
 * Line 90: an extra mod 10,000 is inserted into the rc computation in clause 43. Seems plausible otherwise why have the 10,000 in the inversion?
