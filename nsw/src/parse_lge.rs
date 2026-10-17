@@ -404,7 +404,7 @@ impl NSWLGEDataLoader {
     fn parse_zip_election_file_getting_candidates_list_2012(&self, zipfile : File, electorate:&str, url_path:&str) -> anyhow::Result<ElectionMetadata> {
         let contest = self.find_contest(electorate)?;
         let mut zipfile = zip::ZipArchive::new(zipfile)?;
-        let entry_name = zipfile.file_names().find(|n|n.ends_with("CANDIDATES.txt")).ok_or_else(||anyhow!("Could not find CANDIDATES.txt in zip file"))?.to_string();
+        let entry_name = zipfile.file_names().filter_map(|r|r.ok()).find(|n|n.ends_with("CANDIDATES.txt")).ok_or_else(||anyhow!("Could not find CANDIDATES.txt in zip file"))?.to_string();
         let zip_contents = zipfile.by_name(&entry_name)?;
         let mut reader = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(zip_contents);
         let mut candidates = vec![];
@@ -824,7 +824,7 @@ pub(crate) fn parse_zip_election_file(zipfile : File, metadata:ElectionMetadata,
 /// There is a column, TYPE, that could be used to decode back into ATL votes, but this is not currently done.
 pub(crate) fn parse_zip_election_file_2012(zipfile : File, metadata:ElectionMetadata) -> anyhow::Result<ElectionData> {
     let mut zipfile = zip::ZipArchive::new(zipfile)?;
-    let entry_name = zipfile.file_names().find(|n|n.ends_with("PREFERENCES.txt")).ok_or_else(||anyhow!("Could not find PREFERENCES.txt in zip file"))?.to_string();
+    let entry_name = zipfile.file_names().filter_map(|r|r.ok()).find(|n|n.ends_with("PREFERENCES.txt")).ok_or_else(||anyhow!("Could not find PREFERENCES.txt in zip file"))?.to_string();
     let zip_contents = zipfile.by_name(&entry_name)?;
     let mut reader = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(zip_contents);
     let headings = reader.headers()?;

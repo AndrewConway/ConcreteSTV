@@ -154,7 +154,7 @@ pub(crate) fn read_btl_votes2013(metadata:&ElectionMetadata,path:&Path,min_btl_p
     {
         for i in 0..zipfile.len() {
             let mut file = zipfile.by_index(i)?;
-            if file.name().ends_with(".csv") {
+            if let Ok(name) = file.name() && name.ends_with(".csv") {
                 let mut dummy_buf = [0u8];
                 while dummy_buf[0]!=b'\n' {
                     // print!("{}",dummy_buf[0] as char);

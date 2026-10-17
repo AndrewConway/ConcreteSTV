@@ -9,6 +9,7 @@
 
 
 use rand::Rng;
+use rand::RngExt;
 
 #[derive(Default,Clone)]
 pub struct SampleWithReplacement<E> {

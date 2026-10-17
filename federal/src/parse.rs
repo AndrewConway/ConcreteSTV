@@ -346,7 +346,7 @@ impl RawDataSource for FederalDataLoader {
         {
             for i in 0..zipfile.len() {
                 let file = zipfile.by_index(i)?;
-                if file.name().contains(&metadata.name.electorate) {
+                if let Ok(name) = file.name() && name.contains(&metadata.name.electorate) {
                     return read_official_dop_transcript_work(file,metadata);
                 }
             }

@@ -217,7 +217,7 @@ fn parse_dop(path: &PathBuf, metadata: &ElectionMetadata) -> anyhow::Result<Offi
     {
         for i in 0..zipfile.len() {
             let file = zipfile.by_index(i)?;
-            if file.name().ends_with(".csv") {
+            if let Ok(name) = file.name() && name.ends_with(".csv") {
                 return parse_dop_csv(file,metadata);
             }
         }
